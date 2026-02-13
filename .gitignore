@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# VSCode extension
+*.vsix
+.vscode-test/
+
+# Source maps
+*.js.map
+*.d.ts.map
+
+# Test coverage
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+*.env
+*.env.local
+
+# IDE
+.idea/

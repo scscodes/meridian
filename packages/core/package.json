@@ -1,0 +1,20 @@
+{
+  "name": "@aidev/core",
+  "version": "0.0.1",
+  "description": "Core logic for the AIDev toolkit — zero IDE dependencies",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "vitest": "^1.3.0"
+  }
+}

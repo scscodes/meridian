@@ -29,6 +29,12 @@ export const VALID_LANGUAGES: readonly SupportedLanguage[] = [
   'python',
 ] as const;
 
+/** Minimum allowed value for agent.maxTurns */
+const AGENT_MIN_TURNS = 1;
+
+/** Minimum allowed value for agent.maxTokenBudget */
+const AGENT_MIN_TOKEN_BUDGET = 1000;
+
 // ─── Mode → Tier Mapping ───────────────────────────────────────────────────
 // Defines which model tier is used for each role (chat vs tool) per mode.
 // This is the core logic behind the performance/balanced/economy modes.
@@ -56,6 +62,10 @@ export function normalizeSettings(partial: Partial<ExtensionSettings>): Extensio
     commitConstraints: {
       ...DEFAULT_SETTINGS.commitConstraints,
       ...partial.commitConstraints,
+    },
+    agent: {
+      ...DEFAULT_SETTINGS.agent,
+      ...partial.agent,
     },
   };
 }
@@ -113,6 +123,15 @@ export function validateSettings(settings: ExtensionSettings): string[] {
     if (!VALID_LANGUAGES.includes(lang)) {
       errors.push(`Unsupported language: "${lang}". Supported: ${VALID_LANGUAGES.join(', ')}`);
     }
+  }
+
+  // Agent settings
+  const { agent } = settings;
+  if (agent.maxTurns < AGENT_MIN_TURNS) {
+    errors.push(`agent.maxTurns must be >= ${String(AGENT_MIN_TURNS)} (got ${String(agent.maxTurns)}).`);
+  }
+  if (agent.maxTokenBudget < AGENT_MIN_TOKEN_BUDGET) {
+    errors.push(`agent.maxTokenBudget must be >= ${String(AGENT_MIN_TOKEN_BUDGET)} (got ${String(agent.maxTokenBudget)}).`);
   }
 
   return errors;

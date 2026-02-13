@@ -7,6 +7,7 @@ import type {
   ModelTier,
   ModelRole,
   OperatingMode,
+  StopReason,
 } from '@aidev/core';
 import { resolveTier, resolveModelId } from '@aidev/core';
 import type { SettingsManager } from '../settings/index.js';
@@ -74,14 +75,30 @@ export class VscodeLmProvider implements IModelProvider {
     }
 
     // Build messages for the vscode.lm API
+    // TODO: Add native vscode.lm tool support when the LanguageModelChatRequestOptions.tools
+    // API stabilizes across VSCode versions. For now, tool calling is handled by the
+    // DirectApiProvider, and the agent loop gracefully handles providers that don't
+    // return toolCalls (treats response as final text).
     const messages = options.messages.map((msg) => {
       switch (msg.role) {
         case 'system':
           return vscode.LanguageModelChatMessage.User(`[System] ${msg.content}`);
         case 'user':
           return vscode.LanguageModelChatMessage.User(msg.content);
-        case 'assistant':
-          return vscode.LanguageModelChatMessage.Assistant(msg.content);
+        case 'assistant': {
+          let content = msg.content;
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            const toolCallSummary = msg.toolCalls
+              .map((tc) => `[Tool Call: ${tc.name}(${JSON.stringify(tc.arguments)})]`)
+              .join('\n');
+            content = content ? `${content}\n${toolCallSummary}` : toolCallSummary;
+          }
+          return vscode.LanguageModelChatMessage.Assistant(content);
+        }
+        case 'tool_result':
+          return vscode.LanguageModelChatMessage.User(
+            `[Tool Result${msg.toolCallId ? ` for ${msg.toolCallId}` : ''}]\n${msg.content}`,
+          );
         default:
           return vscode.LanguageModelChatMessage.User(msg.content);
       }
@@ -115,6 +132,7 @@ export class VscodeLmProvider implements IModelProvider {
           role: options.role,
           provider: model.vendor,
         },
+        stopReason: 'end_turn' as StopReason,
       };
     } finally {
       cancellation.dispose();

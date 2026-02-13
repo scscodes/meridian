@@ -1,7 +1,7 @@
 # AIDev — Project Specification
 
-> **Status**: Scaffold complete. Feature implementation pending.
-> **Last updated**: 2026-02-12
+> **Status**: Git tooling expanded — branch diff, conflict resolution, enhanced auto-commit.
+> **Last updated**: 2026-02-13
 
 This is the single source of truth for the AIDev extension. All architectural decisions, constraints, and conventions are recorded here. When in doubt, defer to this document.
 
@@ -107,6 +107,9 @@ Settings apply at both **user** (global) and **workspace** levels via standard V
 | `aidev.commitConstraints.suffix` | `string` | `""` | Required suffix |
 | `aidev.commitConstraints.enforcement` | `warn \| deny` | `warn` | Constraint violation handling |
 | `aidev.preCommitDryRun` | `boolean` | `true` | Dry-run hooks before commit |
+| `aidev.agent.maxTurns` | `number` | `10` | Max tool-call round-trips per agent run |
+| `aidev.agent.maxTokenBudget` | `number` | `32000` | Max total tokens per agent run |
+| `aidev.agent.systemPrompt` | `string` | `""` | Custom system prompt (empty = built-in) |
 
 ---
 
@@ -119,9 +122,27 @@ All providers implement `IModelProvider` (defined in `packages/core/src/types/mo
 ```
 isAvailable() → boolean
 listModels() → ResolvedModel[]
-sendRequest(options) → ModelResponse
+sendRequest(options) → ModelResponse      // options may include tools[]
 dispose()
 ```
+
+### Tool Calling Protocol
+
+Providers support structured tool calling via `ModelRequestOptions.tools` and `ModelResponse.toolCalls`:
+
+- **DirectApiProvider**: Full tool calling via Anthropic tool_use / OpenAI function calling wire formats. Translates `ToolDefinition[]` to native format, parses `ToolCall[]` from responses.
+- **VscodeLmProvider**: Text-based fallback — tool calls/results are serialized as labeled text blocks. Native `vscode.lm` tool support planned when the API stabilizes across VSCode versions.
+
+Key types (all in `packages/core/src/types/models.ts`):
+
+```
+ToolDefinition    { name, description, inputSchema }
+ToolCall          { id, name, arguments }
+ToolResult        { toolCallId, content, isError? }
+StopReason        'end_turn' | 'tool_use' | 'max_tokens'
+```
+
+`ChatMessage` supports `role: 'tool_result'` for feeding tool execution results back into the conversation.
 
 ### Available Providers
 
@@ -193,7 +214,28 @@ This is the **single source of truth** for tool metadata. Chat commands, VSCode 
 ```
 getToolEntry(id: ToolId) → ToolRegistryEntry | undefined
 getToolByCommand(command: string) → ToolRegistryEntry | undefined
+getAutonomousTools() → ToolRegistryEntry[]
+getToolDefinitions(filter?) → ToolDefinition[]
 ```
+
+### Tool Invocation Classification
+
+Each tool has an `invocation` mode (`ToolInvocationMode`) that controls whether the model can call it autonomously during the agentic loop:
+
+| Tool | Invocation | Rationale |
+|------|-----------|-----------|
+| `dead-code` | `autonomous` | Read-only analysis |
+| `lint` | `autonomous` | Read-only analysis |
+| `tldr` | `autonomous` | Read-only summarization |
+| `branch-diff` | `autonomous` | Read-only branch comparison |
+| `comments` | `restricted` | Proposes file modifications |
+| `commit` | `restricted` | Proposes git staging + commit (or applies/amends) |
+| `diff-resolve` | `restricted` | Proposes conflict resolutions (modifies files) |
+
+- **`autonomous`**: Model invokes freely during the agent loop. No user confirmation needed.
+- **`restricted`**: Requires explicit user slash command or confirmation prompt. Enforces the proposal-based constraint.
+
+Each `ToolRegistryEntry` also carries `inputSchema` (JSON Schema) used to build `ToolDefinition[]` for the model's tool calling payload.
 
 ### Tool Interface
 
@@ -241,8 +283,17 @@ export(result: ScanResult, format: ExportFormat) → string
 | **Class** | `CommitTool` in `packages/core/src/tools/commit/index.ts` |
 | **Strategy** | Git status → auto-stage → model-generated message → constraint validation → hook dry-run |
 | **Scope** | Changed files in workspace (or user-specified paths) |
-| **Output** | `CommitProposal` for user approval — **never auto-commit** |
+| **Output** | `CommitProposal` for user approval — **never auto-commit in propose mode** |
 | **Constraints** | Min/max length, prefix/suffix, enforcement (warn/deny) |
+| **Actions** | `propose` (default), `apply`, `amend` — see input schema below |
+
+**Input schema**: `{ action?: 'propose'|'apply'|'amend', message?: string, paths?: string[] }`
+
+- **`propose`** (default): Detect changes, stage, generate message via model, return proposal.
+- **`apply`**: Stage files, validate provided message, create the commit. Requires `message`.
+- **`amend`**: Amend the last commit with a new message. Requires `message`.
+
+Conversational refinement is handled by the agent loop: the model proposes, the user gives feedback, the model adjusts, and calls `apply` or `amend` once confirmed.
 
 #### 5. TLDR (`tldr`)
 
@@ -253,6 +304,33 @@ export(result: ScanResult, format: ExportFormat) → string
 | **Scope** | Adaptive — file, directory, or entire project based on user query |
 | **Output** | `TldrSummary` with highlights and commit references |
 
+#### 6. Branch Diff (`branch-diff`)
+
+| | |
+|---|---|
+| **Class** | `BranchDiffTool` in `packages/core/src/tools/branch-diff/index.ts` |
+| **Strategy** | Fetch remote → ahead/behind → incoming/outgoing commit logs → diff summary |
+| **Scope** | Current branch vs its remote tracking branch |
+| **Output** | `BranchComparison` with ahead/behind, commit lists, diff stat |
+| **Invocation** | `autonomous` — read-only |
+
+**Input schema**: `{ remote?: string, fetch?: boolean }`
+
+#### 7. Diff Resolver (`diff-resolve`)
+
+| | |
+|---|---|
+| **Class** | `DiffResolveTool` in `packages/core/src/tools/diff-resolve/index.ts` |
+| **Strategy** | Detect conflict state → parse markers → classify safe vs complex → model-assisted resolution |
+| **Scope** | Files with unresolved merge/rebase/cherry-pick conflicts |
+| **Output** | `ConflictResolution[]` proposals for user approval — **never auto-apply by default** |
+| **Invocation** | `restricted` — modifies files |
+
+**Safe conflicts** (auto-resolvable): one side empty, both sides identical, whitespace-only differences.
+**Complex conflicts**: overlapping edits requiring model-assisted merge.
+
+**Input schema**: `{ paths?: string[], autoApplySafe?: boolean }`
+
 ---
 
 ## UI Surfaces
@@ -260,9 +338,47 @@ export(result: ScanResult, format: ExportFormat) → string
 ### Chat Participant (`@aidev`)
 
 - Registered via VSCode Chat Participant API in `packages/vscode/src/chat/participant.ts`
-- Commands: `/deadcode`, `/lint`, `/comments`, `/commit`, `/tldr`
+- Two interaction modes:
+  - **Slash commands**: `/deadcode`, `/lint`, `/comments`, `/commit`, `/tldr`, `/branchdiff`, `/resolve` — direct tool invocation, bypasses agent loop
+  - **Free-form messages**: Routed through the agentic multi-turn loop (see below)
 - **Graceful degradation**: if Chat Participant API is unavailable (e.g. some Cursor versions), all tools remain accessible via commands and sidebar
-- Driven by `TOOL_REGISTRY` — adding a tool there auto-registers its chat command
+- Driven by `TOOL_REGISTRY` — adding a tool there auto-registers its chat command and makes it available to the agent loop
+
+### Agentic Multi-Turn Loop
+
+The chat participant drives an agentic loop (`packages/core/src/agent/loop.ts`) that enables the model to autonomously invoke tools during a conversation.
+
+**Architecture** (core has zero IDE deps — testable with vitest):
+
+```
+packages/core/src/agent/
+├── types.ts            AgentConfig, AgentAction (discriminated union), ConversationTurn
+├── loop.ts             runAgentLoop() — async generator state machine
+├── system-prompt.ts    buildSystemPrompt() — tool descriptions + behavioral constraints
+└── index.ts            Barrel export
+```
+
+**Flow**:
+
+1. User sends a free-form message (no slash command)
+2. Chat participant builds `AgentConfig` from settings + `getToolDefinitions()`
+3. Conversation history is reconstructed from `ChatContext.history`
+4. `runAgentLoop()` async generator is started
+5. Generator yields `AgentAction` values:
+   - `tool_call` — autonomous tool: execute via `ToolRunner`, feed result back
+   - `confirmation_required` — restricted tool: prompt user, then execute or skip
+   - `response` — final text response: stream to chat
+   - `error` — budget/turn limit/model failure: display error
+6. Loop continues until text response, error, or limits hit
+
+**Safety rails**:
+
+- `maxTurns` setting (default 10) prevents runaway tool call loops
+- `maxTokenBudget` setting (default 32000) caps total token usage per run
+- Restricted tools cannot be auto-invoked without user awareness
+- All destructive operations remain proposal-based per core philosophy
+
+**Tier interaction**: The outer conversation uses `chat` role (higher tier). Tools that internally call the LLM (e.g. dead-code model synthesis) use `tool` role (potentially lower tier via `MODE_TIER_MAP`).
 
 ### Sidebar Panel
 
@@ -290,6 +406,8 @@ All commands registered in `packages/vscode/src/commands/index.ts`:
 | `aidev.pruneComments` | AIDev: Prune Comments |
 | `aidev.autoCommit` | AIDev: Auto-Commit |
 | `aidev.tldr` | AIDev: TLDR — Summarize Changes |
+| `aidev.branchDiff` | AIDev: Branch Diff — Compare Local vs Remote |
+| `aidev.diffResolve` | AIDev: Diff Resolver — Resolve Merge Conflicts |
 | `aidev.exportResults` | AIDev: Export Results |
 | `aidev.setMode` | AIDev: Set Operating Mode |
 
@@ -343,10 +461,10 @@ packages/core/src/
 ├── types/
 │   ├── index.ts                Type barrel export
 │   ├── common.ts               CodeLocation, Severity, ExportFormat, etc.
-│   ├── settings.ts             ExtensionSettings, OperatingMode, CommitConstraints, etc.
-│   ├── models.ts               IModelProvider, ResolvedModel, ChatMessage, etc.
-│   ├── analysis.ts             ITool, Finding, ScanResult, ScanOptions, etc.
-│   └── git.ts                  CommitProposal, ChangedFile, TldrSummary, etc.
+│   ├── settings.ts             ExtensionSettings, OperatingMode, AgentSettings, CommitConstraints, etc.
+│   ├── models.ts               IModelProvider, ResolvedModel, ChatMessage, ToolDefinition, ToolCall, ToolResult, etc.
+│   ├── analysis.ts             ITool, ToolInvocationMode, Finding, ScanResult, ScanOptions, etc.
+│   └── git.ts                  CommitProposal, ChangedFile, TldrSummary, BranchComparison, ConflictResolution, etc.
 ├── settings/
 │   ├── index.ts                Settings barrel
 │   ├── defaults.ts             DEFAULT_SETTINGS and all default constants
@@ -355,20 +473,29 @@ packages/core/src/
 │   ├── index.ts                Models barrel
 │   └── tiers.ts                resolveTier, resolveModelId
 ├── tools/
-│   ├── index.ts                TOOL_REGISTRY, getToolEntry, getToolByCommand, BaseTool
+│   ├── index.ts                TOOL_REGISTRY, getToolEntry, getToolByCommand, getAutonomousTools, getToolDefinitions, BaseTool
 │   ├── base-tool.ts            Abstract base class (lifecycle, cancel, export)
 │   ├── dead-code/index.ts      DeadCodeTool (static patterns + model synthesis)
 │   ├── lint/index.ts           LintTool (ESLint/Pylint + model analysis)
 │   ├── comments/index.ts       CommentsTool (implemented — blame + model)
-│   ├── commit/index.ts         CommitTool (implemented — full pipeline)
-│   └── tldr/index.ts           TldrTool (implemented — git log + model)
+│   ├── commit/index.ts         CommitTool (propose/apply/amend — full pipeline)
+│   ├── tldr/index.ts           TldrTool (implemented — git log + model)
+│   ├── branch-diff/index.ts    BranchDiffTool (compare local vs remote)
+│   └── diff-resolve/index.ts   DiffResolveTool (conflict detection + resolution)
+├── agent/
+│   ├── index.ts                Agent barrel export
+│   ├── types.ts                AgentConfig, AgentAction, ConversationTurn
+│   ├── loop.ts                 runAgentLoop() — async generator state machine
+│   └── system-prompt.ts        buildSystemPrompt() — tool descriptions + constraints
 ├── git/
 │   ├── index.ts                Git barrel export
 │   ├── executor.ts             execGit, execGitStrict, isGitRepo, getRepoRoot
 │   ├── status.ts               getChangedFiles, parsePorcelainLine
 │   ├── log.ts                  getLog, GitLogEntry, parseLogOutput
 │   ├── blame.ts                getBlame, getFileAge, BlameRange
-│   ├── staging.ts              stageFiles, autoStage, getStagedDiff, createCommit
+│   ├── staging.ts              stageFiles, autoStage, getStagedDiff, createCommit, amendCommit, getLastCommitInfo
+│   ├── branch.ts               getCurrentBranch, getTrackingBranch, getAheadBehind, fetchRemote, getRemoteDiff/Log
+│   ├── conflicts.ts            isInMergeState, getConflictFiles, parseConflictMarkers, writeResolution
 │   ├── hooks.ts                checkHooks, HookCheckResult
 │   └── validation.ts           validateCommitMessage
 └── utils/
@@ -387,7 +514,7 @@ packages/vscode/src/
 │   └── runner.ts               ToolRunner (orchestrates tool execution)
 ├── chat/
 │   ├── index.ts                Chat barrel
-│   └── participant.ts          @aidev chat participant (routes to ToolRunner)
+│   └── participant.ts          @aidev chat participant (agent loop host + slash commands)
 ├── sidebar/
 │   ├── index.ts                Sidebar barrel
 │   └── provider.ts             ToolsTreeProvider, ResultsTreeProvider (jump-to-source)
@@ -408,23 +535,30 @@ packages/vscode/src/
 | Settings schema | Done | Defaults, validation, normalization, 12 unit tests |
 | Settings bridge (VSCode) | Done | SettingsManager with change events, all components use it |
 | Model tier resolution | Done | resolveTier, resolveModelId |
-| Tool registry | Done | TOOL_REGISTRY with all 5 tools |
+| Tool registry | Done | TOOL_REGISTRY with all 7 tools, invocation classification, input schemas |
 | Base tool class | Done | BaseTool: lifecycle, cancellation, summary, JSON/MD export |
 | Git operations | Done | executor, status, log, blame, staging, hooks, validation |
 | Extension activation | Done | settings → providers → runner → UI |
 | ToolRunner | Done | Orchestrates execution, progress, result broadcasting |
-| Chat participant | Done | Routes to ToolRunner, extracts file references |
+| Chat participant | Done | Agentic multi-turn loop + slash command fallback |
+| Agent loop (core) | Done | Async generator state machine, system prompt builder |
+| Tool calling protocol | Done | ToolDefinition, ToolCall, ToolResult types + provider support |
 | Sidebar views | Done | Tools list + Results tree with jump-to-source |
 | Status bar | Done | Mode display with real-time updates |
 | Commands | Done | All route to ToolRunner, export with format selection |
-| VscodeLmProvider | Done | Full sendRequest: tier resolution, model matching, streaming |
-| DirectApiProvider | Done | Anthropic + OpenAI API with model catalogs |
+| VscodeLmProvider | Done | Tier resolution, model matching, streaming, tool message fallback |
+| DirectApiProvider | Done | Anthropic + OpenAI API with model catalogs, full tool calling |
 | DeadCodeTool | Done | Static export analysis + model-driven false positive filtering |
 | LintTool | Done | ESLint/pylint wrapping + model-driven code smell detection |
 | CommentsTool | Done | Git blame age + model-driven value assessment |
-| CommitTool | Done | Full pipeline: status → stage → model → validate → hooks |
+| CommitTool | Done | Full pipeline: propose/apply/amend actions, constraint validation, hook dry-run |
 | TldrTool | Done | Git log → model summarization with highlights |
-| Unit tests | 32 passing | schema (12), validation (9), status parsing (11) |
+| BranchDiffTool | Done | Fetch → ahead/behind → commit logs → diff summary |
+| DiffResolveTool | Done | Conflict detection, safe auto-resolution, model-assisted complex resolution |
+| Git branch ops | Done | getCurrentBranch, getTrackingBranch, getAheadBehind, fetchRemote, getRemoteDiff/Log |
+| Git conflict ops | Done | isInMergeState, getConflictFiles, parseConflictMarkers, writeResolution |
+| Git amend/info | Done | amendCommit, getLastCommitInfo |
+| Unit tests | 43 passing | schema (12), validation (9), status parsing (11), conflict parsing (10), branch module (1) |
 | Integration tests | Not started | @vscode/test-electron configured |
 
 ---
@@ -442,3 +576,13 @@ packages/vscode/src/
 | 2026-02-12 | Chat Participant API with graceful degradation | Works in VSCode, commands fallback for Cursor |
 | 2026-02-12 | npm over pnpm/yarn | More common on developer's systems |
 | 2026-02-12 | Warn (not deny) as default enforcement | Less friction out of the box |
+| 2026-02-13 | Tool invocation classification (autonomous/restricted) | Enforces proposal-based constraint in agentic loop |
+| 2026-02-13 | Agent loop as async generator in core | Pure TS, testable, IDE-agnostic; host drives execution |
+| 2026-02-13 | Slash commands bypass agent loop | Backward compatibility, explicit user override |
+| 2026-02-13 | VscodeLmProvider: text fallback for tool calls | vscode.lm tool API not stable across versions |
+| 2026-02-13 | maxTurns=10, maxTokenBudget=32000 defaults | Safety rails for agentic loop cost control |
+| 2026-02-13 | Commit tool supports propose/apply/amend actions | Enables conversational refinement via agent loop |
+| 2026-02-13 | ScanOptions.args for tool-specific parameters | Generic passthrough from agent loop to tools without breaking ITool interface |
+| 2026-02-13 | Branch diff as autonomous tool | Read-only remote comparison, safe for model invocation |
+| 2026-02-13 | Diff resolver as restricted tool | Modifies files, requires user confirmation per proposal-based policy |
+| 2026-02-13 | Conflict classification: safe (auto) vs complex (model) | Trivial conflicts resolved deterministically; non-trivial use LLM with confidence scoring |

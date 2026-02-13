@@ -115,6 +115,23 @@
           "type": "boolean",
           "default": true,
           "description": "Run pre-commit hooks in dry-run mode before committing to catch failures early."
+        },
+        "aidev.agent.maxTurns": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "description": "Maximum tool-call round-trips per conversation turn in the agentic chat loop."
+        },
+        "aidev.agent.maxTokenBudget": {
+          "type": "number",
+          "default": 32000,
+          "minimum": 1000,
+          "description": "Maximum total tokens (input + output) allowed per agent run."
+        },
+        "aidev.agent.systemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Custom system prompt for the agentic chat loop. Leave empty to use the built-in default."
         }
       }
     },
@@ -124,6 +141,8 @@
       { "command": "aidev.pruneComments", "title": "AIDev: Prune Comments", "icon": "$(comment)" },
       { "command": "aidev.autoCommit", "title": "AIDev: Auto-Commit", "icon": "$(git-commit)" },
       { "command": "aidev.tldr", "title": "AIDev: TLDR — Summarize Changes", "icon": "$(book)" },
+      { "command": "aidev.branchDiff", "title": "AIDev: Branch Diff — Compare Local vs Remote", "icon": "$(git-compare)" },
+      { "command": "aidev.diffResolve", "title": "AIDev: Diff Resolver — Resolve Merge Conflicts", "icon": "$(git-merge)" },
       { "command": "aidev.exportResults", "title": "AIDev: Export Results", "icon": "$(export)" },
       { "command": "aidev.setMode", "title": "AIDev: Set Operating Mode", "icon": "$(settings-gear)" }
     ],
@@ -153,8 +172,10 @@
           { "name": "deadcode", "description": "Scan for dead/unused code" },
           { "name": "lint", "description": "Lint and best practice analysis" },
           { "name": "comments", "description": "Prune stale/verbose comments" },
-          { "name": "commit", "description": "Auto-stage and propose a commit" },
-          { "name": "tldr", "description": "Summarize recent changes" }
+          { "name": "commit", "description": "Auto-stage and propose a commit (or apply/amend)" },
+          { "name": "tldr", "description": "Summarize recent changes" },
+          { "name": "branchdiff", "description": "Compare local branch against remote tracking branch" },
+          { "name": "resolve", "description": "Detect and resolve merge conflicts" }
         ]
       }
     ]

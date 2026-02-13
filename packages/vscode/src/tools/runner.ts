@@ -6,6 +6,8 @@ import { LintTool } from '@aidev/core/dist/tools/lint/index.js';
 import { CommitTool } from '@aidev/core/dist/tools/commit/index.js';
 import { CommentsTool } from '@aidev/core/dist/tools/comments/index.js';
 import { TldrTool } from '@aidev/core/dist/tools/tldr/index.js';
+import { BranchDiffTool } from '@aidev/core/dist/tools/branch-diff/index.js';
+import { DiffResolveTool } from '@aidev/core/dist/tools/diff-resolve/index.js';
 import type { SettingsManager } from '../settings/index.js';
 import type { ProviderManager } from '../providers/index.js';
 
@@ -78,6 +80,7 @@ export class ToolRunner implements vscode.Disposable {
         const scanOptions: ScanOptions = {
           paths: options?.paths,
           signal: options?.signal,
+          args: options?.args,
         };
 
         progress.report({ message: 'Analyzing...' });
@@ -181,6 +184,25 @@ export class ToolRunner implements vscode.Disposable {
           return undefined;
         }
         const tool = new TldrTool();
+        tool.setDeps({
+          modelProvider: provider,
+          cwd,
+        });
+        return tool;
+      }
+      case 'branch-diff': {
+        const tool = new BranchDiffTool();
+        tool.setDeps({ cwd });
+        return tool;
+      }
+      case 'diff-resolve': {
+        if (!provider) {
+          void vscode.window.showErrorMessage(
+            'AIDev: No model provider available. Configure one in settings.',
+          );
+          return undefined;
+        }
+        const tool = new DiffResolveTool();
         tool.setDeps({
           modelProvider: provider,
           cwd,

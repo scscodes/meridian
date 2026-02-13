@@ -4,7 +4,17 @@ import type { CodeLocation, Severity, ExportFormat } from './common.js';
  * Identifier for each analysis tool. Used as the single source of truth
  * for tool registration, command routing, and result attribution.
  */
-export type ToolId = 'dead-code' | 'lint' | 'comments' | 'commit' | 'tldr';
+export type ToolId = 'dead-code' | 'lint' | 'comments' | 'commit' | 'tldr' | 'branch-diff' | 'diff-resolve';
+
+/**
+ * Controls whether the model can invoke a tool autonomously during the
+ * agentic loop, or whether the tool requires explicit user invocation.
+ *
+ * - 'autonomous': Model can invoke freely (read-only, non-destructive tools)
+ * - 'restricted': Requires user slash command or explicit confirmation
+ *                 (destructive / proposal-based tools)
+ */
+export type ToolInvocationMode = 'autonomous' | 'restricted';
 
 /**
  * Lifecycle status of a scan/tool execution.
@@ -84,6 +94,8 @@ export interface ScanOptions {
   paths?: string[];
   /** Abort signal for cancellation */
   signal?: AbortSignal;
+  /** Arbitrary tool-specific arguments from the agent loop (e.g. commit action, message) */
+  args?: Record<string, unknown>;
 }
 
 /**

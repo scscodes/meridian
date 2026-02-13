@@ -10,7 +10,14 @@ import type {
 } from '../../types/index.js';
 import { BaseTool } from '../base-tool.js';
 import { getChangedFiles } from '../../git/status.js';
-import { autoStage, getStagedDiff, getDiffSummary } from '../../git/staging.js';
+import {
+  autoStage,
+  getStagedDiff,
+  getDiffSummary,
+  createCommit,
+  amendCommit,
+  getLastCommitInfo,
+} from '../../git/staging.js';
 import { validateCommitMessage } from '../../git/validation.js';
 import { checkHooks } from '../../git/hooks.js';
 import { getRepoRoot } from '../../git/executor.js';
@@ -22,6 +29,9 @@ const MAX_DIFF_LINES = 500;
 
 /** Max stat output length for the model prompt */
 const MAX_STAT_LENGTH = 3000;
+
+/** Short hash length for display */
+const SHORT_HASH_LENGTH = 8;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,23 +52,26 @@ export interface CommitToolDeps {
 
 // ─── Implementation ─────────────────────────────────────────────────────────
 
+/** Commit action types supported by the tool */
+type CommitAction = 'propose' | 'apply' | 'amend';
+
 /**
  * Auto-Commit tool.
  *
- * Flow:
- * 1. Detect changed files via `git status`
- * 2. Auto-stage changed files
- * 3. Generate commit message using the model (with diff context)
- * 4. Validate message against CommitConstraints
- * 5. Dry-run pre-commit hooks if configured
- * 6. Return CommitProposal (stored in result metadata)
+ * Supports three actions (via `options.args.action`):
  *
- * NEVER auto-commits. Always proposes for user approval.
+ * - `propose` (default): Detect changes, stage, generate commit message via model,
+ *   validate against constraints, dry-run hooks, return CommitProposal.
+ * - `apply`: Stage files, validate the provided message, create the commit.
+ * - `amend`: Amend the last commit with a new message.
+ *
+ * Propose NEVER auto-commits — always returns a proposal.
+ * Apply and amend are restricted (agent loop yields confirmation_required).
  */
 export class CommitTool extends BaseTool {
   readonly id: ToolId = 'commit';
   readonly name = 'Auto-Commit';
-  readonly description = 'Stage changed files and generate a commit message for approval.';
+  readonly description = 'Stage changed files and generate a commit message for approval, or apply/amend a commit.';
 
   private deps: CommitToolDeps | undefined;
 
@@ -74,7 +87,31 @@ export class CommitTool extends BaseTool {
       throw new Error('CommitTool: Dependencies not set. Call setDeps() before execute().');
     }
 
-    const { modelProvider, commitConstraints, preCommitDryRun, cwd } = this.deps;
+    const action = ((options.args?.action as string) ?? 'propose') as CommitAction;
+
+    switch (action) {
+      case 'propose':
+        return this.runPropose(options);
+      case 'apply':
+        return this.runApply(options);
+      case 'amend':
+        return this.runAmend(options);
+      default:
+        return [
+          this.createFinding({
+            title: 'Unknown commit action',
+            description: `Unknown action "${String(action)}". Use "propose", "apply", or "amend".`,
+            location: { filePath: '.', startLine: 0, endLine: 0 },
+            severity: 'error',
+          }),
+        ];
+    }
+  }
+
+  // ─── Propose Action (original behavior) ────────────────────────────────
+
+  private async runPropose(options: ScanOptions): Promise<Finding[]> {
+    const { modelProvider, commitConstraints, preCommitDryRun, cwd } = this.deps!;
     const findings: Finding[] = [];
 
     // Phase 1: Detect changed files
@@ -169,6 +206,181 @@ export class CommitTool extends BaseTool {
           hookResults,
           stagedFileCount: stagedPaths.length,
           totalChangedFiles: changedFiles.length,
+        },
+      }),
+    );
+
+    return findings;
+  }
+
+  // ─── Apply Action ──────────────────────────────────────────────────────
+
+  private async runApply(options: ScanOptions): Promise<Finding[]> {
+    const { commitConstraints, preCommitDryRun, cwd } = this.deps!;
+    const findings: Finding[] = [];
+    const message = options.args?.message as string | undefined;
+
+    if (!message || message.trim().length === 0) {
+      findings.push(
+        this.createFinding({
+          title: 'Missing commit message',
+          description: 'The "apply" action requires a "message" argument.',
+          location: { filePath: '.', startLine: 0, endLine: 0 },
+          severity: 'error',
+        }),
+      );
+      return findings;
+    }
+
+    this.throwIfCancelled(options);
+    const repoRoot = await getRepoRoot(cwd);
+
+    // Stage files if there are unstaged changes
+    const changedFiles = await getChangedFiles(repoRoot);
+    if (changedFiles.length > 0) {
+      const targetFiles = options.paths ?? undefined;
+      await autoStage(repoRoot, changedFiles, targetFiles);
+    }
+
+    // Validate message
+    const validation = validateCommitMessage(message, commitConstraints);
+    for (const violation of validation.violations) {
+      findings.push(
+        this.createFinding({
+          title: `Constraint violation: ${violation.constraint}`,
+          description: violation.message,
+          location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+          severity: commitConstraints.enforcement === 'deny' ? 'error' : 'warning',
+        }),
+      );
+    }
+
+    // If enforcement is 'deny' and validation failed, abort
+    if (commitConstraints.enforcement === 'deny' && !validation.valid) {
+      findings.push(
+        this.createFinding({
+          title: 'Commit blocked',
+          description: 'Commit message violates constraints with enforcement set to "deny".',
+          location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+          severity: 'error',
+        }),
+      );
+      return findings;
+    }
+
+    // Pre-commit hook dry-run
+    if (preCommitDryRun) {
+      this.throwIfCancelled(options);
+      const hookResults = await checkHooks(repoRoot, true);
+
+      for (const hook of hookResults) {
+        if (hook.exists && hook.dryRunPassed === false) {
+          findings.push(
+            this.createFinding({
+              title: `Pre-commit hook failed: ${hook.hookName}`,
+              description: hook.output ?? 'Hook exited with non-zero status.',
+              location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+              severity: 'warning',
+            }),
+          );
+        }
+      }
+    }
+
+    // Create the commit
+    this.throwIfCancelled(options);
+    const hash = await createCommit(repoRoot, message);
+
+    findings.push(
+      this.createFinding({
+        title: 'Commit created',
+        description: `Committed as ${hash.slice(0, SHORT_HASH_LENGTH)}: ${message}`,
+        location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+        severity: 'info',
+        metadata: { hash, message, action: 'apply' },
+      }),
+    );
+
+    return findings;
+  }
+
+  // ─── Amend Action ──────────────────────────────────────────────────────
+
+  private async runAmend(options: ScanOptions): Promise<Finding[]> {
+    const { commitConstraints, cwd } = this.deps!;
+    const findings: Finding[] = [];
+    const message = options.args?.message as string | undefined;
+
+    if (!message || message.trim().length === 0) {
+      findings.push(
+        this.createFinding({
+          title: 'Missing commit message',
+          description: 'The "amend" action requires a "message" argument.',
+          location: { filePath: '.', startLine: 0, endLine: 0 },
+          severity: 'error',
+        }),
+      );
+      return findings;
+    }
+
+    this.throwIfCancelled(options);
+    const repoRoot = await getRepoRoot(cwd);
+
+    // Get info about the commit we're amending
+    const lastCommit = await getLastCommitInfo(repoRoot);
+    if (!lastCommit) {
+      findings.push(
+        this.createFinding({
+          title: 'No commits to amend',
+          description: 'Repository has no commits to amend.',
+          location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+          severity: 'error',
+        }),
+      );
+      return findings;
+    }
+
+    // Validate new message
+    const validation = validateCommitMessage(message, commitConstraints);
+    for (const violation of validation.violations) {
+      findings.push(
+        this.createFinding({
+          title: `Constraint violation: ${violation.constraint}`,
+          description: violation.message,
+          location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+          severity: commitConstraints.enforcement === 'deny' ? 'error' : 'warning',
+        }),
+      );
+    }
+
+    if (commitConstraints.enforcement === 'deny' && !validation.valid) {
+      findings.push(
+        this.createFinding({
+          title: 'Amend blocked',
+          description: 'New commit message violates constraints with enforcement set to "deny".',
+          location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+          severity: 'error',
+        }),
+      );
+      return findings;
+    }
+
+    // Amend the commit
+    this.throwIfCancelled(options);
+    const newHash = await amendCommit(repoRoot, message);
+
+    findings.push(
+      this.createFinding({
+        title: 'Commit amended',
+        description: `Amended ${lastCommit.hash.slice(0, SHORT_HASH_LENGTH)} → ${newHash.slice(0, SHORT_HASH_LENGTH)}: ${message}`,
+        location: { filePath: repoRoot, startLine: 0, endLine: 0 },
+        severity: 'info',
+        metadata: {
+          previousHash: lastCommit.hash,
+          newHash,
+          previousMessage: lastCommit.subject,
+          message,
+          action: 'amend',
         },
       }),
     );

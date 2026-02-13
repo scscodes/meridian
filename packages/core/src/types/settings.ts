@@ -62,6 +62,18 @@ export interface DirectApiConfig {
 }
 
 /**
+ * Configuration for the agentic multi-turn chat loop.
+ */
+export interface AgentSettings {
+  /** Maximum tool-call round-trips per conversation turn */
+  maxTurns: number;
+  /** Maximum total tokens (input + output) per agent run */
+  maxTokenBudget: number;
+  /** Custom system prompt (empty string = use built-in default) */
+  systemPrompt: string;
+}
+
+/**
  * Root extension settings — single source of truth for all configuration.
  *
  * Mapped 1:1 to VSCode's contributes.configuration under the 'aidev' namespace.
@@ -83,4 +95,6 @@ export interface ExtensionSettings {
   commitConstraints: CommitConstraints;
   /** Run pre-commit hooks in dry-run mode before committing */
   preCommitDryRun: boolean;
+  /** Agentic chat loop configuration */
+  agent: AgentSettings;
 }

@@ -17,9 +17,11 @@ Read `docs/SPEC.md` for the full project specification. It is the single source 
 
 - **All types**: `packages/core/src/types/` — the only place to define shared interfaces
 - **All defaults**: `packages/core/src/settings/defaults.ts` — single file, no magic numbers anywhere else
-- **All tool metadata**: `packages/core/src/tools/index.ts` → `TOOL_REGISTRY` — commands, names, descriptions derive from here
+- **All tool metadata**: `packages/core/src/tools/index.ts` → `TOOL_REGISTRY` — commands, names, descriptions, invocation mode derive from here
 - **Settings validation**: `packages/core/src/settings/schema.ts`
 - **Mode → tier mapping**: `packages/core/src/settings/schema.ts` → `MODE_TIER_MAP`
+- **Agent loop**: `packages/core/src/agent/loop.ts` → `runAgentLoop()` — async generator, pure TS, no IDE deps
+- **Git primitives**: `packages/core/src/git/` — executor, status, staging, branch, conflicts, log, blame, hooks, validation
 
 ## Constraints
 
@@ -32,6 +34,20 @@ Read `docs/SPEC.md` for the full project specification. It is the single source 
 ## Adding a New Tool
 
 1. Add `ToolId` variant in `packages/core/src/types/analysis.ts`
-2. Add entry to `TOOL_REGISTRY` in `packages/core/src/tools/index.ts`
+2. Add entry to `TOOL_REGISTRY` in `packages/core/src/tools/index.ts` (include `invocation` and `inputSchema`)
 3. Create tool class implementing `ITool` in `packages/core/src/tools/<name>/index.ts`
-4. The chat command, sidebar entry, and VSCode command are automatically derived from the registry entry
+4. Add case to `ToolRunner.createTool()` in `packages/vscode/src/tools/runner.ts`
+5. Add command + chat participant entry in `packages/vscode/package.json`
+6. The chat command, sidebar entry, VSCode command, and agent loop availability are automatically derived from the registry entry
+
+## Tool Invocation Modes
+
+- `autonomous`: Model can call during agentic loop without user action (read-only tools)
+- `restricted`: Requires user slash command or explicit confirmation (destructive/proposal tools)
+- Classification is set per-tool in `TOOL_REGISTRY.invocation` field
+
+## Tool-Specific Args
+
+Tools can receive arbitrary parameters via `ScanOptions.args` (e.g. commit's `action`/`message`).
+The agent loop passes tool call arguments through to the ToolRunner, which forwards them to the tool.
+Use `args` for parameters that don't fit the standard `paths`/`signal` pattern.

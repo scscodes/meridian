@@ -99,3 +99,59 @@ export async function autoStage(
   await stageFiles(cwd, toStage);
   return toStage;
 }
+
+// ─── Amend & Commit Info ────────────────────────────────────────────────────
+
+/** Number of expected parts when parsing last commit info (hash, subject, body) */
+const LAST_COMMIT_PARTS = 2;
+
+/**
+ * Amend the most recent commit with a new message.
+ *
+ * @param cwd - Repository working directory
+ * @param message - New commit message
+ * @returns The commit hash of the amended commit
+ */
+export async function amendCommit(cwd: string, message: string): Promise<string> {
+  await execGitStrict({ cwd, args: ['commit', '--amend', '-m', message] });
+  const hash = await execGitStrict({ cwd, args: ['rev-parse', 'HEAD'] });
+  return hash.trim();
+}
+
+/**
+ * Info about the most recent commit.
+ */
+export interface LastCommitInfo {
+  /** Full commit hash */
+  hash: string;
+  /** First line of commit message */
+  subject: string;
+  /** Commit body (everything after the first line, trimmed) */
+  body: string;
+}
+
+/**
+ * Get info about the most recent commit.
+ *
+ * @param cwd - Repository working directory
+ * @returns Last commit info, or null if there are no commits.
+ */
+export async function getLastCommitInfo(cwd: string): Promise<LastCommitInfo | null> {
+  const output = await execGitStrict({
+    cwd,
+    args: ['log', '-1', '--format=%H%n%s%n%b'],
+  }).catch(() => '');
+
+  if (!output.trim()) return null;
+
+  const lines = output.trim().split('\n');
+  if (lines.length < LAST_COMMIT_PARTS) return null;
+
+  const [hash, subject, ...bodyLines] = lines;
+
+  return {
+    hash,
+    subject,
+    body: bodyLines.join('\n').trim(),
+  };
+}

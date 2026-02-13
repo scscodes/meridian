@@ -5,7 +5,7 @@ import type {
   ModelProviderSource,
   SupportedLanguage,
 } from '@aidev/core';
-import { normalizeSettings, validateSettings, DEFAULT_COMMIT_CONSTRAINTS } from '@aidev/core';
+import { normalizeSettings, validateSettings, DEFAULT_COMMIT_CONSTRAINTS, DEFAULT_AGENT_SETTINGS } from '@aidev/core';
 
 /** VSCode configuration namespace — all settings live under this prefix. */
 const CONFIG_NAMESPACE = 'aidev';
@@ -89,6 +89,14 @@ export class SettingsManager implements vscode.Disposable {
         prefix: config.get<string>('commitConstraints.prefix', ''),
         suffix: config.get<string>('commitConstraints.suffix', ''),
         enforcement: config.get<'warn' | 'deny'>('commitConstraints.enforcement', 'warn'),
+      },
+      agent: {
+        maxTurns: config.get<number>('agent.maxTurns', DEFAULT_AGENT_SETTINGS.maxTurns),
+        maxTokenBudget: config.get<number>(
+          'agent.maxTokenBudget',
+          DEFAULT_AGENT_SETTINGS.maxTokenBudget,
+        ),
+        systemPrompt: config.get<string>('agent.systemPrompt', DEFAULT_AGENT_SETTINGS.systemPrompt),
       },
       directApi: this.readDirectApi(config),
     });

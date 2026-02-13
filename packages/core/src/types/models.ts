@@ -16,13 +16,69 @@ export interface ResolvedModel {
   provider: string;
 }
 
+// ─── Tool Calling Protocol ─────────────────────────────────────────────────
+
+/**
+ * JSON Schema describing a tool's input parameters for the model.
+ * Provider implementations translate this to their native format.
+ */
+export interface ToolDefinition {
+  /** Tool name (matches ToolRegistryEntry.chatCommand for routing) */
+  name: string;
+  /** Human-readable description for the model */
+  description: string;
+  /** JSON Schema object describing accepted parameters */
+  inputSchema: Record<string, unknown>;
+}
+
+/**
+ * A tool invocation requested by the model during the agentic loop.
+ */
+export interface ToolCall {
+  /** Unique ID for this call (used to correlate with ToolResult) */
+  id: string;
+  /** Tool name (matches ToolDefinition.name) */
+  name: string;
+  /** Arguments the model provided, validated against inputSchema */
+  arguments: Record<string, unknown>;
+}
+
+/**
+ * Result of executing a tool call, fed back to the model.
+ */
+export interface ToolResult {
+  /** Correlates to ToolCall.id */
+  toolCallId: string;
+  /** Serialized result content (typically JSON or markdown) */
+  content: string;
+  /** Whether the tool execution failed */
+  isError?: boolean;
+}
+
+/**
+ * Why the model stopped generating.
+ */
+export type StopReason = 'end_turn' | 'tool_use' | 'max_tokens';
+
+// ─── Messages ──────────────────────────────────────────────────────────────
+
 /**
  * A message in a model conversation.
+ *
+ * Extended to support tool calling:
+ * - Assistant messages may include `toolCalls` when the model wants to invoke tools
+ * - Tool result messages use role 'tool_result' with `toolCallId` linking back
  */
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool_result';
   content: string;
+  /** Present when assistant response includes tool call requests */
+  toolCalls?: ToolCall[];
+  /** Present for tool_result messages — links back to ToolCall.id */
+  toolCallId?: string;
 }
+
+// ─── Request / Response ────────────────────────────────────────────────────
 
 /**
  * Options for a model request.
@@ -32,6 +88,8 @@ export interface ModelRequestOptions {
   role: ModelRole;
   /** Conversation messages */
   messages: ChatMessage[];
+  /** Tool definitions the model is allowed to invoke (optional) */
+  tools?: ToolDefinition[];
   /** Max tokens to generate (optional, provider defaults apply) */
   maxTokens?: number;
   /** Temperature (optional, provider defaults apply) */
@@ -44,7 +102,7 @@ export interface ModelRequestOptions {
  * Response from a model request.
  */
 export interface ModelResponse {
-  /** Generated content */
+  /** Generated text content (may be empty if stopReason is 'tool_use') */
   content: string;
   /** Which model actually handled the request */
   model: ResolvedModel;
@@ -53,7 +111,13 @@ export interface ModelResponse {
     inputTokens: number;
     outputTokens: number;
   };
+  /** Tool calls the model wants to execute (present when stopReason is 'tool_use') */
+  toolCalls?: ToolCall[];
+  /** Why generation stopped */
+  stopReason?: StopReason;
 }
+
+// ─── Provider Interface ────────────────────────────────────────────────────
 
 /**
  * Interface that all model providers must implement.

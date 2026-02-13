@@ -22,7 +22,32 @@ export {
   getDiffSummary,
   getStagedDiff,
   autoStage,
+  amendCommit,
+  getLastCommitInfo,
 } from './staging.js';
+export type { LastCommitInfo } from './staging.js';
+
+// Branch
+export {
+  getCurrentBranch,
+  getTrackingBranch,
+  getAheadBehind,
+  fetchRemote,
+  getRemoteDiff,
+  getRemoteDiffSummary,
+  getRemoteLog,
+} from './branch.js';
+export type { AheadBehind } from './branch.js';
+
+// Conflicts
+export {
+  isInMergeState,
+  isInConflictState,
+  getConflictFiles,
+  parseConflictMarkers,
+  readConflictFile,
+  writeResolution,
+} from './conflicts.js';
 
 // Hooks
 export { checkHooks } from './hooks.js';

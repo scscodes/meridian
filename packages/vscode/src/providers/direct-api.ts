@@ -7,6 +7,8 @@ import type {
   ModelRole,
   DirectApiConfig,
   OperatingMode,
+  ToolCall,
+  StopReason,
 } from '@aidev/core';
 import { resolveTier, resolveModelId } from '@aidev/core';
 import type { SettingsManager } from '../settings/index.js';
@@ -39,6 +41,34 @@ const ANTHROPIC_API_VERSION = '2023-06-01';
 
 /** Default max tokens for responses */
 const DEFAULT_MAX_TOKENS = 4096;
+
+/** Internal response shape from direct API calls */
+interface DirectApiResponse {
+  content: string;
+  usage?: { inputTokens: number; outputTokens: number };
+  toolCalls?: ToolCall[];
+  stopReason?: StopReason;
+}
+
+// ─── Stop Reason Mappers ────────────────────────────────────────────────────
+
+function mapAnthropicStopReason(reason?: string): StopReason | undefined {
+  switch (reason) {
+    case 'end_turn': return 'end_turn';
+    case 'tool_use': return 'tool_use';
+    case 'max_tokens': return 'max_tokens';
+    default: return undefined;
+  }
+}
+
+function mapOpenAIStopReason(reason?: string): StopReason | undefined {
+  switch (reason) {
+    case 'stop': return 'end_turn';
+    case 'tool_calls': return 'tool_use';
+    case 'length': return 'max_tokens';
+    default: return undefined;
+  }
+}
 
 // ─── Provider Implementation ────────────────────────────────────────────────
 
@@ -110,6 +140,8 @@ export class DirectApiProvider implements IModelProvider {
         provider: config.provider,
       },
       usage: response.usage,
+      toolCalls: response.toolCalls,
+      stopReason: response.stopReason,
     };
   }
 
@@ -141,17 +173,43 @@ export class DirectApiProvider implements IModelProvider {
     config: DirectApiConfig,
     modelId: string,
     options: ModelRequestOptions,
-  ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
+  ): Promise<DirectApiResponse> {
     const url = config.baseUrl || ANTHROPIC_DEFAULT_URL;
 
     // Separate system message from conversation messages
     const systemMessages = options.messages.filter((m) => m.role === 'system');
-    const conversationMessages = options.messages
-      .filter((m) => m.role !== 'system')
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      }));
+    const conversationMessages: Array<Record<string, unknown>> = [];
+    for (const m of options.messages.filter((msg) => msg.role !== 'system')) {
+      if (m.role === 'tool_result') {
+        conversationMessages.push({
+          role: 'user',
+          content: [{
+            type: 'tool_result',
+            tool_use_id: m.toolCallId,
+            content: m.content,
+          }],
+        });
+      } else if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+        const contentBlocks: Array<Record<string, unknown>> = [];
+        if (m.content) {
+          contentBlocks.push({ type: 'text', text: m.content });
+        }
+        for (const tc of m.toolCalls) {
+          contentBlocks.push({
+            type: 'tool_use',
+            id: tc.id,
+            name: tc.name,
+            input: tc.arguments,
+          });
+        }
+        conversationMessages.push({ role: 'assistant', content: contentBlocks });
+      } else {
+        conversationMessages.push({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        });
+      }
+    }
 
     const body: Record<string, unknown> = {
       model: modelId,
@@ -165,6 +223,14 @@ export class DirectApiProvider implements IModelProvider {
 
     if (options.temperature !== undefined) {
       body.temperature = options.temperature;
+    }
+
+    if (options.tools && options.tools.length > 0) {
+      body.tools = options.tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.inputSchema,
+      }));
     }
 
     const response = await fetch(url, {
@@ -186,21 +252,33 @@ export class DirectApiProvider implements IModelProvider {
     }
 
     const data = (await response.json()) as {
-      content: Array<{ type: string; text: string }>;
+      content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
       usage?: { input_tokens: number; output_tokens: number };
+      stop_reason?: string;
     };
 
+    const textContent = data.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text ?? '')
+      .join('');
+
+    const toolUseBlocks = data.content.filter((block) => block.type === 'tool_use');
+    const toolCalls: ToolCall[] | undefined =
+      toolUseBlocks.length > 0
+        ? toolUseBlocks.map((block) => ({
+            id: block.id ?? '',
+            name: block.name ?? '',
+            arguments: (block.input as Record<string, unknown>) ?? {},
+          }))
+        : undefined;
+
+    const stopReason = mapAnthropicStopReason(data.stop_reason);
+
     return {
-      content: data.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
-        .join(''),
-      usage: data.usage
-        ? {
-            inputTokens: data.usage.input_tokens,
-            outputTokens: data.usage.output_tokens,
-          }
-        : undefined,
+      content: textContent,
+      usage: data.usage ? { inputTokens: data.usage.input_tokens, outputTokens: data.usage.output_tokens } : undefined,
+      toolCalls,
+      stopReason,
     };
   }
 
@@ -208,13 +286,34 @@ export class DirectApiProvider implements IModelProvider {
     config: DirectApiConfig,
     modelId: string,
     options: ModelRequestOptions,
-  ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
+  ): Promise<DirectApiResponse> {
     const url = config.baseUrl || OPENAI_DEFAULT_URL;
 
-    const messages = options.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    const messages: Array<Record<string, unknown>> = [];
+    for (const m of options.messages) {
+      if (m.role === 'tool_result') {
+        messages.push({
+          role: 'tool',
+          tool_call_id: m.toolCallId,
+          content: m.content,
+        });
+      } else if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+        messages.push({
+          role: 'assistant',
+          content: m.content || null,
+          tool_calls: m.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: 'function',
+            function: {
+              name: tc.name,
+              arguments: JSON.stringify(tc.arguments),
+            },
+          })),
+        });
+      } else {
+        messages.push({ role: m.role, content: m.content });
+      }
+    }
 
     const body: Record<string, unknown> = {
       model: modelId,
@@ -227,6 +326,17 @@ export class DirectApiProvider implements IModelProvider {
 
     if (options.temperature !== undefined) {
       body.temperature = options.temperature;
+    }
+
+    if (options.tools && options.tools.length > 0) {
+      body.tools = options.tools.map((t) => ({
+        type: 'function',
+        function: {
+          name: t.name,
+          description: t.description,
+          parameters: t.inputSchema,
+        },
+      }));
     }
 
     const response = await fetch(url, {
@@ -245,18 +355,42 @@ export class DirectApiProvider implements IModelProvider {
     }
 
     const data = (await response.json()) as {
-      choices: Array<{ message: { content: string } }>;
+      choices: Array<{
+        message: {
+          content: string | null;
+          tool_calls?: Array<{
+            id: string;
+            type: string;
+            function: { name: string; arguments: string };
+          }>;
+        };
+        finish_reason?: string;
+      }>;
       usage?: { prompt_tokens: number; completion_tokens: number };
     };
 
+    const choice = data.choices[0];
+    const toolCalls: ToolCall[] | undefined = choice?.message?.tool_calls?.map((tc) => {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+      } catch {
+        // Malformed JSON from model — use empty args
+      }
+      return {
+        id: tc.id,
+        name: tc.function.name,
+        arguments: args,
+      };
+    });
+
+    const stopReason = mapOpenAIStopReason(choice?.finish_reason);
+
     return {
-      content: data.choices[0]?.message?.content ?? '',
-      usage: data.usage
-        ? {
-            inputTokens: data.usage.prompt_tokens,
-            outputTokens: data.usage.completion_tokens,
-          }
-        : undefined,
+      content: choice?.message?.content ?? '',
+      usage: data.usage ? { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens } : undefined,
+      toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
+      stopReason,
     };
   }
 }

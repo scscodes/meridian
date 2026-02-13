@@ -1,4 +1,4 @@
-import type { ExtensionSettings, CommitConstraints, ModelTierMap } from '../types/index.js';
+import type { ExtensionSettings, CommitConstraints, ModelTierMap, AgentSettings } from '../types/index.js';
 
 // ─── Commit Constraints ─────────────────────────────────────────────────────
 
@@ -29,6 +29,20 @@ export const DEFAULT_MODEL_TIERS: ModelTierMap = {
   low: '',
 };
 
+// ─── Agent Settings ──────────────────────────────────────────────────────────
+
+/** Maximum tool-call round-trips per conversation turn */
+const AGENT_DEFAULT_MAX_TURNS = 10;
+
+/** Maximum total tokens (input + output) per agent run */
+const AGENT_DEFAULT_MAX_TOKEN_BUDGET = 32000;
+
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  maxTurns: AGENT_DEFAULT_MAX_TURNS,
+  maxTokenBudget: AGENT_DEFAULT_MAX_TOKEN_BUDGET,
+  systemPrompt: '',
+};
+
 // ─── Root Settings ──────────────────────────────────────────────────────────
 
 /**
@@ -42,4 +56,5 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   enabledLanguages: ['typescript', 'javascript', 'python'],
   commitConstraints: DEFAULT_COMMIT_CONSTRAINTS,
   preCommitDryRun: true,
+  agent: DEFAULT_AGENT_SETTINGS,
 };

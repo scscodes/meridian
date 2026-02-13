@@ -1,4 +1,5 @@
 import type { CommitConstraints } from './settings.js';
+import type { GitLogEntry } from '../git/log.js';
 
 /**
  * A file that has changed in the working tree.
@@ -87,4 +88,50 @@ export interface TldrHighlight {
   files: string[];
   /** Commit hashes that contributed to this highlight */
   commits: string[];
+}
+
+// ─── Branch Comparison ──────────────────────────────────────────────────────
+
+/**
+ * Result of comparing a local branch against its remote tracking branch.
+ */
+export interface BranchComparison {
+  /** Local branch name */
+  localBranch: string;
+  /** Remote tracking branch (e.g. 'origin/main') */
+  remoteBranch: string;
+  /** Commits local has that remote doesn't */
+  ahead: number;
+  /** Commits remote has that local doesn't */
+  behind: number;
+  /** Commits on remote not yet in local */
+  incomingCommits: GitLogEntry[];
+  /** Commits on local not yet pushed to remote */
+  outgoingCommits: GitLogEntry[];
+  /** Diff stat summary */
+  diffSummary: string;
+}
+
+// ─── Conflict Resolution ────────────────────────────────────────────────────
+
+/**
+ * Re-exported from git/conflicts.ts for external consumers.
+ * @see ConflictFile in git/conflicts.ts
+ */
+export type { ConflictFile, ConflictHunk } from '../git/conflicts.js';
+
+/**
+ * Proposed resolution for a conflict hunk.
+ */
+export interface ConflictResolution {
+  /** Path of the conflicted file */
+  filePath: string;
+  /** Index of the hunk within the file's conflict list */
+  hunkIndex: number;
+  /** The resolved content that should replace the conflict markers */
+  resolvedContent: string;
+  /** Strategy used to resolve: ours, theirs, merged (safe auto-merge), or model (LLM-assisted) */
+  strategy: 'ours' | 'theirs' | 'merged' | 'model';
+  /** Confidence level of the resolution */
+  confidence: 'high' | 'medium' | 'low';
 }

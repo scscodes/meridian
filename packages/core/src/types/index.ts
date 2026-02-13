@@ -16,12 +16,17 @@ export type {
   ModelTierMap,
   CommitConstraints,
   DirectApiConfig,
+  AgentSettings,
   ExtensionSettings,
 } from './settings.js';
 
 // Model providers
 export type {
   ResolvedModel,
+  ToolDefinition,
+  ToolCall,
+  ToolResult,
+  StopReason,
   ChatMessage,
   ModelRequestOptions,
   ModelResponse,
@@ -31,6 +36,7 @@ export type {
 // Analysis / tools
 export type {
   ToolId,
+  ToolInvocationMode,
   ScanStatus,
   Finding,
   SuggestedFix,
@@ -49,4 +55,8 @@ export type {
   HookCheckResult,
   TldrSummary,
   TldrHighlight,
+  BranchComparison,
+  ConflictFile,
+  ConflictHunk,
+  ConflictResolution,
 } from './git.js';

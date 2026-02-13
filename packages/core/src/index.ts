@@ -17,15 +17,21 @@ export type {
   ModelTierMap,
   CommitConstraints,
   DirectApiConfig,
+  AgentSettings,
   ExtensionSettings,
   // Models
   ResolvedModel,
+  ToolDefinition,
+  ToolCall,
+  ToolResult,
+  StopReason,
   ChatMessage,
   ModelRequestOptions,
   ModelResponse,
   IModelProvider,
   // Analysis
   ToolId,
+  ToolInvocationMode,
   ScanStatus,
   Finding,
   SuggestedFix,
@@ -41,6 +47,10 @@ export type {
   HookCheckResult,
   TldrSummary,
   TldrHighlight,
+  BranchComparison,
+  ConflictFile,
+  ConflictHunk,
+  ConflictResolution,
 } from './types/index.js';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
@@ -48,6 +58,7 @@ export {
   DEFAULT_SETTINGS,
   DEFAULT_MODEL_TIERS,
   DEFAULT_COMMIT_CONSTRAINTS,
+  DEFAULT_AGENT_SETTINGS,
 } from './settings/defaults.js';
 
 export {
@@ -63,8 +74,20 @@ export {
 export { resolveTier, resolveModelId } from './models/tiers.js';
 
 // ─── Tools ──────────────────────────────────────────────────────────────────
-export { TOOL_REGISTRY, getToolEntry, getToolByCommand, BaseTool } from './tools/index.js';
+export { TOOL_REGISTRY, getToolEntry, getToolByCommand, getAutonomousTools, getToolDefinitions, BaseTool } from './tools/index.js';
 export type { ToolRegistryEntry } from './tools/index.js';
+
+// ─── Agent ───────────────────────────────────────────────────────────────────
+export { runAgentLoop, buildSystemPrompt } from './agent/index.js';
+export type {
+  AgentConfig,
+  AgentAction,
+  AgentToolCallAction,
+  AgentConfirmationAction,
+  AgentResponseAction,
+  AgentErrorAction,
+  ConversationTurn,
+} from './agent/index.js';
 
 // ─── Git Operations ─────────────────────────────────────────────────────────
 export {
@@ -91,6 +114,23 @@ export {
   getDiffSummary,
   getStagedDiff,
   autoStage,
+  amendCommit,
+  getLastCommitInfo,
+  // Branch
+  getCurrentBranch,
+  getTrackingBranch,
+  getAheadBehind,
+  fetchRemote,
+  getRemoteDiff,
+  getRemoteDiffSummary,
+  getRemoteLog,
+  // Conflicts
+  isInMergeState,
+  isInConflictState,
+  getConflictFiles,
+  parseConflictMarkers,
+  readConflictFile,
+  writeResolution,
   // Hooks
   checkHooks,
   // Validation
@@ -104,6 +144,8 @@ export type {
   GitLogOptions,
   BlameRange,
   BlameOptions,
+  AheadBehind,
+  LastCommitInfo,
 } from './git/index.js';
 
 // ─── Utils ──────────────────────────────────────────────────────────────────

@@ -357,8 +357,8 @@ packages/core/src/
 ├── tools/
 │   ├── index.ts                TOOL_REGISTRY, getToolEntry, getToolByCommand, BaseTool
 │   ├── base-tool.ts            Abstract base class (lifecycle, cancel, export)
-│   ├── dead-code/index.ts      DeadCodeTool (stub — extends BaseTool)
-│   ├── lint/index.ts           LintTool (stub — extends BaseTool)
+│   ├── dead-code/index.ts      DeadCodeTool (static patterns + model synthesis)
+│   ├── lint/index.ts           LintTool (ESLint/Pylint + model analysis)
 │   ├── comments/index.ts       CommentsTool (implemented — blame + model)
 │   ├── commit/index.ts         CommitTool (implemented — full pipeline)
 │   └── tldr/index.ts           TldrTool (implemented — git log + model)

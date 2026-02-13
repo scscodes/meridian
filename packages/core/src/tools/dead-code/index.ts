@@ -1,5 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative, extname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join, extname } from 'node:path';
 import type {
   ToolId,
   ScanOptions,
@@ -8,17 +8,17 @@ import type {
   SupportedLanguage,
 } from '../../types/index.js';
 import { BaseTool } from '../base-tool.js';
-import { getRepoRoot } from '../../git/executor.js';
+import { execGitStrict, getRepoRoot } from '../../git/executor.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-/** Max files to scan in a single run */
-const MAX_FILES = 500;
+/** Max file content to send to the model in one request */
+const MAX_FILE_CONTENT_LENGTH = 10_000;
 
-/** Max file content to send to model (characters) */
-const MAX_CONTENT_FOR_MODEL = 6000;
+/** Max files to analyze per run (safety bound) */
+const MAX_FILES_PER_RUN = 200;
 
-/** File extensions to language mapping */
+/** Extension → language mapping */
 const EXT_TO_LANGUAGE: Record<string, SupportedLanguage> = {
   '.ts': 'typescript',
   '.tsx': 'typescript',
@@ -29,34 +29,62 @@ const EXT_TO_LANGUAGE: Record<string, SupportedLanguage> = {
   '.py': 'python',
 };
 
-/** Directories to always skip */
-const SKIP_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  'build',
-  'out',
-  '.next',
-  '__pycache__',
-  '.venv',
-  'venv',
-  'coverage',
-  '.angular',
-]);
+// ─── Static Analysis Patterns ───────────────────────────────────────────────
+// These catch the obvious cases cheaply — no model needed.
+
+interface StaticPattern {
+  /** Human-readable name */
+  name: string;
+  /** Regex to detect the pattern */
+  pattern: RegExp;
+  /** Languages this pattern applies to */
+  languages: SupportedLanguage[];
+  /** Description template (use $1, $2 for capture groups) */
+  description: string;
+}
+
+const STATIC_PATTERNS: StaticPattern[] = [
+  {
+    name: 'Unused import',
+    pattern: /^import\s+(?:type\s+)?(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+['"][^'"]+['"];?\s*$/gm,
+    languages: ['typescript', 'javascript'],
+    description: 'Import may be unused. Verify with your bundler or linter.',
+  },
+  {
+    name: 'Empty export',
+    pattern: /^export\s*\{\s*\};?\s*$/gm,
+    languages: ['typescript', 'javascript'],
+    description: 'Empty export statement — serves no purpose unless converting to a module.',
+  },
+  {
+    name: 'Commented-out code block',
+    pattern: /(?:\/\/\s*(?:const|let|var|function|class|import|export|if|for|while|return|async)\s+.+\n?){3,}/gm,
+    languages: ['typescript', 'javascript'],
+    description: 'Block of commented-out code. Consider removing — version control preserves history.',
+  },
+  {
+    name: 'Commented-out code block (Python)',
+    pattern: /(?:#\s*(?:def|class|import|from|if|for|while|return|async)\s+.+\n?){3,}/gm,
+    languages: ['python'],
+    description: 'Block of commented-out code. Consider removing — version control preserves history.',
+  },
+  {
+    name: 'Unused variable pattern',
+    pattern: /^\s*(?:const|let|var)\s+_\w+\s*=/gm,
+    languages: ['typescript', 'javascript'],
+    description: 'Variable prefixed with underscore suggests it is intentionally unused, but verify.',
+  },
+];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface DeadCodeToolDeps {
+  /** Model provider for deeper analysis */
   modelProvider?: IModelProvider;
+  /** Working directory */
   cwd: string;
+  /** Languages to analyze */
   enabledLanguages: SupportedLanguage[];
-}
-
-/** Patterns that indicate an export */
-interface ExportInfo {
-  name: string;
-  line: number;
-  kind: 'function' | 'class' | 'variable' | 'type' | 'interface' | 'enum' | 'default';
 }
 
 // ─── Implementation ─────────────────────────────────────────────────────────
@@ -64,10 +92,13 @@ interface ExportInfo {
 /**
  * Dead Code Discovery tool.
  *
- * Phase 1 (Static): Find exports and scan for usage across the codebase.
- * Phase 2 (Model): For ambiguous cases, ask the model for judgment.
+ * Two-phase approach:
+ * 1. **Static analysis**: regex-based pattern matching for obvious dead code
+ *    (commented-out blocks, empty exports, etc.) — fast and free.
+ * 2. **Model synthesis**: send file contents to the model for deeper analysis
+ *    (unused functions, unreachable branches, orphaned exports) — uses tokens.
  *
- * Detects: unused exports, unused variables (top-level), dead files.
+ * Phase 2 only runs if a model provider is available.
  */
 export class DeadCodeTool extends BaseTool {
   readonly id: ToolId = 'dead-code';
@@ -75,14 +106,14 @@ export class DeadCodeTool extends BaseTool {
   readonly description = 'Find unused exports, unreachable code, unused files, and dead variables.';
 
   private deps: DeadCodeToolDeps | undefined;
-  private filesScannedCount = 0;
+  private scannedFileCount = 0;
 
   setDeps(deps: DeadCodeToolDeps): void {
     this.deps = deps;
   }
 
   protected override countScannedFiles(): number {
-    return this.filesScannedCount;
+    return this.scannedFileCount;
   }
 
   protected async run(options: ScanOptions): Promise<Finding[]> {
@@ -90,24 +121,19 @@ export class DeadCodeTool extends BaseTool {
       throw new Error('DeadCodeTool: Dependencies not set. Call setDeps() before execute().');
     }
 
-    const { cwd, enabledLanguages, modelProvider } = this.deps;
+    const { modelProvider, cwd, enabledLanguages } = this.deps;
     const repoRoot = await getRepoRoot(cwd);
     const findings: Finding[] = [];
 
-    // Collect all source files
-    this.throwIfCancelled(options);
-    const scanPaths = options.paths && options.paths.length > 0
-      ? options.paths.map((p) => join(repoRoot, p))
-      : [repoRoot];
-
-    const files = await collectSourceFiles(scanPaths, enabledLanguages);
-    this.filesScannedCount = Math.min(files.length, MAX_FILES);
+    // Get files to scan
+    const files = await getTrackedFiles(repoRoot, enabledLanguages, options.paths);
+    this.scannedFileCount = files.length;
 
     if (files.length === 0) {
       findings.push(
         this.createFinding({
-          title: 'No source files found',
-          description: 'No files matching enabled languages were found in the scan scope.',
+          title: 'No files to scan',
+          description: 'No matching source files found for the configured languages.',
           location: { filePath: repoRoot, startLine: 0, endLine: 0 },
           severity: 'info',
         }),
@@ -115,311 +141,224 @@ export class DeadCodeTool extends BaseTool {
       return findings;
     }
 
-    // Phase 1: Static analysis — find exports and check usage
-    this.throwIfCancelled(options);
-    const fileContents = new Map<string, string>();
-    const allExports = new Map<string, ExportInfo[]>();
-
-    for (const filePath of files.slice(0, MAX_FILES)) {
+    // Phase 1: Static analysis (fast, no model needed)
+    for (const filePath of files) {
       this.throwIfCancelled(options);
+
       try {
-        const content = await readFile(filePath, 'utf-8');
-        const relPath = relative(repoRoot, filePath);
-        fileContents.set(relPath, content);
-
+        const fullPath = join(repoRoot, filePath);
+        const content = await readFile(fullPath, 'utf-8');
         const ext = extname(filePath);
-        const lang = EXT_TO_LANGUAGE[ext];
-        if (lang === 'typescript' || lang === 'javascript') {
-          const exports = extractExports(content);
-          if (exports.length > 0) {
-            allExports.set(relPath, exports);
-          }
-        } else if (lang === 'python') {
-          const exports = extractPythonExports(content);
-          if (exports.length > 0) {
-            allExports.set(relPath, exports);
-          }
-        }
+        const language = EXT_TO_LANGUAGE[ext];
+        if (!language) continue;
+
+        const staticFindings = runStaticPatterns(content, filePath, language);
+        findings.push(...staticFindings.map((f) => this.createFinding(f)));
       } catch {
-        // Skip unreadable files
+        // Skip files that can't be read
       }
     }
 
-    // Check each export for usage across the codebase
-    this.throwIfCancelled(options);
-    const allContent = Array.from(fileContents.values()).join('\n');
+    // Phase 2: Model synthesis (deeper analysis, uses tokens)
+    if (modelProvider) {
+      // Process files in batches to stay within token limits
+      const filesToAnalyze = files.slice(0, MAX_FILES_PER_RUN);
 
-    for (const [filePath, exports] of allExports) {
-      for (const exp of exports) {
-        // Skip default exports (harder to track statically)
-        if (exp.kind === 'default') continue;
+      for (const filePath of filesToAnalyze) {
+        this.throwIfCancelled(options);
 
-        // Count occurrences of this name across all files
-        const regex = new RegExp(`\\b${escapeRegex(exp.name)}\\b`, 'g');
-        const matches = allContent.match(regex);
-        const count = matches ? matches.length : 0;
+        try {
+          const fullPath = join(repoRoot, filePath);
+          const content = await readFile(fullPath, 'utf-8');
+          if (content.length === 0) continue;
 
-        // If only found once (its own declaration), it's potentially dead
-        if (count <= 1) {
-          findings.push(
-            this.createFinding({
-              title: `Unused export: ${exp.name}`,
-              description: `Exported ${exp.kind} "${exp.name}" appears to be unused across the scanned files.`,
-              location: {
-                filePath,
-                startLine: exp.line,
-                endLine: exp.line,
-              },
-              severity: 'warning',
-              suggestedFix: {
-                description: `Remove unused ${exp.kind} or its export`,
-                replacement: '',
-                location: { filePath, startLine: exp.line, endLine: exp.line },
-              },
-            }),
+          const truncated = content.slice(0, MAX_FILE_CONTENT_LENGTH);
+          const modelFindings = await analyzeWithModel(
+            modelProvider,
+            filePath,
+            truncated,
+            options,
           );
+          findings.push(...modelFindings.map((f) => this.createFinding(f)));
+        } catch {
+          // Skip files that fail model analysis
         }
       }
     }
 
-    // Phase 2: Model synthesis for deeper analysis
-    if (modelProvider && findings.length > 0) {
-      this.throwIfCancelled(options);
-      const modelFindings = await this.modelReview(modelProvider, findings, fileContents, options);
-      // Model can either confirm or dismiss static findings
-      // For now, add model insights as additional findings
-      findings.push(...modelFindings);
-    }
-
-    return findings;
+    return deduplicateFindings(findings);
   }
+}
 
-  private async modelReview(
-    provider: IModelProvider,
-    staticFindings: Finding[],
-    fileContents: Map<string, string>,
-    options: ScanOptions,
-  ): Promise<Finding[]> {
-    // Only send a subset to the model for cost efficiency
-    const topFindings = staticFindings.slice(0, 20);
+// ─── Static Analysis ────────────────────────────────────────────────────────
 
-    const findingsSummary = topFindings
-      .map((f) => `- ${f.location.filePath}:${String(f.location.startLine)} — ${f.title}`)
-      .join('\n');
+function runStaticPatterns(
+  content: string,
+  filePath: string,
+  language: SupportedLanguage,
+): Array<Omit<Finding, 'id' | 'toolId'>> {
+  const findings: Array<Omit<Finding, 'id' | 'toolId'>> = [];
 
-    // Get relevant file snippets
-    const contextSnippets: string[] = [];
-    const seenFiles = new Set<string>();
-    for (const f of topFindings) {
-      if (seenFiles.has(f.location.filePath)) continue;
-      seenFiles.add(f.location.filePath);
+  for (const sp of STATIC_PATTERNS) {
+    if (!sp.languages.includes(language)) continue;
 
-      const content = fileContents.get(f.location.filePath);
-      if (content) {
-        contextSnippets.push(
-          `### ${f.location.filePath}\n\`\`\`\n${content.slice(0, MAX_CONTENT_FOR_MODEL)}\n\`\`\``,
-        );
-      }
-    }
+    const regex = new RegExp(sp.pattern.source, sp.pattern.flags);
+    let match: RegExpExecArray | null;
 
-    try {
-      const response = await provider.sendRequest({
-        role: 'tool',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a dead code reviewer. Given a list of potentially unused exports and their source code, identify any FALSE POSITIVES — exports that are likely used via:
-1. Dynamic imports or require()
-2. Framework conventions (Angular decorators, React components used in JSX, Flask routes)
-3. Entry points (main files, index files, config files)
-4. Tests
+    while ((match = regex.exec(content)) !== null) {
+      const startLine = content.slice(0, match.index).split('\n').length;
+      const matchLines = match[0].split('\n').length;
 
-For each finding, output one line: CONFIRM|filepath:line or DISMISS|filepath:line|reason
-Only output these lines, nothing else.`,
-          },
-          {
-            role: 'user',
-            content: `## Static analysis findings\n${findingsSummary}\n\n## Source code\n${contextSnippets.join('\n\n')}`,
-          },
-        ],
-        signal: options.signal,
+      findings.push({
+        title: sp.name,
+        description: sp.description,
+        location: {
+          filePath,
+          startLine,
+          endLine: startLine + matchLines - 1,
+        },
+        severity: 'warning',
+        metadata: { source: 'static', pattern: sp.name },
       });
-
-      // Parse model response to dismiss false positives
-      const dismissals = new Set<string>();
-      for (const line of response.content.split('\n')) {
-        if (line.startsWith('DISMISS|')) {
-          const parts = line.split('|');
-          if (parts.length >= 2) {
-            dismissals.add(parts[1].trim());
-          }
-        }
-      }
-
-      // Downgrade dismissed findings to hints
-      for (const finding of staticFindings) {
-        const key = `${finding.location.filePath}:${String(finding.location.startLine)}`;
-        if (dismissals.has(key)) {
-          finding.severity = 'hint';
-          finding.description += ' (Model suggests this may be a false positive.)';
-        }
-      }
-    } catch {
-      // Model review is best-effort — static findings stand on their own
     }
-
-    return [];
   }
+
+  return findings;
 }
 
-// ─── File Discovery ─────────────────────────────────────────────────────────
+// ─── Model Analysis ─────────────────────────────────────────────────────────
 
-async function collectSourceFiles(
-  roots: string[],
-  enabledLanguages: SupportedLanguage[],
+const MODEL_SYSTEM_PROMPT = `You are a dead code detector. Analyze the source file and identify:
+1. Unused functions/methods that are never called within this file or exported
+2. Unused variables or constants
+3. Unreachable code (after return/throw/break statements)
+4. Unused imports (if you can determine they're not used in the file)
+5. Dead conditional branches (conditions that are always true/false)
+
+For each finding, output one line in this exact format:
+TYPE|LINE_START|LINE_END|DESCRIPTION
+
+TYPE is one of: UNUSED_FUNCTION, UNUSED_VARIABLE, UNREACHABLE, UNUSED_IMPORT, DEAD_BRANCH
+LINE_START and LINE_END are 1-based line numbers.
+
+Only report findings you are confident about. Do NOT report:
+- Exported functions (they may be used elsewhere)
+- Framework lifecycle methods (ngOnInit, useEffect callbacks, etc.)
+- Decorator-annotated methods
+- Test setup/teardown functions
+If there are no findings, output: NONE`;
+
+async function analyzeWithModel(
+  provider: IModelProvider,
+  filePath: string,
+  content: string,
+  options: ScanOptions,
+): Promise<Array<Omit<Finding, 'id' | 'toolId'>>> {
+  const response = await provider.sendRequest({
+    role: 'tool',
+    messages: [
+      { role: 'system', content: MODEL_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `File: ${filePath}\n\n\`\`\`\n${content}\n\`\`\``,
+      },
+    ],
+    signal: options.signal,
+  });
+
+  return parseModelResponse(response.content, filePath);
+}
+
+const TYPE_TO_TITLE: Record<string, string> = {
+  UNUSED_FUNCTION: 'Unused function',
+  UNUSED_VARIABLE: 'Unused variable',
+  UNREACHABLE: 'Unreachable code',
+  UNUSED_IMPORT: 'Unused import',
+  DEAD_BRANCH: 'Dead conditional branch',
+};
+
+function parseModelResponse(
+  content: string,
+  filePath: string,
+): Array<Omit<Finding, 'id' | 'toolId'>> {
+  if (content.trim() === 'NONE') return [];
+
+  const findings: Array<Omit<Finding, 'id' | 'toolId'>> = [];
+
+  for (const line of content.split('\n')) {
+    const parts = line.split('|');
+    if (parts.length < 4) continue;
+
+    const [type, startStr, endStr, ...descParts] = parts;
+    const trimmedType = type.trim();
+    const title = TYPE_TO_TITLE[trimmedType];
+    if (!title) continue;
+
+    const startLine = parseInt(startStr.trim(), 10);
+    const endLine = parseInt(endStr.trim(), 10);
+    if (isNaN(startLine) || isNaN(endLine)) continue;
+
+    findings.push({
+      title,
+      description: descParts.join('|').trim(),
+      location: { filePath, startLine, endLine },
+      severity: 'warning',
+      metadata: { source: 'model', type: trimmedType },
+    });
+  }
+
+  return findings;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Get tracked files from git, filtered by language extensions.
+ */
+async function getTrackedFiles(
+  cwd: string,
+  languages: SupportedLanguage[],
+  paths?: string[],
 ): Promise<string[]> {
-  const validExtensions = new Set(
-    Object.entries(EXT_TO_LANGUAGE)
-      .filter(([_, lang]) => enabledLanguages.includes(lang))
-      .map(([ext]) => ext),
-  );
-
-  const files: string[] = [];
-
-  async function walk(dir: string): Promise<void> {
-    if (files.length >= MAX_FILES) return;
-
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (files.length >= MAX_FILES) return;
-
-      if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) {
-          await walk(join(dir, entry.name));
-        }
-      } else if (entry.isFile()) {
-        const ext = extname(entry.name);
-        if (validExtensions.has(ext)) {
-          files.push(join(dir, entry.name));
-        }
-      }
-    }
+  const validExts = new Set<string>();
+  for (const [ext, lang] of Object.entries(EXT_TO_LANGUAGE)) {
+    if (languages.includes(lang)) validExts.add(ext);
   }
 
-  for (const root of roots) {
-    const rootStat = await stat(root).catch(() => null);
-    if (!rootStat) continue;
-
-    if (rootStat.isDirectory()) {
-      await walk(root);
-    } else if (rootStat.isFile()) {
-      files.push(root);
-    }
+  const args = ['ls-files', '--cached', '--others', '--exclude-standard'];
+  if (paths && paths.length > 0) {
+    args.push('--', ...paths);
   }
 
-  return files;
+  const output = await execGitStrict({ cwd, args });
+  return output
+    .split('\n')
+    .filter((f) => f.length > 0)
+    .filter((f) => validExts.has(extname(f)))
+    .slice(0, MAX_FILES_PER_RUN);
 }
 
-// ─── Export Extraction ──────────────────────────────────────────────────────
+/**
+ * Deduplicate findings that overlap in the same file and line range.
+ * Prefers model findings over static ones (more specific).
+ */
+function deduplicateFindings(findings: Finding[]): Finding[] {
+  const seen = new Map<string, Finding>();
 
-function extractExports(content: string): ExportInfo[] {
-  const exports: ExportInfo[] = [];
-  const lines = content.split('\n');
+  for (const f of findings) {
+    const key = `${f.location.filePath}:${String(f.location.startLine)}:${String(f.location.endLine)}`;
+    const existing = seen.get(key);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNum = i + 1;
-
-    // export function name
-    const funcMatch = line.match(/export\s+(?:async\s+)?function\s+(\w+)/);
-    if (funcMatch) {
-      exports.push({ name: funcMatch[1], line: lineNum, kind: 'function' });
-      continue;
-    }
-
-    // export class name
-    const classMatch = line.match(/export\s+(?:abstract\s+)?class\s+(\w+)/);
-    if (classMatch) {
-      exports.push({ name: classMatch[1], line: lineNum, kind: 'class' });
-      continue;
-    }
-
-    // export const/let/var name
-    const varMatch = line.match(/export\s+(?:const|let|var)\s+(\w+)/);
-    if (varMatch) {
-      exports.push({ name: varMatch[1], line: lineNum, kind: 'variable' });
-      continue;
-    }
-
-    // export type name
-    const typeMatch = line.match(/export\s+type\s+(\w+)/);
-    if (typeMatch) {
-      exports.push({ name: typeMatch[1], line: lineNum, kind: 'type' });
-      continue;
-    }
-
-    // export interface name
-    const ifaceMatch = line.match(/export\s+interface\s+(\w+)/);
-    if (ifaceMatch) {
-      exports.push({ name: ifaceMatch[1], line: lineNum, kind: 'interface' });
-      continue;
-    }
-
-    // export enum name
-    const enumMatch = line.match(/export\s+enum\s+(\w+)/);
-    if (enumMatch) {
-      exports.push({ name: enumMatch[1], line: lineNum, kind: 'enum' });
-      continue;
-    }
-
-    // export default
-    if (line.match(/export\s+default\b/)) {
-      exports.push({ name: 'default', line: lineNum, kind: 'default' });
+    if (!existing) {
+      seen.set(key, f);
+    } else if (
+      existing.metadata?.source === 'static' &&
+      f.metadata?.source === 'model'
+    ) {
+      // Model finding takes precedence
+      seen.set(key, f);
     }
   }
 
-  return exports;
-}
-
-function extractPythonExports(content: string): ExportInfo[] {
-  const exports: ExportInfo[] = [];
-  const lines = content.split('\n');
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNum = i + 1;
-
-    // Top-level function definitions
-    const funcMatch = line.match(/^def\s+(\w+)\s*\(/);
-    if (funcMatch && !funcMatch[1].startsWith('_')) {
-      exports.push({ name: funcMatch[1], line: lineNum, kind: 'function' });
-      continue;
-    }
-
-    // Top-level class definitions
-    const classMatch = line.match(/^class\s+(\w+)/);
-    if (classMatch && !classMatch[1].startsWith('_')) {
-      exports.push({ name: classMatch[1], line: lineNum, kind: 'class' });
-      continue;
-    }
-
-    // Top-level variable assignments
-    const varMatch = line.match(/^(\w+)\s*=/);
-    if (varMatch && !varMatch[1].startsWith('_') && varMatch[1] === varMatch[1].toUpperCase()) {
-      // Only flag ALL_CAPS constants as "exported"
-      exports.push({ name: varMatch[1], line: lineNum, kind: 'variable' });
-    }
-  }
-
-  return exports;
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Array.from(seen.values());
 }

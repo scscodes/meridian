@@ -125,11 +125,22 @@ export class ToolRunner implements vscode.Disposable {
 
     switch (toolId) {
       case 'dead-code': {
-        // DeadCodeTool doesn't need deps yet (stub)
-        return new DeadCodeTool();
+        const tool = new DeadCodeTool();
+        tool.setDeps({
+          modelProvider: provider,
+          cwd,
+          enabledLanguages: current.enabledLanguages,
+        });
+        return tool;
       }
       case 'lint': {
-        return new LintTool();
+        const tool = new LintTool();
+        tool.setDeps({
+          modelProvider: provider,
+          cwd,
+          enabledLanguages: current.enabledLanguages,
+        });
+        return tool;
       }
       case 'commit': {
         if (!provider) {

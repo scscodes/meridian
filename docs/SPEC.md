@@ -419,8 +419,8 @@ packages/vscode/src/
 | Commands | Done | All route to ToolRunner, export with format selection |
 | VscodeLmProvider | Done | Full sendRequest: tier resolution, model matching, streaming |
 | DirectApiProvider | Done | Anthropic + OpenAI API with model catalogs |
-| DeadCodeTool | Stub | Extends BaseTool, `run()` not yet implemented |
-| LintTool | Stub | Extends BaseTool, `run()` not yet implemented |
+| DeadCodeTool | Done | Static export analysis + model-driven false positive filtering |
+| LintTool | Done | ESLint/pylint wrapping + model-driven code smell detection |
 | CommentsTool | Done | Git blame age + model-driven value assessment |
 | CommitTool | Done | Full pipeline: status → stage → model → validate → hooks |
 | TldrTool | Done | Git log → model summarization with highlights |

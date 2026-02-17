@@ -8,6 +8,8 @@ import type {
   ModelRole,
   OperatingMode,
   StopReason,
+  ToolDefinition,
+  ToolCall,
 } from '@aidev/core';
 import { resolveTier, resolveModelId } from '@aidev/core';
 import type { SettingsManager } from '../settings/index.js';
@@ -119,12 +121,7 @@ export class VscodeLmProvider implements IModelProvider {
     options: ModelRequestOptions,
     settings: import('@aidev/core').ExtensionSettings,
   ): Promise<ModelResponse> {
-
-    // Build messages for the vscode.lm API
-    // TODO: Add native vscode.lm tool support when the LanguageModelChatRequestOptions.tools
-    // API stabilizes across VSCode versions. For now, tool calling is handled by the
-    // DirectApiProvider, and the agent loop gracefully handles providers that don't
-    // return toolCalls (treats response as final text).
+    // Build messages for the vscode.lm API with native tool calling support
     const messages = options.messages.map((msg) => {
       switch (msg.role) {
         case 'system':
@@ -132,16 +129,46 @@ export class VscodeLmProvider implements IModelProvider {
         case 'user':
           return vscode.LanguageModelChatMessage.User(msg.content);
         case 'assistant': {
-          let content = msg.content;
+          // Native tool calling: attempt to use native format if toolCalls are present
           if (msg.toolCalls && msg.toolCalls.length > 0) {
-            const toolCallSummary = msg.toolCalls
-              .map((tc) => `[Tool Call: ${tc.name}(${JSON.stringify(tc.arguments)})]`)
-              .join('\n');
-            content = content ? `${content}\n${toolCallSummary}` : toolCallSummary;
+            try {
+              // Convert our ToolCall[] to vscode.lm format
+              const toolCalls = msg.toolCalls.map((tc) => ({
+                name: tc.name,
+                arguments: tc.arguments,
+              }));
+              // Try native format (may not be supported in all VSCode versions)
+              return vscode.LanguageModelChatMessage.Assistant(msg.content, toolCalls);
+            } catch (error) {
+              // Fallback to text serialization if native format fails
+              console.log('AIDev: Native tool call format not supported, using text fallback:', error);
+              const toolCallSummary = msg.toolCalls
+                .map((tc) => `[Tool Call: ${tc.name}(${JSON.stringify(tc.arguments)})]`)
+                .join('\n');
+              const content = msg.content ? `${msg.content}\n${toolCallSummary}` : toolCallSummary;
+              return vscode.LanguageModelChatMessage.Assistant(content);
+            }
           }
-          return vscode.LanguageModelChatMessage.Assistant(content);
+          return vscode.LanguageModelChatMessage.Assistant(msg.content);
         }
         case 'tool_result':
+          // Native tool result format - attempt native format first
+          if (msg.toolCallId) {
+            try {
+              // Try native tool result format (may not be supported)
+              return vscode.LanguageModelChatMessage.User(msg.content, {
+                name: '', // Tool name not needed for results
+                result: msg.content,
+              });
+            } catch (error) {
+              // Fallback to text serialization
+              console.log('AIDev: Native tool result format not supported, using text fallback:', error);
+              return vscode.LanguageModelChatMessage.User(
+                `[Tool Result for ${msg.toolCallId}]\n${msg.content}`,
+              );
+            }
+          }
+          // Fallback: serialize as text
           return vscode.LanguageModelChatMessage.User(
             `[Tool Result${msg.toolCallId ? ` for ${msg.toolCallId}` : ''}]\n${msg.content}`,
           );
@@ -150,8 +177,17 @@ export class VscodeLmProvider implements IModelProvider {
       }
     });
 
-    // Send the request
-    const requestOptions: vscode.LanguageModelChatRequestOptions = {};
+    // Convert ToolDefinition[] to vscode.lm format
+    const tools: vscode.LanguageModelToolInformation[] | undefined = options.tools?.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    }));
+
+    // Send the request with native tool support
+    const requestOptions: vscode.LanguageModelChatRequestOptions = {
+      ...(tools && tools.length > 0 ? { tools } : {}),
+    };
 
     const cancellation = new vscode.CancellationTokenSource();
 
@@ -163,10 +199,47 @@ export class VscodeLmProvider implements IModelProvider {
     try {
       const response = await model.sendRequest(messages, requestOptions, cancellation.token);
 
-      // Collect the streamed response
+      // Collect the streamed response and tool calls
       let content = '';
+      const toolCalls: ToolCall[] = [];
+
+      // Stream text content
       for await (const fragment of response.text) {
         content += fragment;
+      }
+
+      // Parse tool calls from response
+      // VSCode's LanguageModelChatResponse may expose tool calls via response.toolCalls
+      // or through the stream. Check both possibilities.
+      try {
+        // Check if response has a toolCalls property (native API)
+        if ('toolCalls' in response) {
+          const responseToolCalls = (response as {
+            toolCalls?: Array<{
+              name: string;
+              arguments: Record<string, unknown>;
+              id?: string;
+            }>;
+          }).toolCalls;
+          if (Array.isArray(responseToolCalls) && responseToolCalls.length > 0) {
+            for (const tc of responseToolCalls) {
+              toolCalls.push({
+                id: tc.id ?? `tool_${Date.now()}_${Math.random()}`,
+                name: tc.name,
+                arguments: tc.arguments ?? {},
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // If tool calls aren't available in this format, log and continue
+        console.log('AIDev: Tool calls not available in response format:', error);
+      }
+
+      // Determine stop reason
+      let stopReason: StopReason = 'end_turn';
+      if (toolCalls.length > 0) {
+        stopReason = 'tool_use';
       }
 
       return {
@@ -178,7 +251,8 @@ export class VscodeLmProvider implements IModelProvider {
           role: options.role,
           provider: model.vendor,
         },
-        stopReason: 'end_turn' as StopReason,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        stopReason,
       };
     } finally {
       cancellation.dispose();

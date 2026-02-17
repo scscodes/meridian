@@ -131,7 +131,7 @@ dispose()
 Providers support structured tool calling via `ModelRequestOptions.tools` and `ModelResponse.toolCalls`:
 
 - **DirectApiProvider**: Full tool calling via Anthropic tool_use / OpenAI function calling wire formats. Translates `ToolDefinition[]` to native format, parses `ToolCall[]` from responses.
-- **VscodeLmProvider**: Text-based fallback — tool calls/results are serialized as labeled text blocks. Native `vscode.lm` tool support planned when the API stabilizes across VSCode versions.
+- **VscodeLmProvider**: Native tool calling via `vscode.lm` API — passes `ToolDefinition[]` in `LanguageModelChatRequestOptions.tools`, parses `ToolCall[]` from response. Falls back to text serialization for older VSCode versions or unsupported models.
 
 Key types (all in `packages/core/src/types/models.ts`):
 

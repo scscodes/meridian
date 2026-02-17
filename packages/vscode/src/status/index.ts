@@ -8,33 +8,64 @@ const MODE_ICONS: Record<OperatingMode, string> = {
   economy: '$(leaf)',
 };
 
+/** Spinner shown while a tool is running */
+const BUSY_SPINNER = '$(sync~spin)';
+
+export interface StatusBarApi {
+  setBusy(message: string): void;
+  clearBusy(): void;
+}
+
 /**
- * Create status bar items for AIDev.
+ * Create the single AIDev status bar item and return API for busy state.
  *
- * Shows: current operating mode (clickable → opens mode picker)
- * Future: scan progress indicator
+ * Default: shows current mode (e.g. "AIDev: balanced"), clickable → mode picker.
+ * When busy: shows spinner + "AIDev: Scanning..." (or custom message).
  */
-export function createStatusBarItems(_context: vscode.ExtensionContext): vscode.Disposable[] {
+export function createStatusBarItems(
+  _context: vscode.ExtensionContext,
+): { disposables: vscode.Disposable[]; statusBar: StatusBarApi } {
   const modeItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   modeItem.command = 'aidev.setMode';
-  updateModeDisplay(modeItem);
+  let isBusy = false;
+  let busyMessage = 'Scanning...';
+
+  function updateDisplay(): void {
+    if (isBusy) {
+      modeItem.text = `${BUSY_SPINNER} AIDev: ${busyMessage}`;
+      modeItem.tooltip = 'AIDev is running…';
+    } else {
+      const config = vscode.workspace.getConfiguration('aidev');
+      const mode = config.get<OperatingMode>('mode', 'balanced');
+      const icon = MODE_ICONS[mode] ?? '$(beaker)';
+      modeItem.text = `${icon} AIDev: ${mode}`;
+      modeItem.tooltip = `AIDev operating mode: ${mode}\nClick to change.`;
+    }
+  }
+
+  updateDisplay();
   modeItem.show();
 
-  // React to mode changes in real-time
   const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
-    if (e.affectsConfiguration('aidev.mode')) {
-      updateModeDisplay(modeItem);
+    if (e.affectsConfiguration('aidev.mode') && !isBusy) {
+      updateDisplay();
     }
   });
 
-  return [modeItem, configListener];
-}
+  const statusBar: StatusBarApi = {
+    setBusy(message: string): void {
+      isBusy = true;
+      busyMessage = message;
+      updateDisplay();
+    },
+    clearBusy(): void {
+      isBusy = false;
+      updateDisplay();
+    },
+  };
 
-function updateModeDisplay(item: vscode.StatusBarItem): void {
-  const config = vscode.workspace.getConfiguration('aidev');
-  const mode = config.get<OperatingMode>('mode', 'balanced');
-  const icon = MODE_ICONS[mode] ?? '$(beaker)';
-
-  item.text = `${icon} AIDev: ${mode}`;
-  item.tooltip = `AIDev operating mode: ${mode}\nClick to change.`;
+  return {
+    disposables: [modeItem, configListener],
+    statusBar,
+  };
 }

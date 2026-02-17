@@ -12,6 +12,7 @@ import {
 } from '@aidev/core';
 import type { SettingsManager } from '../settings/index.js';
 import type { ProviderManager } from '../providers/index.js';
+import type { StatusBarApi } from '../status/index.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ type ToolResultCallback = (result: ScanResult) => void;
  * - Injects model provider and settings as dependencies
  * - Resolves workspace path for cwd
  * - Manages result notifications and sidebar updates
- * - Handles progress indication
+ * - Single status bar busy state (Scanning... / Fetching...)
  */
 export class ToolRunner implements vscode.Disposable {
   private readonly _onDidCompleteRun = new vscode.EventEmitter<ScanResult>();
@@ -40,6 +41,7 @@ export class ToolRunner implements vscode.Disposable {
   constructor(
     private readonly settings: SettingsManager,
     private readonly providers: ProviderManager,
+    private readonly statusBar?: StatusBarApi,
   ) {}
 
   /**
@@ -89,57 +91,58 @@ export class ToolRunner implements vscode.Disposable {
       }
     }
 
-    // Execute with progress
-    const result = await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Window,
-        title: `AIDev: ${entry.name}`,
-        cancellable: true,
-      },
-      async (progress, token) => {
-        progress.report({ message: 'Starting...' });
+    const busyMessage = toolId === 'branch-diff' ? 'Fetching...' : 'Scanning...';
+    this.statusBar?.setBusy(busyMessage);
 
-        const tool = this.createTool(toolId, cwd, provider);
-        if (!tool) {
-          // Return a failed result instead of throwing
-          // createTool already showed an error message to the user
-          return {
-            toolId,
-            status: 'failed',
-            startedAt: new Date(),
-            completedAt: new Date(),
-            findings: [],
-            summary: {
-              totalFindings: 0,
-              bySeverity: { error: 0, warning: 0, info: 0, hint: 0 },
-            },
-            error: `Tool "${toolId}" could not be created. Check error messages above for details.`,
-            filesScanned: 0,
+    let result: ScanResult;
+    try {
+      result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `AIDev: ${entry.name}`,
+          cancellable: true,
+        },
+        async (progress, token) => {
+          progress.report({ message: 'Starting...' });
+
+          const tool = this.createTool(toolId, cwd, provider);
+          if (!tool) {
+            return {
+              toolId,
+              status: 'failed',
+              startedAt: new Date(),
+              completedAt: new Date(),
+              findings: [],
+              summary: {
+                totalFindings: 0,
+                bySeverity: { error: 0, warning: 0, info: 0, hint: 0 },
+              },
+              error: `Tool "${toolId}" could not be created. Check error messages above for details.`,
+              filesScanned: 0,
+            };
+          }
+
+          token.onCancellationRequested(() => tool.cancel());
+
+          const scanOptions: ScanOptions = {
+            paths: options?.paths,
+            signal: options?.signal,
+            args: options?.args,
           };
-        }
 
-        // Wire cancellation
-        token.onCancellationRequested(() => tool.cancel());
-
-        const scanOptions: ScanOptions = {
-          paths: options?.paths,
-          signal: options?.signal,
-          args: options?.args,
-        };
-
-        progress.report({ message: 'Analyzing...' });
-        
-        console.log(`AIDev: Executing ${toolId}...`);
-        const executeResult = await tool.execute(scanOptions);
-        console.log(`AIDev: ${toolId} execution completed with status: ${executeResult.status}`);
-        
-        if (executeResult.status === 'failed' && executeResult.error) {
-          console.error(`AIDev: ${toolId} execution failed:`, executeResult.error);
-        }
-        
-        return executeResult;
-      },
-    );
+          progress.report({ message: 'Analyzing...' });
+          console.log(`AIDev: Executing ${toolId}...`);
+          const executeResult = await tool.execute(scanOptions);
+          console.log(`AIDev: ${toolId} execution completed with status: ${executeResult.status}`);
+          if (executeResult.status === 'failed' && executeResult.error) {
+            console.error(`AIDev: ${toolId} execution failed:`, executeResult.error);
+          }
+          return executeResult;
+        },
+      );
+    } finally {
+      this.statusBar?.clearBusy();
+    }
 
     // Store and broadcast result
     this.lastResults.set(toolId, result);
@@ -181,24 +184,9 @@ export class ToolRunner implements vscode.Disposable {
     const current = this.settings.current;
 
     // Helper to create consistent error messages for missing providers
-    const getProviderErrorMsg = (toolName: string): string => {
-      const isCursor = vscode.env.appName.toLowerCase().includes('cursor');
-      const baseMsg = `AIDev: ${toolName} requires a model provider. No provider is currently available.`;
-      
-      if (isCursor) {
-        return (
-          baseMsg +
-          ' Cursor IDE does not expose models via vscode.lm API. ' +
-          'Please configure direct API keys: set aidev.providerSource to "direct" ' +
-          'and configure aidev.directApi.provider and aidev.directApi.apiKey in settings.'
-        );
-      }
-      
-      return (
-        baseMsg +
-        ' Check AIDev settings (aidev.providerSource) and ensure your IDE has models configured or API keys are set.'
-      );
-    };
+    const getProviderErrorMsg = (toolName: string): string =>
+      `AIDev: ${toolName} requires a model provider. No provider is currently available. ` +
+      'Check AIDev settings (aidev.providerSource) and ensure your IDE has models configured or API keys are set.';
 
     // Helper to safely create a tool with error handling
     const createToolSafely = <T extends import('@aidev/core').ITool>(
@@ -358,12 +346,8 @@ export class ToolRunner implements vscode.Disposable {
     switch (status) {
       case 'completed':
         if (summary.totalFindings > 0) {
-          const message = `AIDev: ${toolName} found ${String(summary.totalFindings)} items. Check the sidebar for details.`;
-          console.log(message);
-          void vscode.window.showInformationMessage(message);
-        } else {
-          const message = `AIDev: ${toolName} completed — no findings.`;
-          console.log(message);
+          const message = `${toolName}: ${String(summary.totalFindings)} item(s) — see sidebar`;
+          console.log(`AIDev: ${message}`);
           void vscode.window.showInformationMessage(message);
         }
         break;
@@ -374,12 +358,9 @@ export class ToolRunner implements vscode.Disposable {
         void vscode.window.showErrorMessage(message);
         break;
       }
-      case 'cancelled': {
-        const message = `AIDev: ${toolName} cancelled.`;
-        console.log(message);
-        void vscode.window.showInformationMessage(message);
+      case 'cancelled':
+        console.log(`AIDev: ${toolName} cancelled.`);
         break;
-      }
     }
   }
 }

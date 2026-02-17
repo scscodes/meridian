@@ -147,19 +147,7 @@ export class ProviderManager implements vscode.Disposable {
     }
 
     this.activeProvider = undefined;
-    
-    // Check if we're in Cursor and provide helpful guidance
-    const isCursor = vscode.env.appName.toLowerCase().includes('cursor');
-    if (isCursor) {
-      console.warn(
-        'AIDev: No model provider available. ' +
-        'Cursor IDE does not expose models via vscode.lm API. ' +
-        'Please configure direct API keys: set aidev.providerSource to "direct" ' +
-        'and configure aidev.directApi.provider and aidev.directApi.apiKey in settings.',
-      );
-    } else {
-      console.warn('AIDev: No model provider available. Tools requiring models will not work.');
-    }
+    console.warn('AIDev: No model provider available. Tools requiring models will not work.');
   }
 
   /** Get the currently active provider. Undefined if none available. */

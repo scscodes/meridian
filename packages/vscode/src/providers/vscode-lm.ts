@@ -14,15 +14,8 @@ import type { SettingsManager } from '../settings/index.js';
 
 /**
  * Model provider using the VSCode Language Model API (vscode.lm).
- *
- * Works with:
- * - GitHub Copilot in VSCode (models exposed via Copilot subscription)
- *
- * IMPORTANT: Cursor IDE does NOT expose models through vscode.lm API.
- * If you're using Cursor, you must use the Direct API provider instead
- * (aidev.providerSource: "direct" with API keys configured).
- *
- * The vscode.lm API is available in VSCode 1.95+.
+ * Works with GitHub Copilot in VSCode (models exposed via Copilot subscription).
+ * Requires VSCode 1.95+.
  */
 export class VscodeLmProvider implements IModelProvider {
   readonly id = 'vscode-lm';
@@ -53,14 +46,7 @@ export class VscodeLmProvider implements IModelProvider {
         console.log(`AIDev: Available models: ${models.map(m => `${m.name} (${m.id})`).join(', ')}`);
         return true;
       } else {
-        // Cursor IDE doesn't expose models via vscode.lm API
-        // This is expected behavior in Cursor - users should use direct API provider
-        const isCursor = vscode.env.appName.toLowerCase().includes('cursor');
-        if (isCursor) {
-          console.log('AIDev: No models from vscode.lm API (expected in Cursor). Use direct API provider instead.');
-        } else {
-          console.log('AIDev: No models available from vscode.lm API. Ensure GitHub Copilot is installed and signed in.');
-        }
+        console.log('AIDev: No models available from vscode.lm API. Ensure GitHub Copilot is installed and signed in.');
         return false;
       }
     } catch (error) {
@@ -98,9 +84,7 @@ export class VscodeLmProvider implements IModelProvider {
     }
 
     if (!vscode.lm) {
-      throw new Error(
-        'vscode.lm API is not available. This extension requires VSCode 1.95+ or Cursor with language model support.',
-      );
+      throw new Error('vscode.lm API is not available. This extension requires VSCode 1.95+.');
     }
 
     const settings = this.settingsManager.current;
@@ -113,13 +97,9 @@ export class VscodeLmProvider implements IModelProvider {
       console.log(`AIDev: Found ${String(available.length)} available model(s) for fallback`);
       
       if (available.length === 0) {
-        const isCursor = vscode.env.appName.toLowerCase().includes('cursor');
-        const errorMsg = isCursor
-          ? 'Cursor IDE does not expose models through vscode.lm API. ' +
-            'Please use the Direct API provider instead: set aidev.providerSource to "direct" ' +
-            'and configure your API keys (aidev.directApi.provider and aidev.directApi.apiKey).'
-          : 'No language models available from vscode.lm API. ' +
-            'Ensure GitHub Copilot is installed and signed in.';
+        const errorMsg =
+          'No language models available from vscode.lm API. ' +
+          'Ensure GitHub Copilot is installed and signed in.';
         console.error(`AIDev: ${errorMsg}`);
         throw new Error(errorMsg);
       }

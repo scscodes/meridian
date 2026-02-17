@@ -19,7 +19,7 @@ export type ModelRole = 'chat' | 'tool';
 
 /**
  * Where models come from.
- * - 'ide': Uses vscode.lm API (Copilot / Cursor built-in models)
+ * - 'ide': Uses vscode.lm API (GitHub Copilot in VSCode)
  * - 'direct': Uses user-provided API keys (Anthropic / OpenAI)
  */
 export type ModelProviderSource = 'ide' | 'direct';

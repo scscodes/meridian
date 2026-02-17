@@ -45,9 +45,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     context.subscriptions.push(providers);
 
-    // 3. Tool runner — orchestrates tool execution with providers + settings
+    // 3. Status bar (single item; exposes setBusy/clearBusy for runner)
+    const { disposables: statusBarDisposables, statusBar } = createStatusBarItems(context);
+    context.subscriptions.push(...statusBarDisposables);
+
+    // 4. Tool runner — orchestrates tool execution with providers + settings + status bar
     console.log('AIDev: Initializing ToolRunner...');
-    const toolRunner = new ToolRunner(settings, providers);
+    const toolRunner = new ToolRunner(settings, providers, statusBar);
     context.subscriptions.push(toolRunner);
     console.log('AIDev: ToolRunner initialized');
 
@@ -62,13 +66,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       console.error('AIDev: Failed to import TldrTool:', error);
     }
 
-    // 4. UI components — all independent of each other
+    // 5. UI components — commands, chat, sidebar (status bar already registered above)
     console.log('AIDev: Registering UI components...');
     context.subscriptions.push(
       ...registerCommands(context, settings, toolRunner),
       ...registerChatParticipant(context, providers, toolRunner),
       ...registerSidebar(context, toolRunner),
-      ...createStatusBarItems(context),
     );
     console.log('AIDev: UI components registered');
 

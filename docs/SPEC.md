@@ -25,7 +25,7 @@ This is the single source of truth for the AIDev extension. All architectural de
 
 ## Overview
 
-AIDev is an AI-powered developer toolkit extension for **VSCode** and **Cursor** (same extension, one codebase). It provides automated code analysis, commit workflows, and change summarization — driven by language models selected through the IDE or configured via direct API keys.
+AIDev is an AI-powered developer toolkit extension for **VSCode**. It provides automated code analysis, commit workflows, and change summarization — driven by language models selected through the IDE or configured via direct API keys.
 
 ### Core Philosophy
 
@@ -43,7 +43,7 @@ AIDev is an AI-powered developer toolkit extension for **VSCode** and **Cursor**
 ```
 packages/
   core/       Pure TypeScript. Zero IDE dependency. Types, settings, models, tools, utils.
-  vscode/     VSCode/Cursor extension shell. Depends on @aidev/core.
+  vscode/     VSCode extension shell. Depends on @aidev/core.
 ```
 
 **Why**: Enforces clean separation. Core logic is testable in isolation (vitest, no electron). Extension shell is a thin adapter layer.
@@ -75,7 +75,7 @@ packages/
 
 ## Settings
 
-All settings live under the `aidev.*` namespace in VSCode/Cursor settings.
+All settings live under the `aidev.*` namespace in VSCode settings.
 
 ### Authoritative References
 
@@ -148,10 +148,8 @@ StopReason        'end_turn' | 'tool_use' | 'max_tokens'
 
 | ID | Class | Location | Description |
 |----|-------|----------|-------------|
-| `vscode-lm` | `VscodeLmProvider` | `packages/vscode/src/providers/vscode-lm.ts` | Uses `vscode.lm` API — **GitHub Copilot in VSCode only** (Cursor does not expose models via this API) |
-| `direct-api` | `DirectApiProvider` | `packages/vscode/src/providers/direct-api.ts` | Direct API keys — Anthropic / OpenAI (required for Cursor users) |
-
-**Cursor and MCP**: Cursor does not expose models via `vscode.lm`. A future option is to use the Model Context Protocol (MCP): run an MCP server that exposes AIDev tools and, if Cursor supports it, uses *sampling* to request LLM completions from the host (user’s model, including Auto). See [CURSOR_MCP_STRATEGY.md](./CURSOR_MCP_STRATEGY.md) for strategy options and references.
+| `vscode-lm` | `VscodeLmProvider` | `packages/vscode/src/providers/vscode-lm.ts` | Uses `vscode.lm` API — GitHub Copilot in VSCode |
+| `direct-api` | `DirectApiProvider` | `packages/vscode/src/providers/direct-api.ts` | Direct API keys — Anthropic / OpenAI |
 
 ### Provider Selection
 
@@ -343,7 +341,7 @@ Conversational refinement is handled by the agent loop: the model proposes, the 
 - Two interaction modes:
   - **Slash commands**: `/deadcode`, `/lint`, `/comments`, `/commit`, `/tldr`, `/branchdiff`, `/resolve` — direct tool invocation, bypasses agent loop
   - **Free-form messages**: Routed through the agentic multi-turn loop (see below)
-- **Graceful degradation**: if Chat Participant API is unavailable (e.g. some Cursor versions), all tools remain accessible via commands and sidebar
+- **Graceful degradation**: if Chat Participant API is unavailable, all tools remain accessible via commands and sidebar
 - Driven by `TOOL_REGISTRY` — adding a tool there auto-registers its chat command and makes it available to the agent loop
 
 ### Agentic Multi-Turn Loop
@@ -385,16 +383,17 @@ packages/core/src/agent/
 ### Sidebar Panel
 
 - Activity bar icon: `$(beaker)` → "AIDev"
-- Two views:
-  - **Tools**: clickable list of all tools (one item per `TOOL_REGISTRY` entry)
-  - **Results**: findings from the most recent scan, with jump-to-source
+- Single view "AIDev" with categorized tree:
+  - **General**: TLDR
+  - **Hygiene**: Dead Code, Lint & Best Practice, Comment Pruning
+  - **SCM**: Branch Diff, Diff Resolver, Auto-Commit
+- Each category is expandable; each tool is clickable (runs the tool). Results (findings or summary) appear as children under the tool. Jump-to-source for findings.
 - Registered in `packages/vscode/src/sidebar/provider.ts`
 
 ### Status Bar
 
-- Left-aligned, shows current mode with icon (rocket/dashboard/leaf)
-- Clickable → opens mode picker
-- Reacts to settings changes in real-time
+- Single left-aligned item: shows current mode (e.g. "AIDev: balanced") with icon (rocket/dashboard/leaf); clickable → mode picker. When a tool is running, shows spinner and "AIDev: Scanning..." or "AIDev: Fetching..." (branch-diff).
+- Reacts to settings changes and run state.
 - Defined in `packages/vscode/src/status/index.ts`
 
 ### Commands (Palette)
@@ -519,11 +518,11 @@ packages/vscode/src/
 │   └── participant.ts          @aidev chat participant (agent loop host + slash commands)
 ├── sidebar/
 │   ├── index.ts                Sidebar barrel
-│   └── provider.ts             ToolsTreeProvider, ResultsTreeProvider (jump-to-source)
+│   └── provider.ts             AidevTreeProvider (categorized tree, results under tools)
 ├── commands/
 │   └── index.ts                All command registrations (routes to ToolRunner)
 └── status/
-    └── index.ts                Status bar mode indicator
+    └── index.ts                Status bar: mode + busy state (Scanning.../Fetching...)
 ```
 
 ---
@@ -569,13 +568,13 @@ packages/vscode/src/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-02-12 | VSCode + Cursor only (not JetBrains/Neovim) | Same extension API, ship fast |
+| 2026-02-12 | VSCode only (not JetBrains/Neovim/Cursor) | Same extension API, ship fast; Cursor dropped 2026-02-13 |
 | 2026-02-12 | Monorepo: core + vscode | Clean separation, testable core |
 | 2026-02-12 | Global modes only, no per-feature overrides | Keep it simple at launch |
 | 2026-02-12 | IDE-provided models primary, direct API fallback | Cover both Copilot and API-key users |
 | 2026-02-12 | Static analysis + model synthesis for dead code/lint | Static is fast/cheap, model catches subtler issues |
 | 2026-02-12 | Proposal-based for comments and commits | Safety first — never auto-modify without approval |
-| 2026-02-12 | Chat Participant API with graceful degradation | Works in VSCode, commands fallback for Cursor |
+| 2026-02-12 | Chat Participant API with graceful degradation | Works in VSCode; commands fallback if API unavailable |
 | 2026-02-12 | npm over pnpm/yarn | More common on developer's systems |
 | 2026-02-12 | Warn (not deny) as default enforcement | Less friction out of the box |
 | 2026-02-13 | Tool invocation classification (autonomous/restricted) | Enforces proposal-based constraint in agentic loop |
@@ -587,4 +586,5 @@ packages/vscode/src/
 | 2026-02-13 | ScanOptions.args for tool-specific parameters | Generic passthrough from agent loop to tools without breaking ITool interface |
 | 2026-02-13 | Branch diff as autonomous tool | Read-only remote comparison, safe for model invocation |
 | 2026-02-13 | Diff resolver as restricted tool | Modifies files, requires user confirmation per proposal-based policy |
+| 2026-02-13 | Cursor dropped as intended use case | Limitations too hindering; extension targets VSCode only |
 | 2026-02-13 | Conflict classification: safe (auto) vs complex (model) | Trivial conflicts resolved deterministically; non-trivial use LLM with confidence scoring |

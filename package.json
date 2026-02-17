@@ -2,7 +2,7 @@
   "name": "aidev",
   "private": true,
   "version": "0.0.1",
-  "description": "AI-powered developer toolkit for VSCode and Cursor",
+  "description": "AI-powered developer toolkit for VSCode",
   "workspaces": [
     "packages/*"
   ],

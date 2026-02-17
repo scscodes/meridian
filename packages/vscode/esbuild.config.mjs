@@ -3,7 +3,7 @@ import * as esbuild from 'esbuild';
 const isWatch = process.argv.includes('--watch');
 
 /** @type {import('esbuild').BuildOptions} */
-const buildOptions = {
+const extensionBuild = {
   entryPoints: ['src/extension.ts'],
   bundle: true,
   outfile: 'dist/extension.js',
@@ -16,10 +16,10 @@ const buildOptions = {
 };
 
 if (isWatch) {
-  const ctx = await esbuild.context(buildOptions);
+  const ctx = await esbuild.context(extensionBuild);
   await ctx.watch();
-  console.log('[aidev] Watching for changes...');
+  console.log('[aidev] Extension watching...');
 } else {
-  await esbuild.build(buildOptions);
+  await esbuild.build(extensionBuild);
   console.log('[aidev] Build complete.');
 }

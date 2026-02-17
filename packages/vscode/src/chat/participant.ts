@@ -31,10 +31,7 @@ const DEFAULT_SEVERITY_ICON = 'ℹ️';
 
 /**
  * Register the @aidev chat participant for VSCode Copilot Chat.
- *
- * In Cursor, the Chat Participant API may not be available.
- * Features degrade gracefully — all tools remain accessible via
- * commands (palette + sidebar).
+ * If the Chat Participant API is unavailable, tools remain accessible via commands (palette + sidebar).
  */
 export function registerChatParticipant(
   _context: vscode.ExtensionContext,

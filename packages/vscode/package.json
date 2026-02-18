@@ -195,6 +195,11 @@
         "icon": "$(git-merge)"
       },
       {
+        "command": "aidev.prReview",
+        "title": "AIDev: PR Review — Pull and Review Pull Requests",
+        "icon": "$(git-pull-request)"
+      },
+      {
         "command": "aidev.exportResults",
         "title": "AIDev: Export Results",
         "icon": "$(export)"
@@ -202,6 +207,26 @@
       {
         "command": "aidev.setMode",
         "title": "AIDev: Set Operating Mode",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "aidev.tool.run",
+        "title": "Run",
+        "icon": "$(play)"
+      },
+      {
+        "command": "aidev.tool.clear",
+        "title": "Clear Results",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "aidev.tool.export",
+        "title": "Export Results",
+        "icon": "$(export)"
+      },
+      {
+        "command": "aidev.tool.configure",
+        "title": "Configure",
         "icon": "$(settings-gear)"
       }
     ],
@@ -219,6 +244,30 @@
         {
           "id": "aidev.toolsView",
           "name": "AIDev"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "when": "view == aidev.toolsView && viewItem =~ /^aidev\\.tool\\..+/",
+          "command": "aidev.tool.run",
+          "group": "1_actions"
+        },
+        {
+          "when": "view == aidev.toolsView && viewItem =~ /^aidev\\.tool\\..+/",
+          "command": "aidev.tool.clear",
+          "group": "1_actions"
+        },
+        {
+          "when": "view == aidev.toolsView && viewItem =~ /^aidev\\.tool\\..+/",
+          "command": "aidev.tool.export",
+          "group": "1_actions"
+        },
+        {
+          "when": "view == aidev.toolsView && viewItem =~ /^aidev\\.tool\\..+/",
+          "command": "aidev.tool.configure",
+          "group": "2_configuration"
         }
       ]
     },
@@ -257,6 +306,10 @@
           {
             "name": "resolve",
             "description": "Detect and resolve merge conflicts"
+          },
+          {
+            "name": "prreview",
+            "description": "Pull and review pull requests on target branches"
           }
         ]
       }

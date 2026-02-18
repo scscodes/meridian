@@ -52,5 +52,23 @@ export {
 // Hooks
 export { checkHooks } from './hooks.js';
 
+// Stash
+export {
+  stashChanges,
+  hasUncommittedChanges,
+  popStash,
+  listStashes,
+} from './stash.js';
+
+// PR Operations
+export {
+  remoteBranchExists,
+  getUpdatedRemoteBranches,
+  checkoutRemoteBranch,
+  getPullRequestInfo,
+  listPotentialPullRequests,
+} from './pr.js';
+export type { PullRequestInfo } from './pr.js';
+
 // Validation
 export { validateCommitMessage } from './validation.js';

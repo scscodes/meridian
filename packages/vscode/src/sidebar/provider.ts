@@ -12,7 +12,7 @@ type CategoryId = (typeof CATEGORY_IDS)[number];
 const TOOLS_BY_CATEGORY: Record<CategoryId, ToolId[]> = {
   general: ['tldr'],
   hygiene: ['dead-code', 'lint', 'comments'],
-  scm: ['branch-diff', 'diff-resolve', 'commit'],
+  scm: ['branch-diff', 'diff-resolve', 'commit', 'pr-review'],
 };
 
 /** Section headers in uppercase with inline badge (like Extensions INSTALLED/RECOMMENDED). */
@@ -39,11 +39,12 @@ const TOOL_ICONS: Record<string, string> = {
   'tldr': 'book',
   'branch-diff': 'git-branch',
   'diff-resolve': 'git-merge',
+  'pr-review': 'git-pull-request',
 };
 
 // ─── Tree node types ─────────────────────────────────────────────────────────
 
-type AidevTreeNode = CategoryNode | ToolNode | RunToolNode | FindingNode | ResultSummaryNode;
+type AidevTreeNode = CategoryNode | ToolNode | FindingNode | ResultSummaryNode;
 
 class CategoryNode {
   constructor(public readonly id: CategoryId) {}
@@ -65,20 +66,28 @@ class ResultSummaryNode {
   constructor(public readonly result: ScanResult) {}
 }
 
-/** "Run" action row — click to execute the tool (avoids misclicks when expanding). */
-class RunToolNode {
-  constructor(public readonly entry: ToolRegistryEntry) {}
+// ─── Inline status icons ────────────────────────────────────────────────────
+
+/** Get checkmark icon based on state: spinning (running), check (clean), or count (findings). */
+function getStatusIcon(result: ScanResult | undefined, isRunning: boolean): string {
+  if (isRunning) return '$(sync~spin)';
+  if (!result) return '';
+  if (result.status === 'failed') return '$(error)';
+  if (result.status === 'completed') {
+    const n = result.findings.length;
+    return n === 0 ? '$(check)' : `$(warning) ${String(n)}`;
+  }
+  return '';
 }
 
-// ─── Inline status (success/clean/failed) ───────────────────────────────────
-
-/** Description shown on the tool row: ✓ clean, n findings, or Failed. */
-function inlineStatus(result: ScanResult | undefined): string {
+/** Get status text for description. */
+function getStatusText(result: ScanResult | undefined, isRunning: boolean): string {
+  if (isRunning) return 'Running...';
   if (!result) return '';
   if (result.status === 'failed') return 'Failed';
   if (result.status === 'completed') {
     const n = result.findings.length;
-    return n === 0 ? '✓' : String(n);
+    return n === 0 ? 'Clean' : `${String(n)} finding${n === 1 ? '' : 's'}`;
   }
   return '';
 }
@@ -99,54 +108,52 @@ function treeItemForCategory(id: CategoryId, badge: number): vscode.TreeItem {
 
 function treeItemForTool(node: ToolNode, isRunning: boolean): vscode.TreeItem {
   const { entry, result } = node;
-  const status = inlineStatus(result);
+  const statusIcon = getStatusIcon(result, isRunning);
+  const statusText = getStatusText(result, isRunning);
   
-  // Show tool name only - don't make it clickable (fixes expand bug)
+  // Create tree item with tool name
   const item = new vscode.TreeItem(
     entry.name,
-    vscode.TreeItemCollapsibleState.Collapsed,
+    result && result.findings.length > 0
+      ? vscode.TreeItemCollapsibleState.Expanded
+      : vscode.TreeItemCollapsibleState.None,
   );
+  
   item.iconPath = new vscode.ThemeIcon(TOOL_ICONS[entry.id] ?? 'beaker');
   
-  // Show status in description
-  if (isRunning) {
-    item.description = '$(sync~spin) Running...';
-  } else if (status) {
-    item.description = status;
+  // Show status icon and text in description, ellipsis menu icon at the end
+  const descriptionParts: string[] = [];
+  if (statusIcon) {
+    descriptionParts.push(statusIcon);
   }
+  if (statusText && !statusIcon.includes(statusText)) {
+    descriptionParts.push(statusText);
+  }
+  // Add ellipsis icon for menu (right-click to access)
+  descriptionParts.push('$(ellipsis)');
+  item.description = descriptionParts.join(' ');
   
-  item.tooltip = entry.description + (status ? ` — ${status}` : ' — Expand and click Run to execute');
+  // Build tooltip
+  let tooltip = entry.description;
+  if (isRunning) {
+    tooltip = `${entry.description} — Running...`;
+  } else if (statusText) {
+    tooltip = `${entry.description} — ${statusText}`;
+  }
   if (result?.status === 'failed' && result.error) {
-    item.tooltip = result.error;
+    tooltip = `${tooltip}\n\nError: ${result.error}`;
   }
-  if (isRunning) {
-    item.tooltip = `${entry.description} — Running...`;
-  }
+  item.tooltip = tooltip;
   
-  // Don't set command - clicking should only expand, not run
-  item.contextValue = 'aidev.tool';
+  // Set context value with tool ID for context menu commands
+  item.contextValue = `aidev.tool.${entry.id}`;
+  
+  // Store tool ID in resourceUri for command arguments (workaround)
+  item.resourceUri = vscode.Uri.parse(`aidev:tool/${entry.id}`);
+  
   return item;
 }
 
-function treeItemForRunTool(node: RunToolNode, isRunning: boolean): vscode.TreeItem {
-  // Align Run to the right by using description
-  const item = new vscode.TreeItem('', vscode.TreeItemCollapsibleState.None);
-  
-  if (isRunning) {
-    item.description = '$(sync~spin) Running...';
-    item.iconPath = new vscode.ThemeIcon('sync~spin');
-    item.tooltip = `${node.entry.name} is running...`;
-  } else {
-    item.description = 'Run';
-    // Use green play icon (check-circle or play-circle for colored icon)
-    item.iconPath = new vscode.ThemeIcon('play-circle');
-    item.tooltip = `Run ${node.entry.name}`;
-    item.command = { command: node.entry.commandId, title: node.entry.name };
-  }
-  
-  item.contextValue = 'aidev.run';
-  return item;
-}
 
 function treeItemForFinding(finding: Finding): vscode.TreeItem {
   const item = new vscode.TreeItem(finding.title, vscode.TreeItemCollapsibleState.None);
@@ -230,10 +237,6 @@ export class AidevTreeProvider implements vscode.TreeDataProvider<AidevTreeNode>
       const isRunning = this.toolRunner?.isRunning(element.entry.id) ?? false;
       return treeItemForTool(element, isRunning);
     }
-    if (element instanceof RunToolNode) {
-      const isRunning = this.toolRunner?.isRunning(element.entry.id) ?? false;
-      return treeItemForRunTool(element, isRunning);
-    }
     if (element instanceof FindingNode) {
       return treeItemForFinding(element.finding);
     }
@@ -259,17 +262,16 @@ export class AidevTreeProvider implements vscode.TreeDataProvider<AidevTreeNode>
     }
 
     if (element instanceof ToolNode) {
-      // Always show Run node first (aligned right), then results
-      const runNode = new RunToolNode(element.entry);
+      // Show results directly under tool (no Run node - that's in the menu)
       if (!element.result) {
-        return [runNode];
+        return [];
       }
       const { result } = element;
       const resultNodes: AidevTreeNode[] =
         result.findings.length > 0
           ? result.findings.map((f) => new FindingNode(f))
           : [new ResultSummaryNode(result)];
-      return [runNode, ...resultNodes];
+      return resultNodes;
     }
 
     return [];

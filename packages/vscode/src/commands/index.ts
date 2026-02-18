@@ -109,6 +109,127 @@ export function registerCommands(
     }),
   );
 
+  // Helper to extract tool ID from tree item context
+  function extractToolIdFromContext(context: unknown): ToolId | undefined {
+    if (context && typeof context === 'object' && 'resourceUri' in context) {
+      const uri = (context as { resourceUri: vscode.Uri }).resourceUri;
+      if (uri && uri.scheme === 'aidev' && uri.path.startsWith('/tool/')) {
+        const toolId = uri.path.replace('/tool/', '') as ToolId;
+        if (TOOL_REGISTRY.some((t) => t.id === toolId)) {
+          return toolId;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  // Tool context menu commands (work with any tool via argument)
+  disposables.push(
+    vscode.commands.registerCommand('aidev.tool.run', async (context?: unknown) => {
+      let toolId = extractToolIdFromContext(context);
+      if (!toolId) {
+        // If called from menu without context, show picker
+        const selected = await vscode.window.showQuickPick(
+          TOOL_REGISTRY.map((t) => ({ label: t.name, toolId: t.id as ToolId })),
+          { placeHolder: 'Select tool to run' },
+        );
+        if (!selected) return;
+        toolId = selected.toolId;
+      }
+      await toolRunner.run(toolId);
+    }),
+  );
+
+  disposables.push(
+    vscode.commands.registerCommand('aidev.tool.clear', async (context?: unknown) => {
+      let toolId = extractToolIdFromContext(context);
+      if (!toolId) {
+        const selected = await vscode.window.showQuickPick(
+          TOOL_REGISTRY.map((t) => ({ label: t.name, toolId: t.id as ToolId })),
+          { placeHolder: 'Select tool to clear' },
+        );
+        if (!selected) return;
+        toolId = selected.toolId;
+      }
+      // Note: ToolRunner doesn't have a clear method yet
+      // For now, just show a message - results will be replaced on next run
+      const tool = TOOL_REGISTRY.find((t) => t.id === toolId);
+      void vscode.window.showInformationMessage(
+        `Results for ${tool?.name ?? toolId} will be cleared on next run.`,
+      );
+    }),
+  );
+
+  disposables.push(
+    vscode.commands.registerCommand('aidev.tool.export', async (context?: unknown) => {
+      let toolId = extractToolIdFromContext(context);
+      if (!toolId) {
+        const selected = await vscode.window.showQuickPick(
+          TOOL_REGISTRY.map((t) => {
+            const result = toolRunner.getLastResult(t.id as ToolId);
+            return {
+              label: t.name,
+              description: result ? `${String(result.summary.totalFindings)} findings` : 'No results',
+              toolId: t.id as ToolId,
+            };
+          }),
+          { placeHolder: 'Select tool to export' },
+        );
+        if (!selected) return;
+        toolId = selected.toolId;
+      }
+
+      const result = toolRunner.getLastResult(toolId);
+      if (!result) {
+        const tool = TOOL_REGISTRY.find((t) => t.id === toolId);
+        void vscode.window.showInformationMessage(
+          `No results to export for ${tool?.name ?? toolId}. Run the tool first.`,
+        );
+        return;
+      }
+
+      const tool = TOOL_REGISTRY.find((t) => t.id === toolId);
+      const formatPick = await vscode.window.showQuickPick(
+        [
+          { label: 'JSON', description: 'Machine-readable format', format: 'json' as ExportFormat },
+          {
+            label: 'Markdown',
+            description: 'Human-readable format',
+            format: 'markdown' as ExportFormat,
+          },
+        ],
+        { placeHolder: 'Export format' },
+      );
+
+      if (!formatPick) return;
+
+      const ext = formatPick.format === 'json' ? 'json' : 'md';
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`aidev-${toolId}-results.${ext}`),
+        filters:
+          formatPick.format === 'json'
+            ? { JSON: ['json'] }
+            : { Markdown: ['md'] },
+      });
+
+      if (uri) {
+        const content =
+          formatPick.format === 'json'
+            ? JSON.stringify(result, null, 2)
+            : formatResultAsMarkdown(tool?.name ?? toolId, result);
+
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf-8'));
+        await vscode.window.showTextDocument(uri);
+      }
+    }),
+  );
+
+  disposables.push(
+    vscode.commands.registerCommand('aidev.tool.configure', async () => {
+      await vscode.commands.executeCommand('workbench.action.openSettings', 'aidev');
+    }),
+  );
+
   return disposables;
 }
 

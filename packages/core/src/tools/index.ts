@@ -11,6 +11,7 @@ export { CommentsTool } from './comments/index.js';
 export { TldrTool } from './tldr/index.js';
 export { BranchDiffTool } from './branch-diff/index.js';
 export { DiffResolveTool } from './diff-resolve/index.js';
+export { PRReviewTool } from './pr-review/index.js';
 
 /**
  * Metadata for a registered tool.
@@ -154,6 +155,32 @@ export const TOOL_REGISTRY: readonly ToolRegistryEntry[] = [
         autoApplySafe: {
           type: 'boolean',
           description: 'Auto-apply safe resolutions without listing them (default: false).',
+        },
+      },
+    },
+  },
+  {
+    id: 'pr-review',
+    name: 'PR Review',
+    description: 'Pull and review pull requests on target branches. Stashes changes, checks out PR, and generates a TLDR summary.',
+    chatCommand: 'prreview',
+    commandId: 'aidev.prReview',
+    invocation: 'restricted',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        branchName: {
+          type: 'string',
+          description: 'Specific branch name to review (default: first available PR).',
+        },
+        targetBranches: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Target branches to check for PRs (default: ["main", "develop", "test"]).',
+        },
+        restoreOriginal: {
+          type: 'boolean',
+          description: 'Restore original branch and pop stash after review (default: true).',
         },
       },
     },

@@ -88,6 +88,7 @@ export {
   TldrTool,
   BranchDiffTool,
   DiffResolveTool,
+  PRReviewTool,
 } from './tools/index.js';
 export type { ToolRegistryEntry } from './tools/index.js';
 
@@ -145,6 +146,17 @@ export {
   parseConflictMarkers,
   readConflictFile,
   writeResolution,
+  // Stash
+  stashChanges,
+  hasUncommittedChanges,
+  popStash,
+  listStashes,
+  // PR Operations
+  remoteBranchExists,
+  getUpdatedRemoteBranches,
+  checkoutRemoteBranch,
+  getPullRequestInfo,
+  listPotentialPullRequests,
   // Hooks
   checkHooks,
   // Validation
@@ -160,6 +172,7 @@ export type {
   BlameOptions,
   AheadBehind,
   LastCommitInfo,
+  PullRequestInfo,
 } from './git/index.js';
 
 // ─── Utils ──────────────────────────────────────────────────────────────────

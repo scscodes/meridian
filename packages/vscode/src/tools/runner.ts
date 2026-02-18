@@ -9,6 +9,7 @@ import {
   TldrTool,
   BranchDiffTool,
   DiffResolveTool,
+  PRReviewTool,
 } from '@aidev/core';
 import type { SettingsManager } from '../settings/index.js';
 import type { ProviderManager } from '../providers/index.js';
@@ -337,6 +338,24 @@ export class ToolRunner implements vscode.Disposable {
           },
         );
       }
+      case 'pr-review': {
+        if (!provider) {
+          const errorMsg = getProviderErrorMsg('PR Review');
+          console.error(errorMsg);
+          void vscode.window.showErrorMessage(errorMsg);
+          return undefined;
+        }
+        return createToolSafely(
+          PRReviewTool,
+          'PRReviewTool',
+          (tool) => {
+            tool.setDeps({
+              modelProvider: provider!,
+              cwd,
+            });
+          },
+        );
+      }
       default: {
         const errorMsg = `AIDev: Unknown tool ID: ${toolId}`;
         console.error(errorMsg);
@@ -356,7 +375,7 @@ export class ToolRunner implements vscode.Disposable {
    */
   private toolRequiresProvider(toolId: ToolId): boolean {
     // Tools that require a model provider
-    return ['tldr', 'comments', 'commit', 'diff-resolve'].includes(toolId);
+    return ['tldr', 'comments', 'commit', 'diff-resolve', 'pr-review'].includes(toolId);
   }
 
   private notifyResult(toolName: string, result: ScanResult): void {

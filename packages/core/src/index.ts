@@ -59,6 +59,7 @@ export {
   DEFAULT_MODEL_TIERS,
   DEFAULT_COMMIT_CONSTRAINTS,
   DEFAULT_AGENT_SETTINGS,
+  WORKFLOW_PARALLEL_TIMEOUT_MS,
 } from './settings/defaults.js';
 
 export {
@@ -93,7 +94,7 @@ export {
 export type { ToolRegistryEntry } from './tools/index.js';
 
 // ─── Agent ───────────────────────────────────────────────────────────────────
-export { runAgentLoop, buildSystemPrompt } from './agent/index.js';
+export { runAgentLoop, buildSystemPrompt, WORKFLOW_REGISTRY, matchWorkflow } from './agent/index.js';
 export type {
   AgentConfig,
   AgentAction,
@@ -102,6 +103,7 @@ export type {
   AgentResponseAction,
   AgentErrorAction,
   ConversationTurn,
+  WorkflowDefinition,
 } from './agent/index.js';
 
 // ─── Git Operations ─────────────────────────────────────────────────────────

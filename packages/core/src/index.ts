@@ -59,6 +59,7 @@ export {
   DEFAULT_MODEL_TIERS,
   DEFAULT_COMMIT_CONSTRAINTS,
   DEFAULT_AGENT_SETTINGS,
+  WORKFLOW_PARALLEL_TIMEOUT_MS,
 } from './settings/defaults.js';
 
 export {

@@ -72,6 +72,9 @@ export const TOOL_MODEL_BATCH_SIZE = 5;
 /** Timeout for model requests (milliseconds) */
 export const TOOL_MODEL_TIMEOUT_MS = 30_000;
 
+/** Timeout for parallel workflow execution phase (milliseconds) */
+export const WORKFLOW_PARALLEL_TIMEOUT_MS = 60_000;
+
 // ─── Root Settings ──────────────────────────────────────────────────────────
 
 /**

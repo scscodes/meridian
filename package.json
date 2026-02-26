@@ -6,6 +6,7 @@
   "publisher": "scscodes",
   "license": "MIT",
   "engines": {
+    "node": ">=22.22.0",
     "vscode": "^1.80.0"
   },
   "activationEvents": [
@@ -109,10 +110,10 @@
     "lint": "echo 'Linting would run here'"
   },
   "devDependencies": {
-    "@types/node": "^20.19.34",
+    "@types/node": "^22.19.0",
     "@types/vscode": "^1.80.0",
-    "@vitest/ui": "^1.0.4",
     "@vitest/coverage-v8": "^1.0.4",
+    "@vitest/ui": "^1.0.4",
     "typescript": "^5.9.3",
     "vitest": "^1.0.4"
   }

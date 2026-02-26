@@ -1,5 +1,5 @@
 {
-  "name": "vscode-scaffold-poc",
+  "name": "meridian",
   "displayName": "VS Code Scaffold POC",
   "description": "DDD-based command registry architecture for VS Code extensions with workflow engine and local agent discovery",
   "version": "0.0.1",
@@ -16,52 +16,52 @@
   "contributes": {
     "commands": [
       {
-        "command": "vscode-scaffold-poc.git.status",
+        "command": "meridian.git.status",
         "title": "Git: Show Status",
         "category": "Git"
       },
       {
-        "command": "vscode-scaffold-poc.git.pull",
+        "command": "meridian.git.pull",
         "title": "Git: Pull",
         "category": "Git"
       },
       {
-        "command": "vscode-scaffold-poc.git.commit",
+        "command": "meridian.git.commit",
         "title": "Git: Commit",
         "category": "Git"
       },
       {
-        "command": "vscode-scaffold-poc.git.smartCommit",
+        "command": "meridian.git.smartCommit",
         "title": "Git: Smart Commit (Interactive)",
         "category": "Git"
       },
       {
-        "command": "vscode-scaffold-poc.hygiene.scan",
+        "command": "meridian.hygiene.scan",
         "title": "Hygiene: Scan Workspace",
         "category": "Hygiene"
       },
       {
-        "command": "vscode-scaffold-poc.hygiene.cleanup",
+        "command": "meridian.hygiene.cleanup",
         "title": "Hygiene: Cleanup",
         "category": "Hygiene"
       },
       {
-        "command": "vscode-scaffold-poc.chat.context",
+        "command": "meridian.chat.context",
         "title": "Chat: Get Context",
         "category": "Chat"
       },
       {
-        "command": "vscode-scaffold-poc.workflow.list",
+        "command": "meridian.workflow.list",
         "title": "Workflow: List All",
         "category": "Workflow"
       },
       {
-        "command": "vscode-scaffold-poc.workflow.run",
+        "command": "meridian.workflow.run",
         "title": "Workflow: Run",
         "category": "Workflow"
       },
       {
-        "command": "vscode-scaffold-poc.agent.list",
+        "command": "meridian.agent.list",
         "title": "Agent: List All",
         "category": "Agent"
       }
@@ -69,22 +69,22 @@
     "configuration": {
       "title": "VS Code Scaffold POC",
       "properties": {
-        "vscode-scaffold-poc.git.autofetch": {
+        "meridian.git.autofetch": {
           "type": "boolean",
           "default": false,
           "description": "Enable auto-fetch for git repositories"
         },
-        "vscode-scaffold-poc.hygiene.enabled": {
+        "meridian.hygiene.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable workspace hygiene checks"
         },
-        "vscode-scaffold-poc.hygiene.scanInterval": {
+        "meridian.hygiene.scanInterval": {
           "type": "number",
           "default": 60,
           "description": "Workspace scan interval in minutes"
         },
-        "vscode-scaffold-poc.log.level": {
+        "meridian.log.level": {
           "type": "string",
           "enum": [
             "debug",

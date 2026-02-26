@@ -1,6 +1,6 @@
-# VS Code Extension Scaffold POC
+# Meridian POC
 
-**Domain-Driven Design (DDD) architecture for VS Code extensions with OpenClaw integration.**
+**Domain-Driven Design (DDD) architecture for VS Code extensions.**
 
 A production-ready scaffold demonstrating:
 - **Command Router** (Aiogram-style pattern)
@@ -8,14 +8,13 @@ A production-ready scaffold demonstrating:
 - **Result monad error handling** (Either<Error, Success>)
 - **Domain isolation** (Git, Hygiene, Chat/Copilot)
 - **Cross-cutting middleware** (logging, auth, audit)
-- **OpenClaw tool registration** (agent delegation, subagent spawning)
 
 ---
 
 ## Directory Structure
 
 ```
-vscode-scaffold-poc/
+meridian/
 ├── src/
 │   ├── main.ts                  # Extension entry point (activate/deactivate)
 │   ├── types.ts                 # Core interfaces & Result monad
@@ -29,7 +28,7 @@ vscode-scaffold-poc/
 │   │   │   └── service.ts       # HygieneDomainService
 │   │   └── chat/
 │   │       ├── handlers.ts      # chat.context, chat.delegate
-│   │       └── service.ts       # ChatDomainService (OpenClaw integration)
+│   │       └── service.ts       # ChatDomainService (integration)
 │   ├── infrastructure/
 │   │   ├── logger.ts            # Structured logging (no console.log)
 │   │   ├── config.ts            # Typed config schema
@@ -50,7 +49,6 @@ vscode-scaffold-poc/
 
 ### Install Dependencies
 ```bash
-cd vscode-scaffold-poc
 npm install
 ```
 
@@ -134,21 +132,6 @@ router.use(createLoggingMiddleware(logger));
 router.use(createAuditMiddleware(logger));
 // Executed in order before handler dispatch
 ```
-
-#### OpenClaw Integration (Tool Registration)
-```typescript
-// In chat domain:
-private registerTools(): void {
-  this.tools.set("get-chat-context", {
-    name: "get-chat-context",
-    handler: async (params) => await this.handlers["chat.context"]!(...)
-  });
-}
-
-// Agents call:
-// POST /gateway/tools/get-chat-context → Handler → Result
-```
-
 ---
 
 ## Features (One Example per Domain)
@@ -164,7 +147,7 @@ private registerTools(): void {
 
 ### Chat/Copilot Domain
 - **chat.context** — Gathers active file + git state for copilot context window
-- **chat.delegate** — Spawns OpenClaw subagent for complex work
+- **chat.delegate** — Spawns subagent for complex work
 
 ---
 
@@ -175,7 +158,7 @@ private registerTools(): void {
 3. **Dependency Injection** — Services receive dependencies, fully testable
 4. **Middleware Chain** — Cross-cutting concerns applied declaratively
 5. **Handler Registration** — Commands validated at startup, not at call time
-6. **Tool Export** — Domains expose tools for OpenClaw gateway
+6. **Tool Export** — Domains expose tools for external orchestration
 7. **Subagent Delegation** — Background tasks spawn agents, capture results
 8. **Clear Boundaries** — Each domain owns its schema, no type leaks
 
@@ -233,7 +216,7 @@ Declared in `package.json`:
 {
   "configuration": {
     "properties": {
-      "vscode-scaffold-poc.git.autofetch": { "type": "boolean", "default": false }
+      "meridian.git.autofetch": { "type": "boolean", "default": false }
     }
   }
 }
@@ -270,7 +253,7 @@ Middleware can throw to fail fast (auth denied, rate limit exceeded).
 2. Add default and schema entry
 3. Declare in `package.json` contribution points
 
-### Expose OpenClaw Tool
+### Expose External Tool
 1. Register in domain service: `this.tools.set("my-tool", {...})`
 2. Implement handler that calls domain handler
 3. Export via `exportTools()` method
@@ -310,7 +293,7 @@ const result = await router.dispatch({ name: "git.status", params: {} }, ctx);
 ## Known Limitations
 
 - Mock providers used (git, workspace) — replace with real VS Code API wrappers
-- `sessions_spawn()` stubbed — implement when integrated with OpenClaw gateway
+- `sessions_spawn()` stubbed — reserved for future orchestration integration
 - No background task scheduling — needed for hygiene scans
 - No pre-commit hooks — git domain extension point
 - No full test suite — scaffold only, not production-ready tests

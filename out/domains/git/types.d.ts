@@ -41,7 +41,10 @@ export interface CommitInfo {
     timestamp?: number;
 }
 /**
- * Result of smart commit operation
+ * Result of smart commit operation.
+ * - commits: one entry per successful group commit (may be empty on failure)
+ * - totalFiles/totalGroups: reflect all analyzed changes, not only approved ones
+ * - duration: optional timing metadata for telemetry/UX
  */
 export interface SmartCommitBatchResult {
     commits: CommitInfo[];
@@ -50,7 +53,12 @@ export interface SmartCommitBatchResult {
     duration?: number;
 }
 /**
- * Parameters for smartCommit command
+ * Parameters for smartCommit command.
+ * - autoApprove: when true, all generated groups are implicitly approved.
+ *   When false/undefined, the current implementation still auto-approves all
+ *   groups as a stand-in for future interactive UI.
+ * - branch: optional logical target branch name; validation is performed in
+ *   the handler and GitProvider is responsible for enforcing branch rules.
  */
 export interface SmartCommitParams {
     autoApprove?: boolean;

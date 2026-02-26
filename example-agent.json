@@ -12,7 +12,7 @@
     "lint-and-commit"
   ],
   "metadata": {
-    "author": "vscode-scaffold-poc",
+    "author": "meridian",
     "schedule": "on-demand",
     "tags": ["git", "local"]
   }

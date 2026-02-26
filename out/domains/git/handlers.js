@@ -16,6 +16,14 @@ const types_1 = require("../../types");
  */
 function createStatusHandler(gitProvider, logger) {
     return async (_ctx, params = {}) => {
+        // Validate branch parameter shape when provided
+        if (params.branch !== undefined && typeof params.branch !== "string") {
+            return (0, types_1.failure)({
+                code: "INVALID_PARAMS",
+                message: "Branch must be a string when provided",
+                context: "git.status",
+            });
+        }
         try {
             logger.debug(`Getting git status for branch: ${params.branch || "current"}`, "GitStatusHandler");
             const result = await gitProvider.status(params.branch);
@@ -40,6 +48,14 @@ function createStatusHandler(gitProvider, logger) {
  */
 function createPullHandler(gitProvider, logger) {
     return async (_ctx, params = {}) => {
+        // Validate branch parameter shape when provided
+        if (params.branch !== undefined && typeof params.branch !== "string") {
+            return (0, types_1.failure)({
+                code: "INVALID_PARAMS",
+                message: "Branch must be a string when provided",
+                context: "git.pull",
+            });
+        }
         try {
             logger.info(`Pulling from git branch: ${params.branch || "current"}`, "GitPullHandler");
             const result = await gitProvider.pull(params.branch);
@@ -65,6 +81,14 @@ function createPullHandler(gitProvider, logger) {
  */
 function createCommitHandler(gitProvider, logger) {
     return async (_ctx, params = { message: "" }) => {
+        // Validate branch parameter shape when provided
+        if (params.branch !== undefined && typeof params.branch !== "string") {
+            return (0, types_1.failure)({
+                code: "INVALID_PARAMS",
+                message: "Branch must be a string when provided",
+                context: "git.commit",
+            });
+        }
         // Validate required params
         if (!params.message || params.message.trim().length === 0) {
             return (0, types_1.failure)({
@@ -100,6 +124,22 @@ function createSmartCommitHandler(gitProvider, logger, changeGrouper, messageSug
     return async (_ctx, params = {}) => {
         const startTime = Date.now();
         try {
+            // Validate parameters
+            if (params.autoApprove !== undefined &&
+                typeof params.autoApprove !== "boolean") {
+                return (0, types_1.failure)({
+                    code: "INVALID_PARAMS",
+                    message: "autoApprove must be a boolean when provided",
+                    context: "git.smartCommit",
+                });
+            }
+            if (params.branch !== undefined && typeof params.branch !== "string") {
+                return (0, types_1.failure)({
+                    code: "INVALID_PARAMS",
+                    message: "Branch must be a string when provided",
+                    context: "git.smartCommit",
+                });
+            }
             logger.info(`Smart commit: analyzing changes for branch ${params.branch || "current"}`, "GitSmartCommitHandler");
             // Step 1: Get all changes (staged + unstaged)
             const changesResult = await gitProvider.getAllChanges();

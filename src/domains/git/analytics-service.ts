@@ -455,6 +455,9 @@ export class GitAnalyzer {
    * Export analytics to CSV
    */
   exportToCSV(report: GitAnalyticsReport): string {
+    // Escape double-quotes in CSV string fields per RFC 4180
+    const csvStr = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+
     const lines: string[] = [];
 
     // Summary section
@@ -481,7 +484,7 @@ export class GitAnalyzer {
     );
     for (const file of report.files.slice(0, 100)) {
       lines.push(
-        `"${file.path}",${file.commitCount},${file.insertions},${file.deletions},${file.volatility.toFixed(2)},${file.risk},"${Array.from(file.authors).join(";")}",${file.lastModified.toISOString()}`
+        `${csvStr(file.path)},${file.commitCount},${file.insertions},${file.deletions},${file.volatility.toFixed(2)},${file.risk},${csvStr(Array.from(file.authors).join(";"))},${file.lastModified.toISOString()}`
       );
     }
     lines.push("");
@@ -491,7 +494,7 @@ export class GitAnalyzer {
     lines.push("Name,Commits,Insertions,Deletions,Files Changed,Last Active");
     for (const author of report.authors) {
       lines.push(
-        `"${author.name}",${author.commits},${author.insertions},${author.deletions},${author.filesChanged},${author.lastActive.toISOString()}`
+        `${csvStr(author.name)},${author.commits},${author.insertions},${author.deletions},${author.filesChanged},${author.lastActive.toISOString()}`
       );
     }
 

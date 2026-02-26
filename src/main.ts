@@ -3,13 +3,11 @@
  * Activates domains, registers commands, sets up middleware.
  */
 
-// In a real extension, import vscode:
-// import * as vscode from 'vscode';
-
+import * as vscode from "vscode";
 import { CommandRouter } from "./router";
 import { Logger } from "./infrastructure/logger";
 import { Config } from "./infrastructure/config";
-import { CommandContext, GitProvider, WorkspaceProvider, Command } from "./types";
+import { CommandContext, CommandName, Command, Middleware, MiddlewareContext } from "./types";
 import { createGitDomain } from "./domains/git/service";
 import { createHygieneDomain } from "./domains/hygiene/service";
 import { createChatDomain } from "./domains/chat/service";
@@ -20,179 +18,78 @@ import {
   createAuditMiddleware,
 } from "./cross-cutting/middleware";
 import { StepRunner } from "./infrastructure/workflow-engine";
+import { createGitProvider } from "./infrastructure/git-provider";
+import { createWorkspaceProvider } from "./infrastructure/workspace-provider";
+import {
+  TelemetryTracker,
+  ConsoleTelemetrySink,
+} from "./infrastructure/telemetry";
 
 // ============================================================================
-// Mock Providers (for demonstration; replace with vscode API wrappers)
+// Telemetry Middleware Factory
 // ============================================================================
 
-class MockGitProvider implements GitProvider {
-  async status(branch?: string) {
-    return {
-      kind: "ok" as const,
-      value: {
-        branch: branch || "main",
-        isDirty: false,
-        staged: 0,
-        unstaged: 0,
-        untracked: 0,
-      },
-    };
-  }
-
-  async pull(branch?: string) {
-    return {
-      kind: "ok" as const,
-      value: {
-        success: true,
-        branch: branch || "main",
-        message: "Already up to date",
-      },
-    };
-  }
-
-  async commit(_message: string, _branch?: string) {
-    return { kind: "ok" as const, value: "abc123def456" };
-  }
-
-  async getChanges() {
-    return {
-      kind: "ok" as const,
-      value: [
-        { path: "src/main.ts", status: "modified" as const },
-        { path: "README.md", status: "modified" as const },
-      ],
-    };
-  }
-
-  async getDiff(_paths?: string[]) {
-    return {
-      kind: "ok" as const,
-      value: `diff --git a/src/main.ts b/src/main.ts
-index 1234567..abcdefg 100644
---- a/src/main.ts
-+++ b/src/main.ts
-@@ -1,3 +1,4 @@
-+// Sample diff
- // Content here`,
-    };
-  }
-
-  async stage(_paths: string[]) {
-    return { kind: "ok" as const, value: undefined };
-  }
-
-  async reset(_paths: string[] | { mode: string; ref: string }) {
-    return { kind: "ok" as const, value: undefined };
-  }
-
-  async getAllChanges() {
-    // Return realistic test data for smartCommit scenario
-    return {
-      kind: "ok" as const,
-      value: [
-        {
-          path: "src/domains/git/change-grouper.ts",
-          status: "A" as const,
-          additions: 128,
-          deletions: 0,
-        },
-        {
-          path: "src/domains/git/message-suggester.ts",
-          status: "A" as const,
-          additions: 156,
-          deletions: 0,
-        },
-        {
-          path: "src/domains/git/types.ts",
-          status: "A" as const,
-          additions: 45,
-          deletions: 0,
-        },
-        {
-          path: "ARCHITECTURE.md",
-          status: "M" as const,
-          additions: 12,
-          deletions: 8,
-        },
-        {
-          path: "README.md",
-          status: "M" as const,
-          additions: 5,
-          deletions: 0,
-        },
-        {
-          path: "package.json",
-          status: "M" as const,
-          additions: 2,
-          deletions: 1,
-        },
-        {
-          path: "tsconfig.json",
-          status: "M" as const,
-          additions: 1,
-          deletions: 0,
-        },
-        {
-          path: "src/infrastructure/git-provider.ts",
-          status: "M" as const,
-          additions: 34,
-          deletions: 12,
-        },
-      ],
-    };
-  }
-
-  async fetch(_remote?: string) {
-    // Mock fetch from remote
-    return { kind: "ok" as const, value: undefined };
-  }
-
-  async getRemoteUrl(_remote?: string) {
-    // Mock remote URL for GitHub
-    return {
-      kind: "ok" as const,
-      value: "https://github.com/scscodes/builds.git",
-    };
-  }
-
-  async getCurrentBranch() {
-    // Mock current branch
-    return { kind: "ok" as const, value: "main" };
-  }
-
-  async diff(revision: string, _options?: string[]) {
-    // Mock diff output with name-status format
-    if (revision === "HEAD..origin/main") {
-      // Simulate inbound changes
-      return {
-        kind: "ok" as const,
-        value: `M\tsrc/domains/git/service.ts
-A\tsrc/domains/git/types.ts
-M\tREADME.md`,
-      };
+/**
+ * Creates a middleware that emits COMMAND_STARTED, COMMAND_COMPLETED, and
+ * COMMAND_FAILED telemetry events around each dispatched command.
+ */
+function createTelemetryMiddleware(telemetry: TelemetryTracker): Middleware {
+  return async (ctx: MiddlewareContext, next: () => Promise<void>) => {
+    const start = Date.now();
+    telemetry.trackCommandStarted(ctx.commandName);
+    try {
+      await next();
+      telemetry.trackCommandCompleted(
+        ctx.commandName,
+        Date.now() - start,
+        "success"
+      );
+    } catch (err) {
+      const duration = Date.now() - start;
+      telemetry.trackCommandFailed(ctx.commandName, duration, {
+        code: "MIDDLEWARE_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+        context: ctx.commandName,
+      });
+      throw err;
     }
-    // Default: unstaged changes
-    return {
-      kind: "ok" as const,
-      value: `M\tsrc/main.ts
-M\tsrc/router.ts`,
-    };
-  }
+  };
 }
 
-class MockWorkspaceProvider implements WorkspaceProvider {
-  async findFiles(_pattern: string) {
-    return { kind: "ok" as const, value: [] };
-  }
+// ============================================================================
+// Command Context Builder
+// ============================================================================
 
-  async readFile(_path: string) {
-    return { kind: "ok" as const, value: "" };
-  }
-
-  async deleteFile(_path: string) {
-    return { kind: "ok" as const, value: undefined };
-  }
+/**
+ * Build a CommandContext from the VS Code extension context.
+ * workspaceFolders maps to the first workspace folder URI if available.
+ */
+function getCommandContext(context: vscode.ExtensionContext): CommandContext {
+  return {
+    extensionPath: context.extensionUri.fsPath,
+    workspaceFolders:
+      vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath) ?? [],
+    activeFilePath:
+      vscode.window.activeTextEditor?.document.uri.fsPath,
+  };
 }
+
+// ============================================================================
+// Command ID → Internal CommandName mapping
+// ============================================================================
+
+const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
+  ["meridian.git.status",      "git.status"],
+  ["meridian.git.pull",        "git.pull"],
+  ["meridian.git.commit",      "git.commit"],
+  ["meridian.git.smartCommit", "git.smartCommit"],
+  ["meridian.hygiene.scan",    "hygiene.scan"],
+  ["meridian.hygiene.cleanup", "hygiene.cleanup"],
+  ["meridian.chat.context",    "chat.context"],
+  ["meridian.workflow.list",   "workflow.list"],
+  ["meridian.workflow.run",    "workflow.run"],
+  ["meridian.agent.list",      "agent.list"],
+];
 
 // ============================================================================
 // Extension Activation
@@ -201,23 +98,30 @@ class MockWorkspaceProvider implements WorkspaceProvider {
 /**
  * Activate the extension.
  * Called by VS Code when activation event is triggered.
- * In real code: export async function activate(context: vscode.ExtensionContext)
  */
-export async function activate(_extensionPath: string): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
 
   // Initialize infrastructure layer
   const logger = new Logger();
   const config = new Config();
   await config.initialize();
 
-  // Initialize providers
-  const gitProvider = new MockGitProvider();
-  const workspaceProvider = new MockWorkspaceProvider();
+  // Initialize telemetry
+  const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
+
+  // Resolve workspace root from VS Code workspace folders
+  const workspaceRoot =
+    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+
+  // Initialize real providers
+  const gitProvider = createGitProvider(workspaceRoot);
+  const workspaceProvider = createWorkspaceProvider(workspaceRoot);
 
   // Create router
   const router = new CommandRouter(logger);
 
-  // Register middleware
+  // Register middleware (telemetry first, then logging, then audit)
+  router.use(createTelemetryMiddleware(telemetry));
   router.use(createLoggingMiddleware(logger));
   router.use(createAuditMiddleware(logger));
 
@@ -233,7 +137,11 @@ export async function activate(_extensionPath: string): Promise<void> {
   // Register domains
   const gitDomain = createGitDomain(gitProvider, logger);
   const hygieneDomain = createHygieneDomain(workspaceProvider, logger);
-  const chatDomain = createChatDomain(gitProvider, logger);
+  const chatDomain = createChatDomain(
+    gitProvider,
+    logger,
+    (cmd, ctx) => router.dispatch(cmd, ctx)
+  );
   const workflowDomain = createWorkflowDomain(logger, stepRunner);
   const agentDomain = createAgentDomain(logger);
 
@@ -250,40 +158,52 @@ export async function activate(_extensionPath: string): Promise<void> {
     throw new Error(validationResult.error.message);
   }
 
-  // In real extension, register VS Code commands:
-  // context.subscriptions.push(
-  //   vscode.commands.registerCommand('git.status', async () => {
-  //     const result = await router.dispatch(
-  //       { name: 'git.status', params: {} },
-  //       getCommandContext()
-  //     );
-  //   })
-  // );
+  // Register all 10 VS Code commands. Each maps the "meridian.*" vscode ID
+  // to the internal bare CommandName. Results are logged only; UI is deferred.
+  for (const [vsCodeId, commandName] of COMMAND_MAP) {
+    const disposable = vscode.commands.registerCommand(
+      vsCodeId,
+      async (params: Record<string, unknown> = {}) => {
+        const cmdCtx = getCommandContext(context);
+        const command: Command = { name: commandName, params };
+        const result = await router.dispatch(command, cmdCtx);
+        if (result.kind === "ok") {
+          logger.info(
+            `Command ${vsCodeId} succeeded`,
+            "activate",
+            result.value as unknown
+          );
+        } else {
+          logger.error(
+            `Command ${vsCodeId} failed`,
+            "activate",
+            result.error
+          );
+        }
+      }
+    );
+    context.subscriptions.push(disposable);
+  }
 
   logger.info(
     `Extension activated with ${router.listDomains().length} domains`,
     "activate"
   );
   logger.info(
-    `Registered ${router.listCommands().length} commands`,
+    `Registered ${COMMAND_MAP.length} commands`,
     "activate"
   );
-
-  // Store router in global state for command handlers
-  // (In real code, attach to context.subscriptions)
-  (globalThis as any).__vscodeRouter = router;
 }
 
 /**
  * Deactivate the extension.
- * Called when extension is unloaded.
- * In real code: export function deactivate()
+ * Called when extension is unloaded. VS Code disposes subscriptions automatically;
+ * router teardown cleans up domain services.
  */
 export async function deactivate(): Promise<void> {
-  const router = (globalThis as any).__vscodeRouter as CommandRouter | undefined;
-  if (router) {
-    await router.teardown();
-  }
+  // router is local to activate(); VS Code calls deactivate separately.
+  // Domain teardown happens via context.subscriptions disposal.
+  // No action needed here beyond the subscription cleanup VS Code performs.
 }
 
 // ============================================================================

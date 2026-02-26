@@ -1,13 +1,13 @@
 /**
  * Workspace utilities — detect workspace root, resolve .vscode/ paths.
  * All workflow/agent definitions live under .vscode/
- * 
+ *
  * Note: In a real VS Code extension, these would use vscode.workspace APIs.
- * This is a demonstration implementation for scaffold/testing purposes.
+ * This implementation uses Node.js fs/promises for real file I/O.
  */
 
-// Placeholder implementations for workspace utilities
-// In a real extension, these would call vscode.workspace APIs
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Workspace paths and constants.
@@ -21,12 +21,11 @@ export const WORKSPACE_PATHS = {
 
 /**
  * Detect workspace root by searching for .vscode directory.
- * Placeholder: In real extension, use vscode.workspace.workspaceFolders[0]
+ * Falls back to process.cwd() when not in a VS Code extension context.
  */
 export function detectWorkspaceRoot(startPath: string = "."): string {
-  // Placeholder: return process.cwd() if available, else startPath
   try {
-    return (globalThis as any).process?.cwd?.() || startPath;
+    return process.cwd();
   } catch {
     return startPath;
   }
@@ -37,10 +36,9 @@ export function detectWorkspaceRoot(startPath: string = "."): string {
  */
 export function resolveWorkspacePath(
   relativePath: string,
-  _workspaceRoot?: string
+  workspaceRoot?: string
 ): string {
-  // Placeholder: simple path join
-  return `${_workspaceRoot || "."}/` + relativePath;
+  return path.join(workspaceRoot ?? ".", relativePath);
 }
 
 /**
@@ -58,29 +56,44 @@ export function getWorkflowsDir(workspaceRoot?: string): string {
 }
 
 /**
- * List all JSON files in a directory.
- * Placeholder: Would require Node.js fs in real implementation
+ * List all JSON files (non-recursively) in a directory.
+ * Returns an empty array if the directory does not exist or is unreadable.
  */
-export function listJsonFiles(_dirPath: string): string[] {
-  // In real implementation, would use fs.readdirSync
-  // For now, return empty - workflows/agents must be loaded via other means
-  return [];
+export function listJsonFiles(dirPath: string): string[] {
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isFile() && e.name.endsWith(".json"))
+      .map((e) => path.join(dirPath, e.name));
+  } catch {
+    return [];
+  }
 }
 
 /**
- * Read and parse JSON file.
- * Placeholder: Would require Node.js fs in real implementation
+ * Read and parse a JSON file synchronously.
+ * Returns null if the file does not exist, is unreadable, or is invalid JSON.
  */
-export function readJsonFile<T = unknown>(_filePath: string): T | null {
-  // In real implementation, would use fs.readFileSync + JSON.parse
-  return null;
+export function readJsonFile<T = unknown>(filePath: string): T | null {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Write JSON file with formatting.
- * Placeholder: Would require Node.js fs in real implementation
+ * Write data as a formatted JSON file synchronously.
+ * Returns true on success, false on failure.
  */
-export function writeJsonFile<T = unknown>(_filePath: string, _data: T): boolean {
-  // In real implementation, would use fs.writeFileSync + JSON.stringify
-  return false;
+export function writeJsonFile<T = unknown>(filePath: string, data: T): boolean {
+  try {
+    const dir = path.dirname(filePath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+    return true;
+  } catch {
+    return false;
+  }
 }

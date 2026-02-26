@@ -1,5 +1,5 @@
 /**
- * Chat/Copilot Domain Service — local context gathering.
+ * Chat/Copilot Domain Service — local context gathering and task delegation.
  */
 
 import {
@@ -12,7 +12,11 @@ import {
   success,
   failure,
 } from "../../types";
-import { createContextHandler, createDelegateHandler } from "./handlers";
+import {
+  createContextHandler,
+  createDelegateHandler,
+  CommandDispatcher,
+} from "./handlers";
 
 /**
  * Chat domain commands.
@@ -28,26 +32,25 @@ export class ChatDomainService implements DomainService {
   handlers: Partial<Record<ChatCommandName, Handler>> = {};
   private logger: Logger;
 
-  constructor(gitProvider: GitProvider, logger: Logger) {
+  constructor(
+    gitProvider: GitProvider,
+    logger: Logger,
+    dispatcher: CommandDispatcher
+  ) {
     this.logger = logger;
 
-    // Initialize handlers
     this.handlers = {
-      "chat.context": createContextHandler(gitProvider, logger) as any,
-      "chat.delegate": createDelegateHandler(logger) as any,
+      "chat.context": createContextHandler(gitProvider, logger) as Handler,
+      "chat.delegate": createDelegateHandler(dispatcher, logger) as Handler,
     };
   }
 
-  /**
-   * Initialize domain.
-   */
   async initialize(): Promise<Result<void>> {
     try {
       this.logger.info(
         "Initializing chat domain",
         "ChatDomainService.initialize"
       );
-
       return success(void 0);
     } catch (err) {
       return failure({
@@ -59,9 +62,6 @@ export class ChatDomainService implements DomainService {
     }
   }
 
-  /**
-   * Cleanup.
-   */
   async teardown(): Promise<void> {
     this.logger.debug(
       "Tearing down chat domain",
@@ -75,7 +75,8 @@ export class ChatDomainService implements DomainService {
  */
 export function createChatDomain(
   gitProvider: GitProvider,
-  logger: Logger
+  logger: Logger,
+  dispatcher: CommandDispatcher
 ): ChatDomainService {
-  return new ChatDomainService(gitProvider, logger);
+  return new ChatDomainService(gitProvider, logger, dispatcher);
 }

@@ -83,8 +83,15 @@ export function createExportJsonHandler(
   ) => {
     try {
       const period = params.period || "3mo";
+      if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
+        return failure({
+          code: "INVALID_PERIOD",
+          message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
+          context: "ExportJsonHandler",
+        });
+      }
       const options: AnalyticsOptions = {
-        period: period as any,
+        period,
         author: params.author,
         pathPattern: params.pathPattern,
       };
@@ -117,8 +124,15 @@ export function createExportCsvHandler(
   ) => {
     try {
       const period = params.period || "3mo";
+      if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
+        return failure({
+          code: "INVALID_PERIOD",
+          message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
+          context: "ExportCsvHandler",
+        });
+      }
       const options: AnalyticsOptions = {
-        period: period as any,
+        period,
         author: params.author,
         pathPattern: params.pathPattern,
       };

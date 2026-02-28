@@ -84,6 +84,14 @@ export class AnalyticsWebviewProvider {
       } catch {
         // Filter failure is non-fatal — panel keeps current data
       }
+    } else if (msg.type === "refresh") {
+      try {
+        const period = (msg.payload as any)?.period ?? "3mo";
+        const report = await this.onFilter({ period } as AnalyticsOptions);
+        this.panel?.webview.postMessage({ type: "init", payload: report });
+      } catch {
+        // non-fatal — panel keeps current state
+      }
     } else if (msg.type === "openFile") {
       const abs = path.join(this.workspaceRoot, msg.payload as string);
       vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));

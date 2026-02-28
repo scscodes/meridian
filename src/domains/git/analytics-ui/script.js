@@ -13,6 +13,14 @@ let chartInstances = {};
 const DONUT_PALETTE = ["#06b6d4", "#f59e0b", "#8b5cf6", "#10b981", "#ef4444", "#6b7280"];
 
 /**
+ * Post a refresh request to the extension with the current period selection.
+ */
+function postRefresh() {
+  const period = document.getElementById("period")?.value || "3mo";
+  vscode?.postMessage({ type: "refresh", payload: { period } });
+}
+
+/**
  * Listen for messages from the extension
  */
 if (vscode) {
@@ -24,6 +32,9 @@ if (vscode) {
       renderUI();
     }
   });
+
+  // Auto-fetch data on first load
+  postRefresh();
 }
 
 /**
@@ -256,6 +267,8 @@ document.getElementById("applyFilters")?.addEventListener("click", () => {
     });
   }
 });
+
+document.getElementById("refreshBtn")?.addEventListener("click", postRefresh);
 
 document.getElementById("exportJson")?.addEventListener("click", () => {
   if (!analyticsData) return;

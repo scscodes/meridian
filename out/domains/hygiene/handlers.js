@@ -95,7 +95,7 @@ function isExcluded(filePath, patterns) {
  * Uses WorkspaceProvider.findFiles() with patterns from HYGIENE_SETTINGS.
  * Large-file detection reads file content to measure byte length (no stat API available).
  */
-function createScanHandler(workspaceProvider, logger) {
+function createScanHandler(workspaceProvider, logger, deadCodeAnalyzer) {
     return async (ctx) => {
         try {
             logger.info("Scanning workspace for hygiene issues", "HygieneScanHandler");
@@ -175,13 +175,22 @@ function createScanHandler(workspaceProvider, logger) {
                     }
                 }
             }
+            // --- Dead code: unused imports, locals, params (TS compiler diagnostics) ---
+            let deadCode;
+            try {
+                deadCode = deadCodeAnalyzer.analyze(workspaceRoot);
+            }
+            catch {
+                deadCode = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 };
+            }
             const scan = {
                 deadFiles,
                 largeFiles,
                 logFiles,
                 markdownFiles,
+                deadCode,
             };
-            logger.info(`Found ${scan.deadFiles.length} dead, ${scan.largeFiles.length} large, ${scan.logFiles.length} log, ${scan.markdownFiles.length} markdown files`, "HygieneScanHandler");
+            logger.info(`Found ${scan.deadFiles.length} dead, ${scan.largeFiles.length} large, ${scan.logFiles.length} log, ${scan.markdownFiles.length} markdown, ${scan.deadCode.items.length} dead-code items`, "HygieneScanHandler");
             return (0, types_1.success)(scan);
         }
         catch (err) {

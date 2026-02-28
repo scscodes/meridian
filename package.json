@@ -326,12 +326,14 @@
     "test:watch": "vitest --watch",
     "lint": "echo 'Linting would run here'"
   },
+  "dependencies": {
+    "typescript": "^5.9.3"
+  },
   "devDependencies": {
     "@types/node": "^22.19.0",
     "@types/vscode": "^1.80.0",
     "@vitest/coverage-v8": "^1.0.4",
     "@vitest/ui": "^1.0.4",
-    "typescript": "^5.9.3",
     "vitest": "^1.0.4"
   }
 }

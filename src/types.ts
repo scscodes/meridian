@@ -185,11 +185,28 @@ export interface MarkdownFile {
   lineCount: number;
 }
 
+export interface DeadCodeItem {
+  filePath: string;   // absolute path
+  line: number;       // 1-based
+  character: number;  // 1-based
+  message: string;    // TS diagnostic message text
+  code: number;       // 6133 | 6192 | 6196 | 6198 | 6199 | 6205
+  category: "unusedImport" | "unusedLocal" | "unusedTypeParam";
+}
+
+export interface DeadCodeScan {
+  items: DeadCodeItem[];
+  tsconfigPath: string | null; // null = no tsconfig found (fallback mode)
+  durationMs: number;
+  fileCount: number;
+}
+
 export interface WorkspaceScan {
   deadFiles: string[];
   largeFiles: Array<{ path: string; sizeBytes: number }>;
   logFiles: string[];
   markdownFiles: MarkdownFile[];
+  deadCode: DeadCodeScan;
 }
 
 export interface ChatContext {

@@ -24,9 +24,6 @@ const CAT_COLORS = {
   other:    "#90a4ae",
 };
 
-// Temporal line colours
-const TEMPORAL_COLORS = ["#e0e0e0", "#06b6d4", "#f59e0b", "#a78bfa", "#10b981"];
-
 // ============================================================================
 // Message listener
 // ============================================================================
@@ -48,24 +45,39 @@ function renderUI() {
   if (!report) return;
   updateSummary();
   renderCategoryBar();
-  renderTemporalChart();
+  renderCleanupChart();
   renderPruneTable();
   renderFilesTable();
 }
 
 // ============================================================================
-// Summary cards
+// Summary cards — Total Files | Prune Candidates | Dead Code | Disk Savings
 // ============================================================================
 
 function updateSummary() {
-  const s = report.summary;
-  setText("totalFiles", s.totalFiles.toLocaleString());
-  setText("totalSize",  fmtBytes(s.totalSizeBytes));
-  setText("pruneCount", s.pruneCount.toLocaleString());
-  setText("pruneSize",  fmtBytes(s.pruneEstimateSizeBytes) + " recoverable");
+  const s  = report.summary;
+  const dc = report.deadCode;
 
-  // Active prune criteria
-  const pc = report.pruneConfig;
+  setText("totalFiles",  s.totalFiles.toLocaleString());
+  setText("pruneCount",  s.pruneCount.toLocaleString());
+  setText("diskSavings", fmtBytes(s.pruneEstimateSizeBytes));
+
+  if (dc) {
+    const fileCount = countDeadCodeFiles(dc.items);
+    setText("deadCodeCount", dc.items.length.toLocaleString());
+    const fileSub = fileCount === 1 ? "1 file" : `${fileCount} files`;
+    const tsconfigNote = dc.tsconfigPath ? "" : " · no tsconfig";
+    setText("deadCodeSub", `across ${fileSub}${tsconfigNote}`);
+  } else {
+    setText("deadCodeCount", "—");
+    setText("deadCodeSub",   "run a scan to populate");
+  }
+
+  // Prune sub — show size recoverable
+  setText("pruneFilesSub", fmtBytes(s.pruneEstimateSizeBytes) + " recoverable");
+
+  // Active prune criteria (for the prune table section)
+  const pc    = report.pruneConfig;
   const parts = [
     `age ≥ ${pc.minAgeDays}d`,
     `size > ${pc.maxSizeMB} MB`,
@@ -73,6 +85,10 @@ function updateSummary() {
   ];
   if (pc.minLineCount > 0) parts.push(`lines ≥ ${pc.minLineCount}`);
   setText("pruneCriteria", "Active criteria: " + parts.join(" · "));
+}
+
+function countDeadCodeFiles(items) {
+  return new Set((items || []).map((i) => i.filePath)).size;
 }
 
 // ============================================================================
@@ -107,7 +123,7 @@ function renderCategoryBar() {
       maintainAspectRatio: false,
       animation: false,
       plugins: {
-        legend: { display: false },   // custom HTML legend below
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: (item) => {
@@ -138,10 +154,10 @@ function renderCategoryBar() {
 }
 
 // ============================================================================
-// Chart 2 — Temporal activity (multi-line: Total + prune overlay + top extensions, 14 days)
+// Chart 2 — Cleanup Activity: prune candidates + dead code issues, 14-day rolling
 // ============================================================================
 
-function renderTemporalChart() {
+function renderCleanupChart() {
   const ctx = document.getElementById("temporalChart");
   if (!ctx) return;
   destroyChart("temporal");
@@ -149,55 +165,56 @@ function renderTemporalChart() {
   const td = report.temporalData;
   if (!td || !td.buckets || td.buckets.length === 0) return;
 
-  // Trim leading days that have zero activity; keep one buffer day for context.
-  const firstActive = td.buckets.findIndex((b) => b.total > 0);
+  // Trim leading days with zero activity; keep one buffer day for context.
+  const firstActive = td.buckets.findIndex(
+    (b) => b.pruneCount > 0 || (b.deadCodeCount || 0) > 0
+  );
   const startIdx = firstActive > 0 ? Math.max(0, firstActive - 1) : 0;
-  const buckets = td.buckets.slice(startIdx);
+  const buckets  = td.buckets.slice(startIdx);
 
-  const labels  = buckets.map((b) => b.label);
-  const topExts = td.topExtensions || [];
+  const labels        = buckets.map((b) => b.label);
+  const pruneCounts   = buckets.map((b) => b.pruneCount || 0);
+  const deadCounts    = buckets.map((b) => b.deadCodeCount || 0);
 
-  // Y-axis ceiling: next 100 above peak total (minimum 100)
-  const yMax = Math.ceil(Math.max(...buckets.map((b) => b.total), 1) / 100) * 100;
+  const hasDeadData   = deadCounts.some((n) => n > 0);
 
   const datasets = [
     {
-      label: "All files",
-      data: buckets.map((b) => b.total),
-      borderColor: TEMPORAL_COLORS[0],
-      backgroundColor: "rgba(224,224,224,0.07)",
+      label: "Prune candidates",
+      data: pruneCounts,
+      borderColor: "#ffaa00",
+      backgroundColor: "rgba(255,170,0,0.08)",
+      borderDash: [5, 4],
       tension: 0.3,
       fill: true,
-      pointRadius: 2,
+      pointRadius: 3,
       borderWidth: 2,
     },
-    {
-      label: "Prune candidates",
-      data: buckets.map((b) => b.pruneCount || 0),
-      borderColor: "#ffaa00",
-      borderDash: [4, 4],
-      backgroundColor: "transparent",
-      tension: 0.3,
-      fill: false,
-      pointRadius: 2,
-      borderWidth: 1.5,
-    },
-    ...topExts.map((ext, i) => ({
-      label: ext || "(no ext)",
-      data: buckets.map((b) => (b.byExtension || {})[ext] || 0),
-      borderColor: TEMPORAL_COLORS[i + 1] || TEMPORAL_COLORS[TEMPORAL_COLORS.length - 1],
-      backgroundColor: "transparent",
-      tension: 0.3,
-      fill: false,
-      pointRadius: 2,
-      borderWidth: 1.5,
-    })),
   ];
+
+  if (hasDeadData) {
+    datasets.push({
+      label: "Dead code issues",
+      data: deadCounts,
+      borderColor: "#06b6d4",
+      backgroundColor: "rgba(6,182,212,0.08)",
+      tension: 0.3,
+      fill: true,
+      pointRadius: 3,
+      borderWidth: 2,
+    });
+  }
+
+  const yMax = Math.max(
+    Math.ceil(Math.max(...pruneCounts, ...deadCounts, 1) * 1.2),
+    10
+  );
 
   charts.temporal = new Chart(ctx, {
     type: "line",
     data: { labels, datasets },
     options: {
+      aspectRatio: 4,
       responsive: true,
       maintainAspectRatio: true,
       plugins: {
@@ -217,18 +234,14 @@ function renderTemporalChart() {
       scales: {
         x: {
           grid:  { color: "rgba(255,255,255,0.07)" },
-          ticks: {
-            color: "#d4d4d4",
-            font: { size: 10 },
-            maxRotation: 45,
-          },
+          ticks: { color: "#d4d4d4", font: { size: 10 }, maxRotation: 45 },
         },
         y: {
           beginAtZero: true,
           max: yMax,
           grid:  { color: "rgba(255,255,255,0.07)" },
-          ticks: { color: "#d4d4d4", stepSize: 100 },
-          title: { display: true, text: "Files modified", color: "#d4d4d4", font: { size: 11 } },
+          ticks: { color: "#d4d4d4", precision: 0 },
+          title: { display: true, text: "Count", color: "#d4d4d4", font: { size: 11 } },
         },
       },
     },

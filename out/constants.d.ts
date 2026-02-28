@@ -116,7 +116,7 @@ export declare const HYGIENE_SETTINGS: {
     /** Temporary file patterns */
     readonly TEMP_FILE_PATTERNS: readonly ["*.tmp", "*.temp", "*.bak", "*~"];
 };
-export declare const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS: readonly ["**/node_modules/**", "**/.git/**", "**/.vscode/**", "**/.idea/**", "**/.venv/**", "**/venv/**", "**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/.tox/**", "**/.eggs/**", "**/*.egg-info/**", "**/.yarn/**", "**/.pnpm-store/**"];
+export declare const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS: readonly ["**/node_modules/**", "**/.git/**", "**/.vscode/**", "**/.idea/**", "**/.venv/**", "**/venv/**", "**/__pycache__/**", "**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/.tox/**", "**/.eggs/**", "**/*.egg-info/**", "**/.yarn/**", "**/.pnpm-store/**", "**/vendor/**", "**/vendor", "**/.bundle/**", "**/.gradle/**", "**/packages/**", "**/packages", "**/.terraform/**", "**/.terraform", "**/.dart_tool/**", "**/.dart_tool", "**/deps/**", "**/deps", "**/_build/**", "**/_build", "**/.stack-work/**", "**/.stack-work", "**/.cpcache/**", "**/.cpcache"];
 export declare const CHAT_SETTINGS: {
     /** Default LLM model for chat operations */
     readonly DEFAULT_MODEL: "gpt-4";
@@ -226,6 +226,16 @@ export declare const AGENT_SETTINGS: {
     /** Agent discovery timeout in milliseconds */
     readonly DISCOVERY_TIMEOUT_MS: number;
 };
+/**
+ * TypeScript diagnostic codes surfaced by the dead code scanner.
+ * 6133 — 'X' is declared but its value is never read (unused local/param/import binding)
+ * 6192 — All imports in import declaration are unused
+ * 6196 — 'X' is declared but never used (unused type parameter)
+ * 6198 — All destructured elements are unused
+ * 6199 — All variables in destructuring declaration are unused
+ * 6205 — 'X' is read but never used
+ */
+export declare const DEAD_CODE_DIAGNOSTIC_CODES: Set<number>;
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES];
 export type CommandName = typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES][keyof typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES]];
 export type LogLevel = typeof LOG_SETTINGS.LEVELS[number];

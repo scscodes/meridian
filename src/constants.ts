@@ -214,30 +214,46 @@ export const HYGIENE_SETTINGS = {
 
 // ============================================================================
 // Hygiene Analytics — lighter exclusion set for the analytics scan.
-// Unlike HYGIENE_SETTINGS.EXCLUDE_PATTERNS, this intentionally keeps
-// artifact dirs (dist/, build/, out/, coverage/, .cache/, .next/) so they
-// are surfaced and can be flagged as prune candidates.
-// Gitignore patterns are NOT applied to analytics either.
+// Unlike HYGIENE_SETTINGS.EXCLUDE_PATTERNS, we keep dist/, build/, out/, etc.
+// so they are surfaced as prune candidates. Heavy dirs (node_modules, venv,
+// __pycache__) are excluded from recursion but get a single "exists" placeholder
+// so they still show in the report without scanning contents.
 // ============================================================================
 
 export const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
-  // VCS + editor noise — never analytically useful
   "**/node_modules/**",
   "**/.git/**",
   "**/.vscode/**",
   "**/.idea/**",
-  // Python runtime environments — can be enormous
   "**/.venv/**",
   "**/venv/**",
+  "**/__pycache__/**",
   "**/.pytest_cache/**",
   "**/.mypy_cache/**",
   "**/.ruff_cache/**",
   "**/.tox/**",
   "**/.eggs/**",
   "**/*.egg-info/**",
-  // JS package manager internals
   "**/.yarn/**",
   "**/.pnpm-store/**",
+  "**/vendor/**",
+  "**/vendor",
+  "**/.bundle/**",
+  "**/.gradle/**",
+  "**/packages/**",
+  "**/packages",
+  "**/.terraform/**",
+  "**/.terraform",
+  "**/.dart_tool/**",
+  "**/.dart_tool",
+  "**/deps/**",
+  "**/deps",
+  "**/_build/**",
+  "**/_build",
+  "**/.stack-work/**",
+  "**/.stack-work",
+  "**/.cpcache/**",
+  "**/.cpcache",
 ] as const;
 
 // ============================================================================
@@ -439,6 +455,21 @@ export const AGENT_SETTINGS = {
   /** Agent discovery timeout in milliseconds */
   DISCOVERY_TIMEOUT_MS: 5 * 1000,
 } as const;
+
+// ============================================================================
+// Dead Code Diagnostics
+// ============================================================================
+
+/**
+ * TypeScript diagnostic codes surfaced by the dead code scanner.
+ * 6133 — 'X' is declared but its value is never read (unused local/param/import binding)
+ * 6192 — All imports in import declaration are unused
+ * 6196 — 'X' is declared but never used (unused type parameter)
+ * 6198 — All destructured elements are unused
+ * 6199 — All variables in destructuring declaration are unused
+ * 6205 — 'X' is read but never used
+ */
+export const DEAD_CODE_DIAGNOSTIC_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205]);
 
 // ============================================================================
 // Type inference helpers (ensure consistency)

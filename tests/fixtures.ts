@@ -12,6 +12,7 @@ import {
   GitPullResult,
   GitStageChange,
   GitFileChange,
+  DeadCodeScan,
   Result,
   success,
   failure,
@@ -153,6 +154,31 @@ export class MockGitProvider implements GitProvider {
 
   async diff(revision: string): Promise<Result<string>> {
     return success(`diff ${revision}\n${this.diffOutput}`);
+  }
+}
+
+// ============================================================================
+// Mock DeadCodeAnalyzer
+// ============================================================================
+
+export class MockDeadCodeAnalyzer {
+  private result: DeadCodeScan = {
+    items: [],
+    tsconfigPath: null,
+    durationMs: 0,
+    fileCount: 0,
+  };
+
+  setResult(scan: DeadCodeScan): void {
+    this.result = scan;
+  }
+
+  analyze(_workspaceRoot: string): DeadCodeScan {
+    return this.result;
+  }
+
+  clearCache(): void {
+    // no-op for tests
   }
 }
 

@@ -22,21 +22,27 @@
       </div>
     </div>
 
-    <!-- Summary Cards -->
+    <!-- Summary Cards: Total Files → Prune Candidates → Dead Code → Disk Savings -->
     <div class="summary-cards">
       <div class="card">
-        <h3>Scanned Files</h3>
+        <h3>Total Files</h3>
         <p class="value" id="totalFiles">—</p>
         <p class="sub">excl. .git · node_modules · .vscode</p>
       </div>
       <div class="card">
-        <h3>Total Size</h3>
-        <p class="value" id="totalSize">—</p>
-      </div>
-      <div class="card">
         <h3>Prune Candidates</h3>
         <p class="value" id="pruneCount">—</p>
-        <p class="sub" id="pruneSize"></p>
+        <p class="sub" id="pruneFilesSub"></p>
+      </div>
+      <div class="card card--dead">
+        <h3>Dead Code</h3>
+        <p class="value" id="deadCodeCount">—</p>
+        <p class="sub" id="deadCodeSub"></p>
+      </div>
+      <div class="card">
+        <h3>Disk Savings</h3>
+        <p class="value" id="diskSavings">—</p>
+        <p class="sub">recoverable from prune candidates</p>
       </div>
     </div>
 
@@ -49,9 +55,9 @@
       <div id="categoryLegend" class="category-legend"></div>
     </div>
 
-    <!-- Temporal chart — full width -->
+    <!-- Cleanup Activity chart — prune candidates + dead code, 14-day rolling -->
     <div class="chart-section">
-      <h3>File Modification Activity — Last 14 Days</h3>
+      <h3>Cleanup Activity — Last 14 Days</h3>
       <canvas id="temporalChart"></canvas>
     </div>
 

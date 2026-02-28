@@ -2,6 +2,8 @@
  * Hygiene Analytics Types — Data model for workspace file analytics reporting.
  */
 
+import { DeadCodeScan } from "../../types";
+
 export type FileCategory =
   | "markdown"
   | "log"
@@ -81,6 +83,8 @@ export interface TemporalBucket {
   byExtension: Record<string, number>;
   /** Number of prune candidates last-modified on this day */
   pruneCount: number;
+  /** Total dead code issues in files last-modified on this day */
+  deadCodeCount: number;
 }
 
 export interface TemporalData {
@@ -106,8 +110,10 @@ export interface HygieneAnalyticsReport {
   largestFiles: HygieneFileEntry[];
   /** Top 20 by ageDays */
   oldestFiles: HygieneFileEntry[];
-  /** Monthly modification activity time series */
+  /** 14-day modification activity time series, including dead code bucketing */
   temporalData: TemporalData;
   /** Active prune config used for this report (displayed in UI) */
   pruneConfig: PruneConfig;
+  /** Dead code scan results (unused imports, locals, type params) */
+  deadCode?: DeadCodeScan;
 }

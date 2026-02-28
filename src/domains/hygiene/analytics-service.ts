@@ -18,6 +18,7 @@ import {
   TemporalBucket,
   TemporalData,
 } from "./analytics-types";
+import { DeadCodeScan } from "../../types";
 import { HYGIENE_ANALYTICS_EXCLUDE_PATTERNS } from "../../constants";
 
 // ============================================================================
@@ -32,8 +33,29 @@ const TEMP_EXTS      = new Set([".tmp", ".temp"]);
 const SOURCE_EXTS    = new Set([".ts", ".js", ".py", ".go", ".rs", ".java", ".rb", ".cs", ".tsx", ".jsx", ".sh", ".bash"]);
 /** Compiled / generated artifact extensions */
 const ARTIFACT_EXTS  = new Set([".class", ".pyc", ".pyo", ".o", ".obj", ".a", ".so"]);
-/** Directory names that indicate build / cache output not covered by EXCLUDE_PATTERNS */
-const ARTIFACT_DIRS  = new Set(["target", ".next", ".nuxt", ".parcel-cache"]);
+/** Directory names that indicate build / cache, venvs, or tool output */
+const ARTIFACT_DIRS = new Set([
+  "target", ".next", ".nuxt", ".parcel-cache",
+  "__pycache__", "venv", ".venv",
+  ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
+]);
+
+/**
+ * Heavy dirs we never recurse into (would be expensive). We only check existence
+ * and add a single placeholder entry (one stat) so they still show as hygiene targets.
+ * Covers: JS/Node, Python, PHP/Ruby, JVM/Gradle, .NET, Terraform, Dart/Flutter,
+ * Elixir, Haskell, Clojure.
+ */
+const HEAVY_ARTIFACT_DIRS = new Set([
+  "node_modules", "venv", ".venv",
+  "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
+  ".yarn", ".pnpm-store",
+  "vendor", ".bundle",
+  ".gradle", "packages",
+  ".terraform", ".dart_tool",
+  "deps", "_build",
+  ".stack-work", ".cpcache",
+]);
 
 /** Extensions for which we attempt line counting (text-based only) */
 const LINE_COUNT_EXTS = new Set([
@@ -51,7 +73,7 @@ const MAX_LINECOUNT_BYTES = 5 * 1024 * 1024;
 function categorize(ext: string, name: string, relPath: string): FileCategory {
   if (ARTIFACT_EXTS.has(ext)) return "artifact";
   const parts = relPath.split(/[/\\]/);
-  if (parts.some((p) => ARTIFACT_DIRS.has(p))) return "artifact";
+  if (parts.some((p) => ARTIFACT_DIRS.has(p) || p.endsWith(".egg-info"))) return "artifact";
   if (MARKDOWN_EXTS.has(ext))                   return "markdown";
   if (LOG_EXTS.has(ext))                        return "log";
   if (CONFIG_EXTS.has(ext))                     return "config";
@@ -89,22 +111,6 @@ function isPruneCandidate(
 // ============================================================================
 // Ignore pattern helpers (mirrors handlers.ts)
 // ============================================================================
-
-function readGitignorePatterns(workspaceRoot: string): string[] {
-  try {
-    const content = fs.readFileSync(path.join(workspaceRoot, ".gitignore"), "utf-8");
-    return content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith("#"))
-      .map((l) => {
-        const stripped = l.endsWith("/") ? l.slice(0, -1) : l;
-        return stripped.startsWith("**/") ? stripped : `**/${stripped}`;
-      });
-  } catch {
-    return [];
-  }
-}
 
 function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
   try {
@@ -152,17 +158,22 @@ function lastNDays(n: number): DayInfo[] {
   return result;
 }
 
-function buildTemporalData(files: HygieneFileEntry[]): TemporalData {
+function buildTemporalData(
+  files: HygieneFileEntry[],
+  deadCodeByRelPath?: Map<string, number>
+): TemporalData {
   const days = lastNDays(14);
-  const totalByDay: Record<string, number>                = {};
-  const pruneByDay: Record<string, number>                = {};
-  const extByDay:   Record<string, Record<string, number>> = {};
-  const extTotals:  Record<string, number>                = {};
+  const totalByDay:    Record<string, number>                = {};
+  const pruneByDay:    Record<string, number>                = {};
+  const deadCodeByDay: Record<string, number>                = {};
+  const extByDay:      Record<string, Record<string, number>> = {};
+  const extTotals:     Record<string, number>                = {};
 
   for (const d of days) {
-    totalByDay[d.key] = 0;
-    pruneByDay[d.key] = 0;
-    extByDay[d.key]   = {};
+    totalByDay[d.key]    = 0;
+    pruneByDay[d.key]    = 0;
+    deadCodeByDay[d.key] = 0;
+    extByDay[d.key]      = {};
   }
 
   for (const f of files) {
@@ -171,6 +182,9 @@ function buildTemporalData(files: HygieneFileEntry[]): TemporalData {
       if (fileMs >= d.start && fileMs < d.end) {
         totalByDay[d.key]++;
         if (f.isPruneCandidate) pruneByDay[d.key]++;
+        if (deadCodeByRelPath) {
+          deadCodeByDay[d.key] += deadCodeByRelPath.get(f.path) ?? 0;
+        }
         const ext = f.extension || "(none)";
         extTotals[ext]        = (extTotals[ext] || 0) + 1;
         extByDay[d.key][ext]  = (extByDay[d.key][ext] || 0) + 1;
@@ -185,9 +199,10 @@ function buildTemporalData(files: HygieneFileEntry[]): TemporalData {
     .map(([ext]) => ext);
 
   const buckets: TemporalBucket[] = days.map((d) => ({
-    label:      d.label,
-    total:      totalByDay[d.key],
-    pruneCount: pruneByDay[d.key],
+    label:         d.label,
+    total:         totalByDay[d.key],
+    pruneCount:    pruneByDay[d.key],
+    deadCodeCount: deadCodeByDay[d.key],
     byExtension: Object.fromEntries(
       topExtensions.map((ext) => [ext, extByDay[d.key][ext] || 0])
     ),
@@ -211,6 +226,30 @@ function pruneConfigKey(config: PruneConfig): string {
 }
 
 // ============================================================================
+// Dead code → relative path map
+// ============================================================================
+
+/**
+ * Build a Map<relPath, issueCount> from a DeadCodeScan.
+ * DeadCodeItem.filePath is absolute; we strip workspaceRoot to get the
+ * relative path that matches HygieneFileEntry.path.
+ */
+function buildDeadCodeRelPathMap(
+  workspaceRoot: string,
+  scan: DeadCodeScan
+): Map<string, number> {
+  const sep = workspaceRoot.endsWith("/") ? "" : "/";
+  const prefix = workspaceRoot + sep;
+  const map = new Map<string, number>();
+  for (const item of scan.items) {
+    if (!item.filePath.startsWith(prefix)) continue;
+    const rel = item.filePath.slice(prefix.length);
+    map.set(rel, (map.get(rel) ?? 0) + 1);
+  }
+  return map;
+}
+
+// ============================================================================
 // Analyzer
 // ============================================================================
 
@@ -221,8 +260,16 @@ export class HygieneAnalyzer {
   /**
    * Analyze workspace files and return a full report.
    * Cached per workspaceRoot+pruneConfig for 10 minutes.
+   *
+   * @param deadCodeScan — optional scan from DeadCodeAnalyzer; when provided,
+   *   dead code issue counts are bucketed into the temporal chart and the raw
+   *   scan is included in the report for the webview summary cards.
    */
-  analyze(workspaceRoot: string, config: PruneConfig = PRUNE_DEFAULTS): HygieneAnalyticsReport {
+  analyze(
+    workspaceRoot: string,
+    config: PruneConfig = PRUNE_DEFAULTS,
+    deadCodeScan?: DeadCodeScan
+  ): HygieneAnalyticsReport {
     const cfgKey = pruneConfigKey(config);
     const cached = this.cache.get(workspaceRoot);
     if (
@@ -230,6 +277,11 @@ export class HygieneAnalyzer {
       cached.configKey === cfgKey &&
       Date.now() - cached.cachedAt < this.cacheTTLMs
     ) {
+      // Re-attach the latest dead code scan even on cache hit — the dead code
+      // cache is managed separately and may have refreshed since the file scan.
+      if (deadCodeScan) {
+        return { ...cached.report, deadCode: deadCodeScan };
+      }
       return cached.report;
     }
 
@@ -245,11 +297,17 @@ export class HygieneAnalyzer {
 
     const files = this.walkDir(workspaceRoot, workspaceRoot, excludePatterns, config);
 
+    // Build relPath → issue count map so buildTemporalData can join by path.
+    // DeadCodeItem.filePath is absolute; HygieneFileEntry.path is relative.
+    const deadCodeByRelPath = deadCodeScan
+      ? buildDeadCodeRelPathMap(workspaceRoot, deadCodeScan)
+      : undefined;
+
     const summary       = this.buildSummary(files);
     const pruneCandiates = files.filter((f) => f.isPruneCandidate);
     const largestFiles  = [...files].sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 20);
     const oldestFiles   = [...files].sort((a, b) => b.ageDays - a.ageDays).slice(0, 20);
-    const temporalData  = buildTemporalData(files);
+    const temporalData  = buildTemporalData(files, deadCodeByRelPath);
 
     const report: HygieneAnalyticsReport = {
       generatedAt: new Date(),
@@ -261,6 +319,7 @@ export class HygieneAnalyzer {
       oldestFiles,
       temporalData,
       pruneConfig: config,
+      deadCode: deadCodeScan,
     };
 
     this.cache.set(workspaceRoot, { report, cachedAt: Date.now(), configKey: cfgKey });
@@ -292,10 +351,40 @@ export class HygieneAnalyzer {
       const fullPath = path.join(dir, dirent.name);
       const relPath  = path.relative(workspaceRoot, fullPath);
 
-      if (
+      const isExcluded =
         micromatch.isMatch(fullPath, excludePatterns) ||
-        micromatch.isMatch(relPath,  excludePatterns)
-      ) {
+        micromatch.isMatch(relPath, excludePatterns);
+
+      if (isExcluded) {
+        // Don't recurse into heavy dirs; just record existence (one stat) so they show as prune targets
+        if (
+          dirent.isDirectory() &&
+          (HEAVY_ARTIFACT_DIRS.has(dirent.name) || dirent.name.endsWith(".egg-info"))
+        ) {
+          try {
+            const stat = fs.statSync(fullPath);
+            const ageDays = Math.floor((Date.now() - stat.mtimeMs) / 86_400_000);
+            entries.push({
+              path: relPath,
+              name: dirent.name,
+              extension: "",
+              category: "artifact",
+              sizeBytes: 0,
+              lastModified: stat.mtime,
+              ageDays,
+              lineCount: -1,
+              isPruneCandidate: isPruneCandidate(
+                ageDays,
+                "artifact",
+                0,
+                -1,
+                config
+              ),
+            });
+          } catch {
+            // stat failed, skip placeholder
+          }
+        }
         continue;
       }
 

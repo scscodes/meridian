@@ -2,12 +2,13 @@
  * Hygiene Domain Handlers — workspace cleanup and analysis.
  */
 import { Handler, WorkspaceScan, WorkspaceProvider, Logger } from "../../types";
+import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 /**
  * hygiene.scan — Analyze workspace for dead files, large files, and stale logs.
  * Uses WorkspaceProvider.findFiles() with patterns from HYGIENE_SETTINGS.
  * Large-file detection reads file content to measure byte length (no stat API available).
  */
-export declare function createScanHandler(workspaceProvider: WorkspaceProvider, logger: Logger): Handler<Record<string, never>, WorkspaceScan>;
+export declare function createScanHandler(workspaceProvider: WorkspaceProvider, logger: Logger, deadCodeAnalyzer: DeadCodeAnalyzer): Handler<Record<string, never>, WorkspaceScan>;
 export interface CleanupParams {
     dryRun?: boolean;
     files?: string[];

@@ -14,6 +14,7 @@ import {
 } from "../../types";
 import { createScanHandler, createCleanupHandler } from "./handlers";
 import { HygieneAnalyzer } from "./analytics-service";
+import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 import { createShowHygieneAnalyticsHandler } from "./analytics-handler";
 
 /**
@@ -30,18 +31,20 @@ export class HygieneDomainService implements DomainService {
 
   handlers: Partial<Record<HygieneCommandName, Handler>> = {};
   public analyzer: HygieneAnalyzer;
+  public deadCodeAnalyzer: DeadCodeAnalyzer;
   private logger: Logger;
   private scanIntervalMs: number = 60 * 60 * 1000; // 1 hour default
 
   constructor(workspaceProvider: WorkspaceProvider, logger: Logger) {
     this.logger = logger;
     this.analyzer = new HygieneAnalyzer();
+    this.deadCodeAnalyzer = new DeadCodeAnalyzer(logger);
 
     // Initialize handlers
     this.handlers = {
-      "hygiene.scan": createScanHandler(workspaceProvider, logger) as any,
+      "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer) as any,
       "hygiene.cleanup": createCleanupHandler(workspaceProvider, logger) as any,
-      "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, logger) as any,
+      "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, this.deadCodeAnalyzer, logger) as any,
     };
   }
 

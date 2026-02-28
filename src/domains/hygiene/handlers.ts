@@ -12,11 +12,13 @@ import {
   success,
   failure,
   WorkspaceScan,
+  DeadCodeScan,
   MarkdownFile,
   WorkspaceProvider,
   Logger,
 } from "../../types";
 import { HYGIENE_SETTINGS } from "../../constants";
+import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 
 /**
  * Read and parse .gitignore patterns from the workspace root.
@@ -73,7 +75,8 @@ function isExcluded(filePath: string, patterns: string[]): boolean {
  */
 export function createScanHandler(
   workspaceProvider: WorkspaceProvider,
-  logger: Logger
+  logger: Logger,
+  deadCodeAnalyzer: DeadCodeAnalyzer
 ): Handler<Record<string, never>, WorkspaceScan> {
   return async (ctx: CommandContext) => {
     try {
@@ -163,15 +166,24 @@ export function createScanHandler(
         }
       }
 
+      // --- Dead code: unused imports, locals, params (TS compiler diagnostics) ---
+      let deadCode: DeadCodeScan;
+      try {
+        deadCode = deadCodeAnalyzer.analyze(workspaceRoot);
+      } catch {
+        deadCode = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 };
+      }
+
       const scan: WorkspaceScan = {
         deadFiles,
         largeFiles,
         logFiles,
         markdownFiles,
+        deadCode,
       };
 
       logger.info(
-        `Found ${scan.deadFiles.length} dead, ${scan.largeFiles.length} large, ${scan.logFiles.length} log, ${scan.markdownFiles.length} markdown files`,
+        `Found ${scan.deadFiles.length} dead, ${scan.largeFiles.length} large, ${scan.logFiles.length} log, ${scan.markdownFiles.length} markdown, ${scan.deadCode.items.length} dead-code items`,
         "HygieneScanHandler"
       );
 

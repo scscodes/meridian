@@ -6,7 +6,7 @@
  * Organized by domain for clarity.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AGENT_SETTINGS = exports.WORKFLOW_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.PERFORMANCE_BOUNDS = exports.FILE_PATTERNS = exports.LOG_CONTEXT = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = exports.SIMILARITY_THRESHOLDS = exports.ERROR_CODES = exports.COMMAND_NAMES = void 0;
+exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.AGENT_SETTINGS = exports.WORKFLOW_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.PERFORMANCE_BOUNDS = exports.FILE_PATTERNS = exports.LOG_CONTEXT = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = exports.SIMILARITY_THRESHOLDS = exports.ERROR_CODES = exports.COMMAND_NAMES = void 0;
 // ============================================================================
 // Command Names
 // ============================================================================
@@ -176,29 +176,45 @@ exports.HYGIENE_SETTINGS = {
 };
 // ============================================================================
 // Hygiene Analytics — lighter exclusion set for the analytics scan.
-// Unlike HYGIENE_SETTINGS.EXCLUDE_PATTERNS, this intentionally keeps
-// artifact dirs (dist/, build/, out/, coverage/, .cache/, .next/) so they
-// are surfaced and can be flagged as prune candidates.
-// Gitignore patterns are NOT applied to analytics either.
+// Unlike HYGIENE_SETTINGS.EXCLUDE_PATTERNS, we keep dist/, build/, out/, etc.
+// so they are surfaced as prune candidates. Heavy dirs (node_modules, venv,
+// __pycache__) are excluded from recursion but get a single "exists" placeholder
+// so they still show in the report without scanning contents.
 // ============================================================================
 exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
-    // VCS + editor noise — never analytically useful
     "**/node_modules/**",
     "**/.git/**",
     "**/.vscode/**",
     "**/.idea/**",
-    // Python runtime environments — can be enormous
     "**/.venv/**",
     "**/venv/**",
+    "**/__pycache__/**",
     "**/.pytest_cache/**",
     "**/.mypy_cache/**",
     "**/.ruff_cache/**",
     "**/.tox/**",
     "**/.eggs/**",
     "**/*.egg-info/**",
-    // JS package manager internals
     "**/.yarn/**",
     "**/.pnpm-store/**",
+    "**/vendor/**",
+    "**/vendor",
+    "**/.bundle/**",
+    "**/.gradle/**",
+    "**/packages/**",
+    "**/packages",
+    "**/.terraform/**",
+    "**/.terraform",
+    "**/.dart_tool/**",
+    "**/.dart_tool",
+    "**/deps/**",
+    "**/deps",
+    "**/_build/**",
+    "**/_build",
+    "**/.stack-work/**",
+    "**/.stack-work",
+    "**/.cpcache/**",
+    "**/.cpcache",
 ];
 // ============================================================================
 // Chat Configuration
@@ -353,4 +369,17 @@ exports.AGENT_SETTINGS = {
     /** Agent discovery timeout in milliseconds */
     DISCOVERY_TIMEOUT_MS: 5 * 1000,
 };
+// ============================================================================
+// Dead Code Diagnostics
+// ============================================================================
+/**
+ * TypeScript diagnostic codes surfaced by the dead code scanner.
+ * 6133 — 'X' is declared but its value is never read (unused local/param/import binding)
+ * 6192 — All imports in import declaration are unused
+ * 6196 — 'X' is declared but never used (unused type parameter)
+ * 6198 — All destructured elements are unused
+ * 6199 — All variables in destructuring declaration are unused
+ * 6205 — 'X' is read but never used
+ */
+exports.DEAD_CODE_DIAGNOSTIC_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205]);
 //# sourceMappingURL=constants.js.map

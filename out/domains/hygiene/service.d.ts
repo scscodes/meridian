@@ -3,6 +3,7 @@
  */
 import { DomainService, HygieneCommandName, Handler, Logger, WorkspaceProvider, Result } from "../../types";
 import { HygieneAnalyzer } from "./analytics-service";
+import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 /**
  * Hygiene domain commands.
  */
@@ -11,6 +12,7 @@ export declare class HygieneDomainService implements DomainService {
     readonly name = "hygiene";
     handlers: Partial<Record<HygieneCommandName, Handler>>;
     analyzer: HygieneAnalyzer;
+    deadCodeAnalyzer: DeadCodeAnalyzer;
     private logger;
     private scanIntervalMs;
     constructor(workspaceProvider: WorkspaceProvider, logger: Logger);

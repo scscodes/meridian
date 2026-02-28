@@ -8,6 +8,7 @@ exports.createHygieneDomain = createHygieneDomain;
 const types_1 = require("../../types");
 const handlers_1 = require("./handlers");
 const analytics_service_1 = require("./analytics-service");
+const dead_code_analyzer_1 = require("./dead-code-analyzer");
 const analytics_handler_1 = require("./analytics-handler");
 /**
  * Hygiene domain commands.
@@ -24,11 +25,12 @@ class HygieneDomainService {
         this.scanIntervalMs = 60 * 60 * 1000; // 1 hour default
         this.logger = logger;
         this.analyzer = new analytics_service_1.HygieneAnalyzer();
+        this.deadCodeAnalyzer = new dead_code_analyzer_1.DeadCodeAnalyzer(logger);
         // Initialize handlers
         this.handlers = {
-            "hygiene.scan": (0, handlers_1.createScanHandler)(workspaceProvider, logger),
+            "hygiene.scan": (0, handlers_1.createScanHandler)(workspaceProvider, logger, this.deadCodeAnalyzer),
             "hygiene.cleanup": (0, handlers_1.createCleanupHandler)(workspaceProvider, logger),
-            "hygiene.showAnalytics": (0, analytics_handler_1.createShowHygieneAnalyticsHandler)(this.analyzer, logger),
+            "hygiene.showAnalytics": (0, analytics_handler_1.createShowHygieneAnalyticsHandler)(this.analyzer, this.deadCodeAnalyzer, logger),
         };
     }
     /**

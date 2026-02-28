@@ -123,6 +123,20 @@ export interface MarkdownFile {
     sizeBytes: number;
     lineCount: number;
 }
+export interface DeadCodeItem {
+    filePath: string;
+    line: number;
+    character: number;
+    message: string;
+    code: number;
+    category: "unusedImport" | "unusedLocal" | "unusedTypeParam";
+}
+export interface DeadCodeScan {
+    items: DeadCodeItem[];
+    tsconfigPath: string | null;
+    durationMs: number;
+    fileCount: number;
+}
 export interface WorkspaceScan {
     deadFiles: string[];
     largeFiles: Array<{
@@ -131,6 +145,7 @@ export interface WorkspaceScan {
     }>;
     logFiles: string[];
     markdownFiles: MarkdownFile[];
+    deadCode: DeadCodeScan;
 }
 export interface ChatContext {
     activeFile?: string;

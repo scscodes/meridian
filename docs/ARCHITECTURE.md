@@ -83,6 +83,7 @@ Each domain is isolated, owns its command space, and exports:
 - **Patterns**:
   - Context gathering (`chat.context`) — active file + git state
   - Local task delegation (`chat.delegate`) — spawn background tasks
+- **Note**: `chat.delegate` is implemented but unreachable from the chat UI (no VS Code command or chat participant route maps to it). See `docs/DEBUG_AUDIT_AGENTS_WORKFLOWS_CHAT.md` for details.
 - **Integration**: Local task execution
 
 #### Workflow Domain (`workflow/`) — NEW
@@ -118,7 +119,7 @@ Typed wrappers for external systems, no leaking abstraction.
 
 **config.ts** — Configuration Provider
 - Typed schema (no string keys)
-- Defaults + VS Code workspace settings
+- Defaults only (VS Code workspace settings not yet wired)
 - Example: `CONFIG_KEYS.GIT_AUTOFETCH`, `CONFIG_KEYS.HYGIENE_ENABLED`
 
 **workspace.ts** — Workspace utilities
@@ -340,7 +341,7 @@ Every error message must be actionable, not generic:
 
 ### Detailed Error Handling Guide
 
-See **refactor/error-handling.md** for comprehensive before/after examples, patterns, and best practices.
+<!-- refactor/error-handling.md — planned, not yet written -->
 
 ---
 
@@ -445,7 +446,7 @@ ORDER BY successRate ASC;
 - **OpenTelemetry**: Emit spans and metrics
 - **CloudWatch**: Log to AWS CloudWatch
 
-See **refactor/telemetry-events.md** for comprehensive event reference and examples.
+<!-- refactor/telemetry-events.md — planned, not yet written -->
 
 ---
 
@@ -473,7 +474,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 ### Environment Variables
 
-Supported environment variables:
+**Planned — not yet implemented.** No `process.env` reads exist in current code.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -583,15 +584,8 @@ if (result.kind === "ok") {
   "version": "1.0.0",
   "steps": [
     {
-      "id": "lint",
-      "command": "hygiene.lint",
-      "params": { "path": "." },
-      "onSuccess": "test",
-      "onFailure": "exit"
-    },
-    {
-      "id": "test",
-      "command": "hygiene.test",
+      "id": "scan",
+      "command": "hygiene.scan",
       "params": { "path": "." },
       "onSuccess": "commit",
       "onFailure": "exit"
@@ -599,7 +593,7 @@ if (result.kind === "ok") {
     {
       "id": "commit",
       "command": "git.smartCommit",
-      "params": { "message": "chore: lint and test passed" },
+      "params": { "message": "chore: hygiene scan passed" },
       "onSuccess": "exit"
     }
   ]
@@ -954,10 +948,10 @@ src/
 
 ### Documentation (✓ Complete)
 
-- [x] **refactor/error-handling.md** — Error handling patterns with before/after examples
-- [x] **refactor/telemetry-events.md** — Telemetry event reference
-- [x] **TESTING.md** — Testing guide with mock usage and error path testing
-- [x] **MIGRATION.md** — Breaking changes guide for callers
+- [ ] **refactor/error-handling.md** — Error handling patterns with before/after examples
+- [ ] **refactor/telemetry-events.md** — Telemetry event reference
+- [ ] **TESTING.md** — Testing guide with mock usage and error path testing
+- [ ] **MIGRATION.md** — Breaking changes guide for callers
 - [x] **ARCHITECTURE.md** — This document (added error handling & telemetry sections)
 
 ### Infrastructure (✓ Complete)

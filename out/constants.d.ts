@@ -4,81 +4,11 @@
  *
  * Organized by domain for clarity.
  */
-export declare const COMMAND_NAMES: {
-    readonly GIT: {
-        readonly STATUS: "git.status";
-        readonly PULL: "git.pull";
-        readonly COMMIT: "git.commit";
-        readonly SMART_COMMIT: "git.smartCommit";
-        readonly ANALYZE_INBOUND: "git.analyzeInbound";
-        readonly SHOW_ANALYTICS: "git.showAnalytics";
-        readonly EXPORT_JSON: "git.exportJson";
-        readonly EXPORT_CSV: "git.exportCsv";
-    };
-    readonly HYGIENE: {
-        readonly SCAN: "hygiene.scan";
-        readonly CLEANUP: "hygiene.cleanup";
-        readonly SHOW_ANALYTICS: "hygiene.showAnalytics";
-    };
-    readonly CHAT: {
-        readonly CONTEXT: "chat.context";
-        readonly DELEGATE: "chat.delegate";
-    };
-    readonly WORKFLOW: {
-        readonly LIST: "workflow.list";
-        readonly RUN: "workflow.run";
-    };
-    readonly AGENT: {
-        readonly LIST: "agent.list";
-    };
-};
-export declare const ERROR_CODES: {
-    readonly CONFIG_INIT_ERROR: "CONFIG_INIT_ERROR";
-    readonly CONFIG_SET_ERROR: "CONFIG_SET_ERROR";
-    readonly CONFIG_VALIDATION_ERROR: "CONFIG_VALIDATION_ERROR";
-    readonly CONFIG_MISSING_REQUIRED: "CONFIG_MISSING_REQUIRED";
-    readonly GIT_OPERATION_FAILED: "GIT_OPERATION_FAILED";
-    readonly GIT_CLONE_FAILED: "GIT_CLONE_FAILED";
-    readonly GIT_NO_CHANGES: "GIT_NO_CHANGES";
-    readonly GIT_CONFLICT: "GIT_CONFLICT";
-    readonly WORKSPACE_NOT_FOUND: "WORKSPACE_NOT_FOUND";
-    readonly FILE_READ_ERROR: "FILE_READ_ERROR";
-    readonly FILE_WRITE_ERROR: "FILE_WRITE_ERROR";
-    readonly FILE_DELETE_ERROR: "FILE_DELETE_ERROR";
-    readonly WORKFLOW_NOT_FOUND: "WORKFLOW_NOT_FOUND";
-    readonly WORKFLOW_EXECUTION_ERROR: "WORKFLOW_EXECUTION_ERROR";
-    readonly WORKFLOW_STEP_FAILED: "WORKFLOW_STEP_FAILED";
-    readonly AGENT_NOT_FOUND: "AGENT_NOT_FOUND";
-    readonly AGENT_CAPABILITY_MISSING: "AGENT_CAPABILITY_MISSING";
-    readonly HANDLER_NOT_FOUND: "HANDLER_NOT_FOUND";
-    readonly HANDLER_EXECUTION_ERROR: "HANDLER_EXECUTION_ERROR";
-    readonly OPERATION_TIMEOUT: "OPERATION_TIMEOUT";
-    readonly OPERATION_CANCELLED: "OPERATION_CANCELLED";
-    readonly INTERNAL_ERROR: "INTERNAL_ERROR";
-};
-export declare const SIMILARITY_THRESHOLDS: {
-    /** Minimum Levenshtein similarity (0.0 to 1.0) for grouping related file changes */
-    readonly CHANGE_GROUPING: 0.4;
-    /** Minimum similarity for commit message suggestions */
-    readonly MESSAGE_SUGGESTION: 0.5;
-    /** Similarity threshold for file path clustering */
-    readonly PATH_CLUSTERING: 0.35;
-};
 export declare const CACHE_SETTINGS: {
-    /** Maximum number of log entries to keep in memory */
-    readonly MAX_LOG_ENTRIES: 1000;
-    /** Log cache TTL in milliseconds (30 minutes) */
-    readonly LOG_TTL_MS: number;
-    /** Maximum number of cached workflow definitions */
-    readonly MAX_WORKFLOW_CACHE: 100;
-    /** Workflow cache TTL in milliseconds (1 hour) */
-    readonly WORKFLOW_CACHE_TTL_MS: number;
-    /** Maximum number of cached agent definitions */
-    readonly MAX_AGENT_CACHE: 50;
-    /** Agent cache TTL in milliseconds (1 hour) */
-    readonly AGENT_CACHE_TTL_MS: number;
-    /** Git status cache TTL in milliseconds (5 minutes) */
-    readonly GIT_STATUS_TTL_MS: number;
+    /** Git analytics report cache TTL in milliseconds (10 minutes) */
+    readonly ANALYTICS_TTL_MS: number;
+    /** Dead code scan cache TTL in milliseconds (5 minutes) */
+    readonly DEAD_CODE_TTL_MS: number;
 };
 export declare const GIT_DEFAULTS: {
     /** Default remote name */
@@ -114,7 +44,7 @@ export declare const HYGIENE_SETTINGS: {
     /** Log file patterns to detect */
     readonly LOG_FILE_PATTERNS: readonly ["*.log", "debug.log", "*-error.log"];
     /** Temporary file patterns */
-    readonly TEMP_FILE_PATTERNS: readonly ["*.tmp", "*.temp", "*.bak", "*~"];
+    readonly TEMP_FILE_PATTERNS: readonly ["*.tmp", "*.temp", "*.bak", "*~", "*.orig", "*.swp"];
 };
 export declare const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS: readonly ["**/node_modules/**", "**/.git/**", "**/.vscode/**", "**/.idea/**", "**/.venv/**", "**/venv/**", "**/__pycache__/**", "**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/.tox/**", "**/.eggs/**", "**/*.egg-info/**", "**/.yarn/**", "**/.pnpm-store/**", "**/vendor/**", "**/vendor", "**/.bundle/**", "**/.gradle/**", "**/packages/**", "**/packages", "**/.terraform/**", "**/.terraform", "**/.dart_tool/**", "**/.dart_tool", "**/deps/**", "**/deps", "**/_build/**", "**/_build", "**/.stack-work/**", "**/.stack-work", "**/.cpcache/**", "**/.cpcache"];
 export declare const CHAT_SETTINGS: {
@@ -143,58 +73,6 @@ export declare const LOG_SETTINGS: {
     /** Whether to include context in logs */
     readonly INCLUDE_CONTEXT: true;
 };
-export declare const LOG_CONTEXT: {
-    readonly GIT_SERVICE: "GitService";
-    readonly GIT_STATUS_HANDLER: "GitStatusHandler";
-    readonly GIT_COMMIT_HANDLER: "GitCommitHandler";
-    readonly GIT_SMART_COMMIT_HANDLER: "GitSmartCommitHandler";
-    readonly GIT_ANALYTICS_SERVICE: "GitAnalyticsService";
-    readonly CHANGE_GROUPER: "ChangeGrouper";
-    readonly MESSAGE_SUGGESTER: "MessageSuggester";
-    readonly HYGIENE_SERVICE: "HygieneService";
-    readonly HYGIENE_SCANNER: "HygieneScanner";
-    readonly CHAT_SERVICE: "ChatService";
-    readonly CHAT_CONTEXT_HANDLER: "ChatContextHandler";
-    readonly WORKFLOW_SERVICE: "WorkflowService";
-    readonly WORKFLOW_ENGINE: "WorkflowEngine";
-    readonly WORKFLOW_STEP_RUNNER: "StepRunner";
-    readonly AGENT_SERVICE: "AgentService";
-    readonly AGENT_REGISTRY: "AgentRegistry";
-    readonly LOGGER: "Logger";
-    readonly CONFIG: "Config";
-    readonly TELEMETRY: "Telemetry";
-    readonly ROUTER: "CommandRouter";
-    readonly MIDDLEWARE: "Middleware";
-    readonly PERMISSION_CHECKER: "PermissionChecker";
-    readonly AUDIT_LOG: "AuditLog";
-};
-export declare const FILE_PATTERNS: {
-    readonly TYPESCRIPT: "**/*.ts";
-    readonly TYPESCRIPT_BUILD: "**/*.js";
-    readonly CONFIG_FILES: readonly ["tsconfig.json", "package.json", "*.config.js"];
-    readonly DOCS: "**/*.md";
-    readonly TESTS: "**/*.test.ts";
-    readonly TEST_SPEC: "**/*.spec.ts";
-    readonly EXCLUDED_DIRS: readonly ["node_modules", ".git", "dist", "build", "out", ".vscode", ".idea"];
-};
-export declare const PERFORMANCE_BOUNDS: {
-    /** Maximum handler execution time in milliseconds */
-    readonly MAX_HANDLER_TIME_MS: number;
-    /** Maximum workflow execution time in milliseconds */
-    readonly MAX_WORKFLOW_TIME_MS: number;
-    /** Maximum number of concurrent operations */
-    readonly MAX_CONCURRENT_OPS: 5;
-    /** Timeout for external API calls in milliseconds */
-    readonly API_TIMEOUT_MS: number;
-    /** Debounce delay for file system events in milliseconds */
-    readonly FS_EVENT_DEBOUNCE_MS: 500;
-    /** Batch size for processing large file lists */
-    readonly BATCH_SIZE: 50;
-    /** Maximum retries for transient failures */
-    readonly MAX_RETRIES: 3;
-    /** Base retry delay in milliseconds (exponential backoff) */
-    readonly RETRY_BASE_DELAY_MS: 1000;
-};
 export declare const TELEMETRY_EVENT_KINDS: {
     readonly COMMAND_STARTED: "COMMAND_STARTED";
     readonly COMMAND_COMPLETED: "COMMAND_COMPLETED";
@@ -208,23 +86,27 @@ export declare const TELEMETRY_EVENT_KINDS: {
     readonly AGENT_INVOKED: "AGENT_INVOKED";
     readonly USER_ACTION: "USER_ACTION";
 };
-export declare const WORKFLOW_SETTINGS: {
-    /** Default timeout for workflow execution in milliseconds */
-    readonly EXECUTION_TIMEOUT_MS: number;
-    /** Default timeout per step in milliseconds */
-    readonly STEP_TIMEOUT_MS: number;
-    /** Maximum number of sequential steps allowed in a workflow */
-    readonly MAX_STEPS: 50;
-    /** Whether to continue on step failure */
-    readonly CONTINUE_ON_FAILURE: false;
-};
-export declare const AGENT_SETTINGS: {
-    /** Maximum number of capabilities per agent */
-    readonly MAX_CAPABILITIES_PER_AGENT: 20;
-    /** Whether to allow dynamic agent registration */
-    readonly ALLOW_DYNAMIC_REGISTRATION: true;
-    /** Agent discovery timeout in milliseconds */
-    readonly DISCOVERY_TIMEOUT_MS: number;
+export declare const ANALYTICS_SETTINGS: {
+    /** Number of high-churn files to surface in the summary report */
+    readonly TOP_CHURN_FILES_COUNT: 10;
+    /** Number of top authors to surface in the summary report */
+    readonly TOP_AUTHORS_COUNT: 5;
+    /** Maximum file rows written to a CSV export */
+    readonly CSV_MAX_FILES: 100;
+    /** Volatility score above which a file is classified as "high" risk */
+    readonly RISK_HIGH_VOLATILITY: 100;
+    /** Volatility score above which a file is classified as "medium" risk */
+    readonly RISK_MEDIUM_VOLATILITY: 30;
+    /** Confidence score assigned to commit trend calculations (0–1) */
+    readonly TREND_CONFIDENCE: 0.75;
+    /** Minimum slope magnitude to classify a trend as "up" or "down" vs "stable" */
+    readonly TREND_SLOPE_THRESHOLD: 0.5;
+    /**
+     * Divisor used to normalize each trend half-period to a per-week rate.
+     * NOTE: Currently a fixed estimate. See docs/TODO.md for the known limitation
+     * (does not account for actual period length — tracked for future fix).
+     */
+    readonly TREND_NORMALIZE_WEEKS: 4;
 };
 /**
  * TypeScript diagnostic codes surfaced by the dead code scanner.
@@ -236,8 +118,4 @@ export declare const AGENT_SETTINGS: {
  * 6205 — 'X' is read but never used
  */
 export declare const DEAD_CODE_DIAGNOSTIC_CODES: Set<number>;
-export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES];
-export type CommandName = typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES][keyof typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES]];
-export type LogLevel = typeof LOG_SETTINGS.LEVELS[number];
-export type TelemetryEventKind = typeof TELEMETRY_EVENT_KINDS[keyof typeof TELEMETRY_EVENT_KINDS];
 //# sourceMappingURL=constants.d.ts.map

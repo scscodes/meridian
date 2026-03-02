@@ -239,7 +239,8 @@ class TelemetryTracker {
             this.sink.emit(event);
         }
         catch (err) {
-            // Silently fail; don't let telemetry errors break the application
+            // Intentional console.error: Logger depends on TelemetryTracker,
+            // so using Logger here would create a circular dependency.
             console.error("Telemetry emit failed", err);
         }
     }
@@ -328,6 +329,8 @@ class ConsoleTelemetrySink {
             constants_1.TELEMETRY_EVENT_KINDS.WORKFLOW_FAILED,
         ];
         if (importantKinds.includes(event.kind)) {
+            // Intentional console.log: this sink IS the output destination;
+            // routing through Logger would create a circular dependency.
             console.log(`[TELEMETRY:${event.kind}]`, event.payload);
         }
     }

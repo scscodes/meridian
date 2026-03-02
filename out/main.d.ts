@@ -17,5 +17,4 @@ export declare function activate(context: vscode.ExtensionContext): Promise<void
 export declare function deactivate(): Promise<void>;
 export { CommandRouter };
 export { Logger } from "./infrastructure/logger";
-export { Config } from "./infrastructure/config";
 //# sourceMappingURL=main.d.ts.map

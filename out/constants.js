@@ -6,106 +6,15 @@
  * Organized by domain for clarity.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.AGENT_SETTINGS = exports.WORKFLOW_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.PERFORMANCE_BOUNDS = exports.FILE_PATTERNS = exports.LOG_CONTEXT = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = exports.SIMILARITY_THRESHOLDS = exports.ERROR_CODES = exports.COMMAND_NAMES = void 0;
-// ============================================================================
-// Command Names
-// ============================================================================
-exports.COMMAND_NAMES = {
-    // Git domain
-    GIT: {
-        STATUS: "git.status",
-        PULL: "git.pull",
-        COMMIT: "git.commit",
-        SMART_COMMIT: "git.smartCommit",
-        ANALYZE_INBOUND: "git.analyzeInbound",
-        SHOW_ANALYTICS: "git.showAnalytics",
-        EXPORT_JSON: "git.exportJson",
-        EXPORT_CSV: "git.exportCsv",
-    },
-    // Hygiene domain
-    HYGIENE: {
-        SCAN: "hygiene.scan",
-        CLEANUP: "hygiene.cleanup",
-        SHOW_ANALYTICS: "hygiene.showAnalytics",
-    },
-    // Chat domain
-    CHAT: {
-        CONTEXT: "chat.context",
-        DELEGATE: "chat.delegate",
-    },
-    // Workflow domain
-    WORKFLOW: {
-        LIST: "workflow.list",
-        RUN: "workflow.run",
-    },
-    // Agent domain
-    AGENT: {
-        LIST: "agent.list",
-    },
-};
-// ============================================================================
-// Error Codes
-// ============================================================================
-exports.ERROR_CODES = {
-    // Configuration errors
-    CONFIG_INIT_ERROR: "CONFIG_INIT_ERROR",
-    CONFIG_SET_ERROR: "CONFIG_SET_ERROR",
-    CONFIG_VALIDATION_ERROR: "CONFIG_VALIDATION_ERROR",
-    CONFIG_MISSING_REQUIRED: "CONFIG_MISSING_REQUIRED",
-    // Git errors
-    GIT_OPERATION_FAILED: "GIT_OPERATION_FAILED",
-    GIT_CLONE_FAILED: "GIT_CLONE_FAILED",
-    GIT_NO_CHANGES: "GIT_NO_CHANGES",
-    GIT_CONFLICT: "GIT_CONFLICT",
-    // Workspace errors
-    WORKSPACE_NOT_FOUND: "WORKSPACE_NOT_FOUND",
-    FILE_READ_ERROR: "FILE_READ_ERROR",
-    FILE_WRITE_ERROR: "FILE_WRITE_ERROR",
-    FILE_DELETE_ERROR: "FILE_DELETE_ERROR",
-    // Workflow errors
-    WORKFLOW_NOT_FOUND: "WORKFLOW_NOT_FOUND",
-    WORKFLOW_EXECUTION_ERROR: "WORKFLOW_EXECUTION_ERROR",
-    WORKFLOW_STEP_FAILED: "WORKFLOW_STEP_FAILED",
-    // Agent errors
-    AGENT_NOT_FOUND: "AGENT_NOT_FOUND",
-    AGENT_CAPABILITY_MISSING: "AGENT_CAPABILITY_MISSING",
-    // Handler errors
-    HANDLER_NOT_FOUND: "HANDLER_NOT_FOUND",
-    HANDLER_EXECUTION_ERROR: "HANDLER_EXECUTION_ERROR",
-    // Generic errors
-    OPERATION_TIMEOUT: "OPERATION_TIMEOUT",
-    OPERATION_CANCELLED: "OPERATION_CANCELLED",
-    INTERNAL_ERROR: "INTERNAL_ERROR",
-};
-// ============================================================================
-// Similarity & Clustering Thresholds
-// ============================================================================
-exports.SIMILARITY_THRESHOLDS = {
-    /** Minimum Levenshtein similarity (0.0 to 1.0) for grouping related file changes */
-    CHANGE_GROUPING: 0.4,
-    /** Minimum similarity for commit message suggestions */
-    MESSAGE_SUGGESTION: 0.5,
-    /** Similarity threshold for file path clustering */
-    PATH_CLUSTERING: 0.35,
-};
+exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.ANALYTICS_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = void 0;
 // ============================================================================
 // Cache Configuration
 // ============================================================================
 exports.CACHE_SETTINGS = {
-    /** Maximum number of log entries to keep in memory */
-    MAX_LOG_ENTRIES: 1000,
-    /** Log cache TTL in milliseconds (30 minutes) */
-    LOG_TTL_MS: 30 * 60 * 1000,
-    /** Maximum number of cached workflow definitions */
-    MAX_WORKFLOW_CACHE: 100,
-    /** Workflow cache TTL in milliseconds (1 hour) */
-    WORKFLOW_CACHE_TTL_MS: 60 * 60 * 1000,
-    /** Maximum number of cached agent definitions */
-    MAX_AGENT_CACHE: 50,
-    /** Agent cache TTL in milliseconds (1 hour) */
-    AGENT_CACHE_TTL_MS: 60 * 60 * 1000,
-    /** Git status cache TTL in milliseconds (5 minutes) */
-    GIT_STATUS_TTL_MS: 5 * 60 * 1000,
+    /** Git analytics report cache TTL in milliseconds (10 minutes) */
+    ANALYTICS_TTL_MS: 10 * 60 * 1000,
+    /** Dead code scan cache TTL in milliseconds (5 minutes) */
+    DEAD_CODE_TTL_MS: 5 * 60 * 1000,
 };
 // ============================================================================
 // Git Configuration Defaults
@@ -172,7 +81,7 @@ exports.HYGIENE_SETTINGS = {
     /** Log file patterns to detect */
     LOG_FILE_PATTERNS: ["*.log", "debug.log", "*-error.log"],
     /** Temporary file patterns */
-    TEMP_FILE_PATTERNS: ["*.tmp", "*.temp", "*.bak", "*~"],
+    TEMP_FILE_PATTERNS: ["*.tmp", "*.temp", "*.bak", "*~", "*.orig", "*.swp"],
 };
 // ============================================================================
 // Hygiene Analytics — lighter exclusion set for the analytics scan.
@@ -249,87 +158,6 @@ exports.LOG_SETTINGS = {
     INCLUDE_CONTEXT: true,
 };
 // ============================================================================
-// Log Context Strings
-// ============================================================================
-exports.LOG_CONTEXT = {
-    // Git domain
-    GIT_SERVICE: "GitService",
-    GIT_STATUS_HANDLER: "GitStatusHandler",
-    GIT_COMMIT_HANDLER: "GitCommitHandler",
-    GIT_SMART_COMMIT_HANDLER: "GitSmartCommitHandler",
-    GIT_ANALYTICS_SERVICE: "GitAnalyticsService",
-    CHANGE_GROUPER: "ChangeGrouper",
-    MESSAGE_SUGGESTER: "MessageSuggester",
-    // Hygiene domain
-    HYGIENE_SERVICE: "HygieneService",
-    HYGIENE_SCANNER: "HygieneScanner",
-    // Chat domain
-    CHAT_SERVICE: "ChatService",
-    CHAT_CONTEXT_HANDLER: "ChatContextHandler",
-    // Workflow domain
-    WORKFLOW_SERVICE: "WorkflowService",
-    WORKFLOW_ENGINE: "WorkflowEngine",
-    WORKFLOW_STEP_RUNNER: "StepRunner",
-    // Agent domain
-    AGENT_SERVICE: "AgentService",
-    AGENT_REGISTRY: "AgentRegistry",
-    // Infrastructure
-    LOGGER: "Logger",
-    CONFIG: "Config",
-    TELEMETRY: "Telemetry",
-    ROUTER: "CommandRouter",
-    MIDDLEWARE: "Middleware",
-    // Cross-cutting
-    PERMISSION_CHECKER: "PermissionChecker",
-    AUDIT_LOG: "AuditLog",
-};
-// ============================================================================
-// File Patterns & Paths
-// ============================================================================
-exports.FILE_PATTERNS = {
-    // TypeScript files
-    TYPESCRIPT: "**/*.ts",
-    TYPESCRIPT_BUILD: "**/*.js",
-    // Configuration files
-    CONFIG_FILES: ["tsconfig.json", "package.json", "*.config.js"],
-    // Documentation
-    DOCS: "**/*.md",
-    // Test files
-    TESTS: "**/*.test.ts",
-    TEST_SPEC: "**/*.spec.ts",
-    // Common folders to exclude
-    EXCLUDED_DIRS: [
-        "node_modules",
-        ".git",
-        "dist",
-        "build",
-        "out",
-        ".vscode",
-        ".idea",
-    ],
-};
-// ============================================================================
-// Performance Bounds
-// ============================================================================
-exports.PERFORMANCE_BOUNDS = {
-    /** Maximum handler execution time in milliseconds */
-    MAX_HANDLER_TIME_MS: 60 * 1000,
-    /** Maximum workflow execution time in milliseconds */
-    MAX_WORKFLOW_TIME_MS: 5 * 60 * 1000,
-    /** Maximum number of concurrent operations */
-    MAX_CONCURRENT_OPS: 5,
-    /** Timeout for external API calls in milliseconds */
-    API_TIMEOUT_MS: 30 * 1000,
-    /** Debounce delay for file system events in milliseconds */
-    FS_EVENT_DEBOUNCE_MS: 500,
-    /** Batch size for processing large file lists */
-    BATCH_SIZE: 50,
-    /** Maximum retries for transient failures */
-    MAX_RETRIES: 3,
-    /** Base retry delay in milliseconds (exponential backoff) */
-    RETRY_BASE_DELAY_MS: 1000,
-};
-// ============================================================================
 // Telemetry Event Types
 // ============================================================================
 exports.TELEMETRY_EVENT_KINDS = {
@@ -346,28 +174,29 @@ exports.TELEMETRY_EVENT_KINDS = {
     USER_ACTION: "USER_ACTION",
 };
 // ============================================================================
-// Workflow Engine Constants
+// Git Analytics Settings
 // ============================================================================
-exports.WORKFLOW_SETTINGS = {
-    /** Default timeout for workflow execution in milliseconds */
-    EXECUTION_TIMEOUT_MS: 5 * 60 * 1000,
-    /** Default timeout per step in milliseconds */
-    STEP_TIMEOUT_MS: 60 * 1000,
-    /** Maximum number of sequential steps allowed in a workflow */
-    MAX_STEPS: 50,
-    /** Whether to continue on step failure */
-    CONTINUE_ON_FAILURE: false,
-};
-// ============================================================================
-// Agent Registry Constants
-// ============================================================================
-exports.AGENT_SETTINGS = {
-    /** Maximum number of capabilities per agent */
-    MAX_CAPABILITIES_PER_AGENT: 20,
-    /** Whether to allow dynamic agent registration */
-    ALLOW_DYNAMIC_REGISTRATION: true,
-    /** Agent discovery timeout in milliseconds */
-    DISCOVERY_TIMEOUT_MS: 5 * 1000,
+exports.ANALYTICS_SETTINGS = {
+    /** Number of high-churn files to surface in the summary report */
+    TOP_CHURN_FILES_COUNT: 10,
+    /** Number of top authors to surface in the summary report */
+    TOP_AUTHORS_COUNT: 5,
+    /** Maximum file rows written to a CSV export */
+    CSV_MAX_FILES: 100,
+    /** Volatility score above which a file is classified as "high" risk */
+    RISK_HIGH_VOLATILITY: 100,
+    /** Volatility score above which a file is classified as "medium" risk */
+    RISK_MEDIUM_VOLATILITY: 30,
+    /** Confidence score assigned to commit trend calculations (0–1) */
+    TREND_CONFIDENCE: 0.75,
+    /** Minimum slope magnitude to classify a trend as "up" or "down" vs "stable" */
+    TREND_SLOPE_THRESHOLD: 0.5,
+    /**
+     * Divisor used to normalize each trend half-period to a per-week rate.
+     * NOTE: Currently a fixed estimate. See docs/TODO.md for the known limitation
+     * (does not account for actual period length — tracked for future fix).
+     */
+    TREND_NORMALIZE_WEEKS: 4,
 };
 // ============================================================================
 // Dead Code Diagnostics

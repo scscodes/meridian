@@ -37,7 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Config = exports.Logger = exports.CommandRouter = void 0;
+exports.Logger = exports.CommandRouter = void 0;
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
@@ -46,7 +46,6 @@ const nodePath = __importStar(require("path"));
 const router_1 = require("./router");
 Object.defineProperty(exports, "CommandRouter", { enumerable: true, get: function () { return router_1.CommandRouter; } });
 const logger_1 = require("./infrastructure/logger");
-const config_1 = require("./infrastructure/config");
 const service_1 = require("./domains/git/service");
 const service_2 = require("./domains/hygiene/service");
 const service_3 = require("./domains/chat/service");
@@ -144,8 +143,6 @@ const COMMAND_MAP = [
 async function activate(context) {
     // Initialize infrastructure layer
     const logger = new logger_1.Logger();
-    const config = new config_1.Config();
-    await config.initialize();
     // Output channel — primary user-facing log surface
     const outputChannel = vscode.window.createOutputChannel("Meridian");
     context.subscriptions.push(outputChannel);
@@ -367,6 +364,4 @@ async function deactivate() {
 }
 var logger_2 = require("./infrastructure/logger");
 Object.defineProperty(exports, "Logger", { enumerable: true, get: function () { return logger_2.Logger; } });
-var config_2 = require("./infrastructure/config");
-Object.defineProperty(exports, "Config", { enumerable: true, get: function () { return config_2.Config; } });
 //# sourceMappingURL=main.js.map

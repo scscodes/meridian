@@ -7,8 +7,9 @@
  * - Integration with Logger for signal-based reporting
  * - No breaking changes to existing Logger interface (additive only)
  */
-import { Logger, AppError } from "../types";
-import { TELEMETRY_EVENT_KINDS, CommandName, ErrorCode } from "../constants";
+import { Logger, AppError, CommandName } from "../types";
+import { TELEMETRY_EVENT_KINDS } from "../constants";
+import { ErrorCode } from "./error-codes";
 /**
  * Event kind discriminator for type-safe event dispatch.
  * Only signal events that represent state changes or important milestones,

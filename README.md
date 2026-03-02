@@ -134,7 +134,32 @@ router.use(createAuditMiddleware(logger));
 ```
 ---
 
-## Features (One Example per Domain)
+## Features
+
+### Git & Repository Analytics
+- **Git status & flows**: View branch health (clean/dirty, staged/unstaged/untracked), pull from remote, and create validated commits, including an interactive **smart commit** flow that groups changes and suggests messages.
+- **Inbound change analysis**: Analyze inbound remote changes before pulling to understand conflict risk and impacted files.
+- **Analytics dashboards & exports**: Generate Git analytics (churn, volatility, authorship, trends) and view them in a full-screen dashboard with charts, tables, and JSON/CSV export.
+
+### Workspace Hygiene
+- **Hygiene scans**: Scan the workspace for dead files, large/log/markdown files, and dead TypeScript code while respecting `.gitignore` and `.meridianignore`.
+- **Safe cleanup**: Perform targeted cleanup of candidates (with optional dry-run) and manage them from a dedicated Hygiene view (delete or ignore).
+- **Hygiene analytics**: Open a hygiene analytics dashboard showing prune candidates, disk impact, and file-type breakdowns over time.
+- **AI doc review**: Request LLM-powered reviews of markdown files surfaced by hygiene scans.
+
+### Workflows & Agents
+- **JSON-defined workflows**: Discover and run workflows from `.vscode/workflows/*.json` (and bundled assets), including conditional branches and shared variables between steps.
+- **Automation agents**: Discover agents from `.vscode/agents/*.json` that wrap capabilities (git, hygiene, workflows) into reusable automation profiles.
+- **VS Code views**: Browse and run workflows and inspect agents from dedicated sidebar views.
+
+### Chat / Copilot Integration
+- **`@meridian` chat participant**: Use Meridian from Copilot Chat with slash and keyword commands (`/status`, `/scan`, `/workflows`, `/agents`, `/analytics`, `/context`, `run <workflow>`).
+- **LLM intent routing**: Let an LLM classify free-form chat requests into concrete commands (`git.*`, `hygiene.*`, `workflow.*`, `agent.*`, `chat.*`).
+- **Tooling for autonomy**: Expose Git, hygiene, workflow, and analytics commands as LM tools so copilots can orchestrate them programmatically.
+
+### Configuration & Observability
+- **Typed configuration**: Configure Git auto-fetch, hygiene enablement/thresholds, log level, and model selection via strongly-typed settings.
+- **Middleware & telemetry**: All commands run through logging/audit/rate-limit middleware and are observable via a central command bus.
 
 ### Git Domain
 - **git.status** — Read-only; returns branch, dirty state, staged/unstaged counts

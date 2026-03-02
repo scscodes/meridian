@@ -216,32 +216,6 @@
     "configuration": {
       "title": "Meridian",
       "properties": {
-        "meridian.git.autofetch": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable auto-fetch for git repositories"
-        },
-        "meridian.hygiene.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable workspace hygiene checks"
-        },
-        "meridian.hygiene.scanInterval": {
-          "type": "number",
-          "default": 60,
-          "description": "Workspace scan interval in minutes"
-        },
-        "meridian.log.level": {
-          "type": "string",
-          "enum": [
-            "debug",
-            "info",
-            "warn",
-            "error"
-          ],
-          "default": "info",
-          "description": "Logger output level"
-        },
         "meridian.model.default": {
           "type": "string",
           "default": "gpt-4o",
@@ -327,6 +301,7 @@
     "lint": "echo 'Linting would run here'"
   },
   "dependencies": {
+    "micromatch": "^4.0.8",
     "typescript": "^5.9.3"
   },
   "devDependencies": {

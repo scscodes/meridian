@@ -5,7 +5,7 @@
   "steps": [
     {
       "id": "lint",
-      "command": "hygiene.lint",
+      "command": "hygiene.scan",
       "params": {
         "path": "."
       },

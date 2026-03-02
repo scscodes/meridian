@@ -8,7 +8,6 @@ import * as fs from "fs";
 import * as nodePath from "path";
 import { CommandRouter } from "./router";
 import { Logger } from "./infrastructure/logger";
-import { Config } from "./infrastructure/config";
 import { CommandContext, CommandName, Command, Middleware, MiddlewareContext } from "./types";
 import { createGitDomain } from "./domains/git/service";
 import { createHygieneDomain } from "./domains/hygiene/service";
@@ -130,9 +129,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Initialize infrastructure layer
   const logger = new Logger();
-  const config = new Config();
-  await config.initialize();
-
   // Output channel — primary user-facing log surface
   const outputChannel = vscode.window.createOutputChannel("Meridian");
   context.subscriptions.push(outputChannel);
@@ -436,4 +432,3 @@ export async function deactivate(): Promise<void> {
 
 export { CommandRouter };
 export { Logger } from "./infrastructure/logger";
-export { Config } from "./infrastructure/config";

@@ -39,7 +39,9 @@ async function collectFiles(
     try {
       entries = await fs.readdir(current, { withFileTypes: true });
     } catch {
-      return; // directory unreadable — skip silently
+      // Directory unreadable — skip silently.
+      // TODO(F7): Inject Logger to surface traversal failures.
+      return;
     }
 
     for (const entry of entries) {

@@ -8,6 +8,7 @@ exports.GitAnalyzer = void 0;
 const { execSync } = require("child_process");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const micromatch = require("micromatch");
+const constants_1 = require("../../constants");
 /** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
 const ANALYTICS_EXCLUDE = [
     "**/node_modules/**",
@@ -23,7 +24,7 @@ class GitAnalyzer {
     constructor(workspaceRoot = process.cwd()) {
         this.workspaceRoot = workspaceRoot;
         this.cacheMap = new Map();
-        this.cacheTTLMs = 10 * 60 * 1000; // 10 minutes
+        this.cacheTTLMs = constants_1.CACHE_SETTINGS.ANALYTICS_TTL_MS;
     }
     /**
      * Generate cache key from options
@@ -56,12 +57,12 @@ class GitAnalyzer {
         const summary = this.buildSummary(commits, files, authors, since, until);
         // Build frequency data
         const commitFrequency = this.buildCommitFrequency(commits);
-        // Top 10 churn files
-        const churnFiles = files.sort((a, b) => b.volatility - a.volatility).slice(0, 10);
-        // Top 5 authors
+        // Top churn files
+        const churnFiles = files.sort((a, b) => b.volatility - a.volatility).slice(0, constants_1.ANALYTICS_SETTINGS.TOP_CHURN_FILES_COUNT);
+        // Top authors
         const topAuthors = authors
             .sort((a, b) => b.commits - a.commits)
-            .slice(0, 5);
+            .slice(0, constants_1.ANALYTICS_SETTINGS.TOP_AUTHORS_COUNT);
         const report = {
             period: opts.period,
             generatedAt: new Date(),
@@ -232,10 +233,10 @@ class GitAnalyzer {
                     ? (metric.insertions + metric.deletions) / metric.commitCount
                     : 0;
             // Determine risk level
-            if (metric.volatility > 100) {
+            if (metric.volatility > constants_1.ANALYTICS_SETTINGS.RISK_HIGH_VOLATILITY) {
                 metric.risk = "high";
             }
-            else if (metric.volatility > 30) {
+            else if (metric.volatility > constants_1.ANALYTICS_SETTINGS.RISK_MEDIUM_VOLATILITY) {
                 metric.risk = "medium";
             }
             else {
@@ -279,8 +280,8 @@ class GitAnalyzer {
         const mid = Math.floor(commits.length / 2);
         const firstHalf = commits.slice(0, mid);
         const secondHalf = commits.slice(mid);
-        const firstAvg = firstHalf.length > 0 ? firstHalf.length / 4 : 0; // Normalize to weeks
-        const secondAvg = secondHalf.length > 0 ? secondHalf.length / 4 : 0;
+        const firstAvg = firstHalf.length > 0 ? firstHalf.length / constants_1.ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS : 0;
+        const secondAvg = secondHalf.length > 0 ? secondHalf.length / constants_1.ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS : 0;
         const commitSlope = secondAvg - firstAvg;
         const commitDirection = this.getDirection(commitSlope);
         // Volatility trend
@@ -292,7 +293,7 @@ class GitAnalyzer {
             commitTrend: {
                 slope: commitSlope,
                 direction: commitDirection,
-                confidence: 0.75,
+                confidence: constants_1.ANALYTICS_SETTINGS.TREND_CONFIDENCE,
             },
             volatilityTrend: {
                 slope: volatilitySlope,
@@ -304,9 +305,9 @@ class GitAnalyzer {
      * Get trend direction from slope
      */
     getDirection(slope) {
-        if (slope > 0.5)
+        if (slope > constants_1.ANALYTICS_SETTINGS.TREND_SLOPE_THRESHOLD)
             return "up";
-        if (slope < -0.5)
+        if (slope < -constants_1.ANALYTICS_SETTINGS.TREND_SLOPE_THRESHOLD)
             return "down";
         return "stable";
     }
@@ -409,7 +410,7 @@ class GitAnalyzer {
         // Files section
         lines.push("Files");
         lines.push("Path,Commits,Insertions,Deletions,Volatility,Risk,Authors,Last Modified");
-        for (const file of report.files.slice(0, 100)) {
+        for (const file of report.files.slice(0, constants_1.ANALYTICS_SETTINGS.CSV_MAX_FILES)) {
             lines.push(`${csvStr(file.path)},${file.commitCount},${file.insertions},${file.deletions},${file.volatility.toFixed(2)},${file.risk},${csvStr(file.authors.join(";"))},${file.lastModified.toISOString()}`);
         }
         lines.push("");

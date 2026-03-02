@@ -8,12 +8,9 @@
  * - No breaking changes to existing Logger interface (additive only)
  */
 
-import { Logger, AppError } from "../types";
-import {
-  TELEMETRY_EVENT_KINDS,
-  CommandName,
-  ErrorCode,
-} from "../constants";
+import { Logger, AppError, CommandName } from "../types";
+import { TELEMETRY_EVENT_KINDS } from "../constants";
+import { ErrorCode } from "./error-codes";
 
 // ============================================================================
 // Telemetry Event Types
@@ -416,7 +413,8 @@ export class TelemetryTracker {
     try {
       this.sink.emit(event);
     } catch (err) {
-      // Silently fail; don't let telemetry errors break the application
+      // Intentional console.error: Logger depends on TelemetryTracker,
+      // so using Logger here would create a circular dependency.
       console.error("Telemetry emit failed", err);
     }
   }
@@ -566,6 +564,8 @@ export class ConsoleTelemetrySink implements TelemetrySink {
     ];
 
     if (importantKinds.includes(event.kind as any)) {
+      // Intentional console.log: this sink IS the output destination;
+      // routing through Logger would create a circular dependency.
       console.log(`[TELEMETRY:${event.kind}]`, event.payload);
     }
   }

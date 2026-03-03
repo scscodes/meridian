@@ -2,13 +2,8 @@
  * Git Analytics Service — Parse git history and generate telemetry
  */
 
-// Declare require for Node.js module access
-declare const require: any;
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { execSync } = require("child_process");
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const micromatch = require("micromatch");
+import { execSync } from "child_process";
+import micromatch from "micromatch";
 import {
   AnalyticsPeriod,
   AnalyticsOptions,
@@ -232,10 +227,8 @@ export class GitAnalyzer {
   /**
    * Check if commit matches path pattern filter
    */
-  private matchesPathPattern(_commit: CommitMetric, _pattern: string): boolean {
-    // For now, simple path filtering
-    // In a full implementation, would parse numstat and check file paths
-    return true; // TODO: implement path filtering
+  private matchesPathPattern(commit: CommitMetric, pattern: string): boolean {
+    return commit.files.some((f) => micromatch.isMatch(f.path, pattern));
   }
 
   /**

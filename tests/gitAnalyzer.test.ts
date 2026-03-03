@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { execSync } from 'child_process';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
 import { createTestGitLog } from './fixtures';
 
@@ -11,6 +12,8 @@ import { createTestGitLog } from './fixtures';
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
 }));
+
+const mockedExecSync = vi.mocked(execSync);
 
 describe('GitAnalyzer', () => {
   let analyzer: GitAnalyzer;
@@ -142,5 +145,55 @@ describe('GitAnalyzer', () => {
     // Test that analyzer doesn't crash on empty input
     const analyzer2 = new GitAnalyzer();
     expect(analyzer2).toBeDefined();
+  });
+
+  // Test 8: filters commits by path pattern
+  it('should filter commits by path pattern', async () => {
+    // Two commits: one touches src/api/**, the other touches docs/**
+    const gitLog = [
+      'aaa111|Alice|2026-02-20T10:00:00Z|feat(api): add handler',
+      '50\t10\tsrc/api/handler.ts',
+      '20\t5\tsrc/api/types.ts',
+      '',
+      'bbb222|Bob|2026-02-21T11:00:00Z|docs: update readme',
+      '30\t10\tdocs/README.md',
+      '15\t5\tdocs/GUIDE.md',
+    ].join('\n');
+
+    mockedExecSync.mockReturnValue(gitLog);
+
+    // Pattern matching src/api/** → only commit aaa111
+    const apiReport = await analyzer.analyze({ period: '3mo', pathPattern: 'src/api/**' });
+    expect(apiReport.commits).toHaveLength(1);
+    expect(apiReport.commits[0].hash).toBe('aaa111');
+
+    analyzer.clearCache();
+    mockedExecSync.mockReturnValue(gitLog);
+
+    // Pattern matching **/*.md → only commit bbb222
+    const docsReport = await analyzer.analyze({ period: '3mo', pathPattern: '**/*.md' });
+    expect(docsReport.commits).toHaveLength(1);
+    expect(docsReport.commits[0].hash).toBe('bbb222');
+
+    analyzer.clearCache();
+    mockedExecSync.mockReturnValue(gitLog);
+
+    // No pattern → both commits
+    const allReport = await analyzer.analyze({ period: '3mo' });
+    expect(allReport.commits).toHaveLength(2);
+  });
+
+  // Test 9: returns empty when pattern matches nothing
+  it('should return empty commits when pattern matches nothing', async () => {
+    const gitLog = [
+      'ccc333|Charlie|2026-02-22T09:00:00Z|feat: add handler',
+      '40\t15\tsrc/api/handler.ts',
+    ].join('\n');
+
+    mockedExecSync.mockReturnValue(gitLog);
+
+    const report = await analyzer.analyze({ period: '3mo', pathPattern: 'nonexistent/**' });
+    expect(report.commits).toHaveLength(0);
+    expect(report.summary.totalCommits).toBe(0);
   });
 });

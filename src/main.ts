@@ -326,7 +326,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Hygiene file actions — registered after tree providers so hygieneTree is in scope.
   context.subscriptions.push(
     vscode.commands.registerCommand("meridian.hygiene.deleteFile", async (item: any) => {
-      const filePath: string | undefined = item?.filePath;
+      const filePath: string | undefined =
+        item instanceof vscode.Uri ? item.fsPath : item?.filePath;
       if (!filePath) return;
       const filename = nodePath.basename(filePath);
       const confirm = await vscode.window.showWarningMessage(
@@ -346,7 +347,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.commands.registerCommand("meridian.hygiene.ignoreFile", async (item: any) => {
-      const filePath: string | undefined = item?.filePath;
+      const filePath: string | undefined =
+        item instanceof vscode.Uri ? item.fsPath : item?.filePath;
       if (!filePath) return;
       const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
       const ignorePath = nodePath.join(wsRoot, ".meridianignore");
@@ -356,7 +358,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       hygieneTree.refresh();
     }),
     vscode.commands.registerCommand("meridian.hygiene.reviewFile", async (item: any) => {
-      const filePath: string | undefined = item?.filePath;
+      const filePath: string | undefined =
+        item instanceof vscode.Uri ? item.fsPath : item?.filePath;
       if (!filePath) return;
 
       let content: string;

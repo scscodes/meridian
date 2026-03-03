@@ -2,21 +2,29 @@
  * Git Domain — Index
  */
 
-export { GitDomainService, createGitDomain, GIT_COMMANDS, ChangeGrouper, CommitMessageSuggester, BatchCommitter, InboundAnalyzer } from "./service";
+export { GitDomainService, createGitDomain, GIT_COMMANDS } from "./service";
+export { ChangeGrouper, CommitMessageSuggester, BatchCommitter } from "./smart-commit-service";
+export { InboundAnalyzer } from "./inbound-analyzer";
 export {
   createStatusHandler,
   createPullHandler,
   createCommitHandler,
+} from "./handlers";
+export {
   createSmartCommitHandler,
+  parseFileChanges,
+} from "./smart-commit-handler";
+export {
   createAnalyzeInboundHandler,
+} from "./inbound-handler";
+export {
   createGeneratePRHandler,
   createReviewPRHandler,
   createCommentPRHandler,
   createResolveConflictsHandler,
   gatherPRContext,
-  parseFileChanges,
   GenerateProseFn,
-} from "./handlers";
+} from "./pr-handlers";
 export {
   createShowAnalyticsHandler,
   createExportJsonHandler,

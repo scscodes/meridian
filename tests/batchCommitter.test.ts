@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { BatchCommitter } from '../src/domains/git/service';
+import { BatchCommitter } from '../src/domains/git/smart-commit-service';
 import { MockGitProvider, MockLogger, assertSuccess, assertFailure } from './fixtures';
 
 describe('BatchCommitter', () => {

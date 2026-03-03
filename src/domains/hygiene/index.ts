@@ -3,4 +3,5 @@
  */
 
 export { HygieneDomainService, createHygieneDomain } from "./service";
-export { createScanHandler, createCleanupHandler } from "./handlers";
+export { createScanHandler } from "./scan-handler";
+export { createCleanupHandler, CleanupParams, CleanupResult } from "./cleanup-handler";

@@ -1,5 +1,5 @@
 /**
- * Hygiene Domain Handlers — workspace cleanup and analysis.
+ * Hygiene Domain Scan Handler — workspace analysis for dead files, large files, and stale logs.
  */
 
 import * as fs from "fs";
@@ -63,10 +63,6 @@ function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
 function isExcluded(filePath: string, patterns: string[]): boolean {
   return patterns.length > 0 && micromatch.isMatch(filePath, patterns);
 }
-
-// ============================================================================
-// Scan Handler
-// ============================================================================
 
 /**
  * hygiene.scan — Analyze workspace for dead files, large files, and stale logs.
@@ -156,7 +152,7 @@ export function createScanHandler(
       }
 
       // --- Dead code: unused imports, locals, params (TS compiler diagnostics) ---
-      let deadCode: DeadCodeScan;
+      let deadCode: DeadCodeScan = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 };
       try {
         deadCode = deadCodeAnalyzer.analyze(workspaceRoot);
       } catch {
@@ -183,97 +179,6 @@ export function createScanHandler(
         message: "Workspace scan failed",
         details: err,
         context: "hygiene.scan",
-      });
-    }
-  };
-}
-
-// ============================================================================
-// Cleanup Handler
-// ============================================================================
-
-export interface CleanupParams {
-  dryRun?: boolean;
-  files?: string[];
-}
-
-export interface CleanupResult {
-  dryRun: boolean;
-  files: string[];
-  deleted: string[];
-  failed: Array<{ path: string; reason: string }>;
-}
-
-/**
- * hygiene.cleanup — Remove specified files from the workspace.
- * Safety: requires an explicit file list; never deletes without one.
- * If dryRun=true, returns the list of files that WOULD be deleted without touching the FS.
- */
-export function createCleanupHandler(
-  workspaceProvider: WorkspaceProvider,
-  logger: Logger
-): Handler<CleanupParams, CleanupResult> {
-  return async (_ctx: CommandContext, params: CleanupParams = {}) => {
-    try {
-      const { dryRun = false, files } = params;
-
-      if (!files || files.length === 0) {
-        return failure({
-          code: "HYGIENE_CLEANUP_NO_FILES",
-          message: "Cleanup requires an explicit file list; none provided",
-          context: "hygiene.cleanup",
-        });
-      }
-
-      const mode = dryRun ? "DRY RUN" : "EXECUTE";
-      logger.info(
-        `Starting cleanup (${mode}) for ${files.length} file(s)`,
-        "HygieneCleanupHandler"
-      );
-
-      if (dryRun) {
-        logger.info(
-          `Dry-run complete: ${files.length} file(s) would be deleted`,
-          "HygieneCleanupHandler"
-        );
-        return success({
-          dryRun: true,
-          files,
-          deleted: [],
-          failed: [],
-        });
-      }
-
-      const deleted: string[] = [];
-      const failed: Array<{ path: string; reason: string }> = [];
-
-      for (const filePath of files) {
-        const result = await workspaceProvider.deleteFile(filePath);
-        if (result.kind === "ok") {
-          deleted.push(filePath);
-          logger.debug(`Deleted: ${filePath}`, "HygieneCleanupHandler");
-        } else {
-          failed.push({ path: filePath, reason: result.error.message });
-          logger.warn(
-            `Failed to delete: ${filePath} — ${result.error.message}`,
-            "HygieneCleanupHandler",
-            result.error
-          );
-        }
-      }
-
-      logger.info(
-        `Cleanup complete: ${deleted.length} deleted, ${failed.length} failed`,
-        "HygieneCleanupHandler"
-      );
-
-      return success({ dryRun: false, files, deleted, failed });
-    } catch (err) {
-      return failure({
-        code: "HYGIENE_CLEANUP_ERROR",
-        message: "Cleanup operation failed",
-        details: err,
-        context: "hygiene.cleanup",
       });
     }
   };

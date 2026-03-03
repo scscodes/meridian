@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ChangeGrouper, CommitMessageSuggester, BatchCommitter } from '../src/domains/git/service';
+import { ChangeGrouper, CommitMessageSuggester, BatchCommitter } from '../src/domains/git/smart-commit-service';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
 import { WorkflowEngine, StepRunner } from '../src/infrastructure/workflow-engine';
 import { Logger, Result, success, failure } from '../src/types';

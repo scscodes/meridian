@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { InboundAnalyzer } from "../src/domains/git/service";
+import { InboundAnalyzer } from "../src/domains/git/inbound-analyzer";
 import { MockGitProvider, MockLogger, assertSuccess, assertFailure } from "./fixtures";
 import { success, failure } from "../src/types";
 

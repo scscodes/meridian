@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   createSmartCommitHandler,
-} from "../src/domains/git/handlers";
+} from "../src/domains/git/smart-commit-handler";
 import {
   MockGitProvider,
   MockLogger,
@@ -14,7 +14,7 @@ import {
   ChangeGrouper,
   CommitMessageSuggester,
   BatchCommitter,
-} from "../src/domains/git/service";
+} from "../src/domains/git/smart-commit-service";
 import { SmartCommitParams, ApprovalUI, ApprovalItem, ChangeGroup } from "../src/domains/git/types";
 
 describe("git.smartCommit handler", () => {

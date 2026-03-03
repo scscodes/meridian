@@ -12,7 +12,8 @@ import {
   success,
   failure,
 } from "../../types";
-import { createScanHandler, createCleanupHandler } from "./handlers";
+import { createScanHandler } from "./scan-handler";
+import { createCleanupHandler } from "./cleanup-handler";
 import { HygieneAnalyzer } from "./analytics-service";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 import { createShowHygieneAnalyticsHandler } from "./analytics-handler";

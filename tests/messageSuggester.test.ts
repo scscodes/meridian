@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { CommitMessageSuggester } from '../src/domains/git/service';
+import { CommitMessageSuggester } from '../src/domains/git/smart-commit-service';
 
 describe('CommitMessageSuggester', () => {
   const suggester = new CommitMessageSuggester();

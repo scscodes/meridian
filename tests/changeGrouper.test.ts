@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ChangeGrouper } from '../src/domains/git/service';
+import { ChangeGrouper } from '../src/domains/git/smart-commit-service';
 import { createTestChanges } from './fixtures';
 
 describe('ChangeGrouper', () => {

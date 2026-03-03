@@ -31,6 +31,7 @@ import { HygieneTreeProvider } from "./ui/tree-providers/hygiene-tree-provider";
 import { WorkflowTreeProvider } from "./ui/tree-providers/workflow-tree-provider";
 import { AgentTreeProvider } from "./ui/tree-providers/agent-tree-provider";
 import { createChatParticipant } from "./ui/chat-participant";
+import { createSmartCommitApprovalUI } from "./ui/smart-commit-quick-pick";
 import { registerMeridianTools } from "./ui/lm-tools";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider } from "./infrastructure/webview-provider";
 import { GitAnalyticsReport } from "./domains/git/analytics-types";
@@ -165,7 +166,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   // Register domains
-  const gitDomain = createGitDomain(gitProvider, logger, workspaceRoot);
+  const smartCommitApprovalUI = createSmartCommitApprovalUI();
+  const gitDomain = createGitDomain(gitProvider, logger, workspaceRoot, smartCommitApprovalUI);
   const hygieneDomain = createHygieneDomain(workspaceProvider, logger);
   const chatDomain = createChatDomain(
     gitProvider,

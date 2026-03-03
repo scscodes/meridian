@@ -61,9 +61,8 @@ export interface SmartCommitBatchResult {
 
 /**
  * Parameters for smartCommit command.
- * - autoApprove: when true, all generated groups are implicitly approved.
- *   When false/undefined, the current implementation still auto-approves all
- *   groups as a stand-in for future interactive UI.
+ * - autoApprove: when true, all generated groups are implicitly approved
+ *   and the approval UI is skipped entirely (used by workflows, LM tools, chat).
  * - branch: optional logical target branch name; validation is performed in
  *   the handler and GitProvider is responsible for enforcing branch rules.
  */
@@ -71,6 +70,20 @@ export interface SmartCommitParams {
   autoApprove?: boolean; // Skip user approval UI
   branch?: string;
 }
+
+/** A single approved group with its (possibly user-edited) commit message. */
+export interface ApprovalItem {
+  group: ChangeGroup;
+  approvedMessage: string; // may differ from group.suggestedMessage.full
+}
+
+/**
+ * Approval UI callback. Receives grouped changes with suggested messages.
+ * Returns:
+ *   - ApprovalItem[] → approved groups (may be subset, messages may be edited)
+ *   - null           → user cancelled the entire flow (Escape)
+ */
+export type ApprovalUI = (groups: ChangeGroup[]) => Promise<ApprovalItem[] | null>;
 
 // ============================================================================
 // Inbound Changes Analysis Types

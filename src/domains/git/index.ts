@@ -24,6 +24,8 @@ export {
   CommitInfo,
   SmartCommitBatchResult,
   SmartCommitParams,
+  ApprovalItem,
+  ApprovalUI,
   InboundChanges,
   ConflictFile,
   ChangesSummary,

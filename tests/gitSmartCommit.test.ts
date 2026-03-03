@@ -15,7 +15,7 @@ import {
   CommitMessageSuggester,
   BatchCommitter,
 } from "../src/domains/git/service";
-import { SmartCommitParams } from "../src/domains/git/types";
+import { SmartCommitParams, ApprovalUI, ApprovalItem, ChangeGroup } from "../src/domains/git/types";
 
 describe("git.smartCommit handler", () => {
   const ctx = createMockContext();
@@ -195,6 +195,131 @@ describe("git.smartCommit handler", () => {
 
     expect(err.code).toBe("BATCH_COMMIT_ERROR");
     expect(err.context).toBe("BatchCommitter.executeBatch");
+  });
+});
+
+// ============================================================================
+// Approval UI Tests
+// ============================================================================
+
+describe("git.smartCommit approval UI", () => {
+  const ctx = createMockContext();
+
+  /** Set up a handler with N changes and an optional approvalUI mock. */
+  function setup(approvalUI?: ApprovalUI) {
+    const git = new MockGitProvider();
+    const logger = new MockLogger();
+    const fileChanges = createTestChanges(3, "api", "M");
+    git.setAllChanges(
+      fileChanges.map((c) => ({
+        path: c.path,
+        status: c.status,
+        additions: c.additions,
+        deletions: c.deletions,
+      })) as any
+    );
+    const grouper = new ChangeGrouper();
+    const suggester = new CommitMessageSuggester();
+    const committer = new BatchCommitter(git as any, logger);
+
+    const handler = createSmartCommitHandler(
+      git as any,
+      logger,
+      grouper,
+      suggester,
+      committer,
+      approvalUI,
+    );
+    return { handler, git, logger };
+  }
+
+  it("does not invoke approvalUI when autoApprove is true", async () => {
+    const mockUI = vi.fn<ApprovalUI>();
+    const { handler } = setup(mockUI);
+
+    const result = await handler(ctx, { autoApprove: true });
+    assertSuccess(result);
+
+    expect(mockUI).not.toHaveBeenCalled();
+  });
+
+  it("invokes approvalUI with grouped changes when not autoApprove", async () => {
+    const mockUI = vi.fn<ApprovalUI>().mockImplementation(async (groups) =>
+      groups.map((g) => ({ group: g, approvedMessage: g.suggestedMessage.full }))
+    );
+    const { handler } = setup(mockUI);
+
+    const result = await handler(ctx, {});
+    assertSuccess(result);
+
+    expect(mockUI).toHaveBeenCalledOnce();
+    const passedGroups = mockUI.mock.calls[0][0];
+    expect(passedGroups.length).toBeGreaterThanOrEqual(1);
+    expect(passedGroups[0].suggestedMessage.full).toBeTruthy();
+  });
+
+  it("returns COMMIT_CANCELLED when approvalUI returns null", async () => {
+    const mockUI = vi.fn<ApprovalUI>().mockResolvedValue(null);
+    const { handler } = setup(mockUI);
+
+    const result = await handler(ctx, {});
+    const err = assertFailure(result);
+
+    expect(err.code).toBe("COMMIT_CANCELLED");
+    expect(err.context).toBe("git.smartCommit");
+  });
+
+  it("returns NO_GROUPS_APPROVED when approvalUI returns empty array", async () => {
+    const mockUI = vi.fn<ApprovalUI>().mockResolvedValue([]);
+    const { handler } = setup(mockUI);
+
+    const result = await handler(ctx, {});
+    const err = assertFailure(result);
+
+    expect(err.code).toBe("NO_GROUPS_APPROVED");
+  });
+
+  it("only commits approved groups when approvalUI returns a subset", async () => {
+    // Approve only the first group returned by the UI
+    const mockUI = vi.fn<ApprovalUI>().mockImplementation(async (groups) => {
+      const first = groups[0];
+      return [{ group: first, approvedMessage: first.suggestedMessage.full }];
+    });
+    const { handler } = setup(mockUI);
+
+    const result = await handler(ctx, {});
+    const batchResult = assertSuccess(result);
+
+    // Only 1 group committed regardless of how many groups were generated
+    expect(batchResult.commits.length).toBe(1);
+  });
+
+  it("uses the edited approvedMessage as the git commit message", async () => {
+    const editedMessage = "custom: user-edited message";
+    const mockUI = vi.fn<ApprovalUI>().mockImplementation(async (groups) =>
+      groups.map((g) => ({ group: g, approvedMessage: editedMessage }))
+    );
+    const { handler, git } = setup(mockUI);
+    const commitSpy = vi.spyOn(git, "commit");
+
+    const result = await handler(ctx, {});
+    assertSuccess(result);
+
+    // Every commit call should use the edited message
+    for (const call of commitSpy.mock.calls) {
+      expect(call[0]).toBe(editedMessage);
+    }
+  });
+
+  it("auto-approves all groups when no approvalUI is injected", async () => {
+    // No approvalUI passed → should behave like autoApprove
+    const { handler } = setup(undefined);
+
+    const result = await handler(ctx, {}); // autoApprove not set either
+    const batchResult = assertSuccess(result);
+
+    expect(batchResult.commits.length).toBeGreaterThanOrEqual(1);
+    expect(batchResult.totalFiles).toBe(3);
   });
 });
 

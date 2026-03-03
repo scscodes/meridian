@@ -19,6 +19,7 @@ import {
   SmartCommitParams,
   SmartCommitBatchResult,
   InboundChanges,
+  ApprovalUI,
 } from "./types";
 import {
   ChangeGrouper,
@@ -170,7 +171,8 @@ export function createSmartCommitHandler(
   logger: Logger,
   changeGrouper: ChangeGrouper,
   messageSuggester: CommitMessageSuggester,
-  batchCommitter: BatchCommitter
+  batchCommitter: BatchCommitter,
+  approvalUI?: ApprovalUI
 ): Handler<SmartCommitParams, SmartCommitBatchResult> {
   return async (
     _ctx: CommandContext,
@@ -250,17 +252,40 @@ export function createSmartCommitHandler(
 
       // Step 5: Present to user for approval (or auto-approve)
       let approvedGroups: ChangeGroup[];
-      if (params.autoApprove) {
-        approvedGroups = groupsWithMessages;
-        logger.info("Auto-approving all groups (autoApprove enabled)", "GitSmartCommitHandler");
-      } else {
-        // In a real UI context, this would show a dialog/prompt
-        // For now, we'll just auto-approve as a default
+
+      if (params.autoApprove || !approvalUI) {
+        // Programmatic path: skip UI entirely
         approvedGroups = groupsWithMessages;
         logger.info(
-          `Presenting ${groupsWithMessages.length} groups for user approval`,
+          `Auto-approving all ${groupsWithMessages.length} group(s)`,
           "GitSmartCommitHandler"
         );
+      } else {
+        // Interactive path: show approval UI
+        logger.info(
+          `Presenting ${groupsWithMessages.length} group(s) for user approval`,
+          "GitSmartCommitHandler"
+        );
+
+        const approvalResult = await approvalUI(groupsWithMessages);
+
+        // null = user cancelled (Escape)
+        if (approvalResult === null) {
+          return failure({
+            code: "COMMIT_CANCELLED",
+            message: "Smart commit cancelled by user",
+            context: "git.smartCommit",
+          });
+        }
+
+        // Patch approved messages back onto groups for BatchCommitter
+        approvedGroups = approvalResult.map((item) => ({
+          ...item.group,
+          suggestedMessage: {
+            ...item.group.suggestedMessage,
+            full: item.approvedMessage,
+          },
+        }));
       }
 
       if (approvedGroups.length === 0) {

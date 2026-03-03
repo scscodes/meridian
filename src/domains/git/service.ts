@@ -41,6 +41,7 @@ import {
   InboundChanges,
   ConflictFile,
   ChangesSummary,
+  ApprovalUI,
 } from "./types";
 import { GitAnalyzer } from "./analytics-service";
 import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
@@ -927,7 +928,7 @@ export class GitDomainService implements DomainService {
   // Analytics component
   public analyzer: GitAnalyzer;
 
-  constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot: string = process.cwd()) {
+  constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot: string = process.cwd(), approvalUI?: ApprovalUI) {
     this.gitProvider = gitProvider;
     this.logger = logger;
 
@@ -952,7 +953,8 @@ export class GitDomainService implements DomainService {
         logger,
         this.changeGrouper,
         this.messageSuggester,
-        this.batchCommitter
+        this.batchCommitter,
+        approvalUI
       ) as any,
       "git.analyzeInbound": createAnalyzeInboundHandler(
         this.inboundAnalyzer,
@@ -1023,7 +1025,8 @@ export class GitDomainService implements DomainService {
 export function createGitDomain(
   gitProvider: GitProvider,
   logger: Logger,
-  workspaceRoot: string = process.cwd()
+  workspaceRoot: string = process.cwd(),
+  approvalUI?: ApprovalUI
 ): GitDomainService {
-  return new GitDomainService(gitProvider, logger, workspaceRoot);
+  return new GitDomainService(gitProvider, logger, workspaceRoot, approvalUI);
 }

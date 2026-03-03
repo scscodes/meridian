@@ -1,13 +1,13 @@
-# Architecture — VS Code Extension Scaffold POC
+# Architecture — Meridian
 
-**Design Pattern**: Domain-Driven Design (DDD) with Aiogram-style Command Router  
+**Design Pattern**: Domain-Driven Design (DDD) with Aiogram-style Command Router
 **Philosophy**: Structure over features, explicit types, no magic, Result monad for error handling
 
 ---
 
 ## Overview
 
-This scaffold implements a production-ready VS Code extension architecture with:
+Meridian implements a production-ready VS Code extension architecture with:
 
 1. **Command Router** — centralized registry for command handlers (Aiogram/Telegram Bot pattern)
 2. **Domain Services** — isolated, testable business logic (git, hygiene, chat, workflow, agent)
@@ -53,38 +53,44 @@ Each domain is isolated, owns its command space, and exports:
 - `index.ts` — public API exports
 
 #### Git Domain (`git/`)
-- **Commands**: `git.status`, `git.pull`, `git.commit`, `git.smartCommit`
+- **Commands**: `git.status`, `git.pull`, `git.commit`, `git.smartCommit`, `git.analyzeInbound`, `git.showAnalytics`
 - **Patterns**:
   - Read-only (`git.status`) — fetches state
   - Mutations with validation (`git.commit` requires message)
-  - Smart commit (`git.smartCommit`) — interactive staged commit with validation, diff preview, and rollback
-- **Integration**: GitProvider for git CLI execution
+  - Smart commit (`git.smartCommit`) — staged commit with validation, diff preview, and rollback
+  - Analytics (`git.showAnalytics`) — commit frequency, churn, author contributions via webview
+- **Integration**: GitProvider wraps real git CLI via async `execFile`
 
 ##### Smart Commit Workflow
 ```
-1. Validate message (length, format)
-2. Get unstaged changes (git status)
-3. Stage selected paths (git add)
-4. Show diff for review (git diff --cached)
-5. User approval (interactive)
-6. Execute commit (git commit)
+1. Validate parameters (autoApprove, branch)
+2. Get all changes (staged + unstaged)
+3. Group similar changes (ChangeGrouper)
+4. Suggest commit messages (CommitMessageSuggester)
+5. Approval gate:
+   - autoApprove=true or no approvalUI → auto-approve all groups
+   - Otherwise → QuickPick multi-select (Phase A) + InputBox per group (Phase B)
+   - Escape → COMMIT_CANCELLED, empty selection → NO_GROUPS_APPROVED
+6. Execute batch commits (BatchCommitter — stage + commit per group)
 7. Rollback on failure (git reset --soft)
 ```
 
 #### Hygiene Domain (`hygiene/`)
-- **Commands**: `hygiene.scan`, `hygiene.cleanup`
+- **Commands**: `hygiene.scan`, `hygiene.cleanup`, `hygiene.showAnalytics`
 - **Patterns**:
-  - Analysis (`hygiene.scan`) — finds dead files, large logs
+  - Analysis (`hygiene.scan`) — finds dead files, large logs, dead code
   - Mutations with dry-run (`hygiene.cleanup` with `dryRun` param)
-- **Integration**: WorkspaceProvider for file operations
+  - Analytics (`hygiene.showAnalytics`) — scan history and issue trends via webview
+  - Dead code detection (`dead-code-analyzer.ts`) — identifies unused exports and unreferenced files
+- **Integration**: WorkspaceProvider wraps real `fs/promises` for file operations
 
 #### Chat/Copilot Domain (`chat/`)
 - **Commands**: `chat.context`, `chat.delegate`
 - **Patterns**:
   - Context gathering (`chat.context`) — active file + git state
   - Local task delegation (`chat.delegate`) — spawn background tasks
-- **Note**: `chat.delegate` is implemented but unreachable from the chat UI (no VS Code command or chat participant route maps to it). See `docs/DEBUG_AUDIT_AGENTS_WORKFLOWS_CHAT.md` for details.
-- **Integration**: Local task execution
+- **Note**: `chat.delegate` is implemented in the domain but not yet routable from the chat participant UI. The chat participant routes via slash commands, keyword matching, and an LLM classifier — all of which map to other commands. Delegation remains backend-only for now.
+- **Integration**: Chat participant registered via VS Code Chat API with multi-tier intent classification (slash commands → keyword map → LLM classifier → fallback to `chat.context`)
 
 #### Workflow Domain (`workflow/`) — NEW
 - **Commands**: `workflow.list`, `workflow.run`
@@ -119,8 +125,21 @@ Typed wrappers for external systems, no leaking abstraction.
 
 **config.ts** — Configuration Provider
 - Typed schema (no string keys)
-- Defaults only (VS Code workspace settings not yet wired)
-- Example: `CONFIG_KEYS.GIT_AUTOFETCH`, `CONFIG_KEYS.HYGIENE_ENABLED`
+- Defaults only for core settings; VS Code workspace settings read directly for model selection (`meridian.model.*`) and prune config (`meridian.hygiene.prune.*`)
+- Canonical config service not yet implemented — direct `vscode.workspace.getConfiguration` reads exist in `main.ts` and `model-selector.ts`
+
+**model-selector.ts** — Model Selection
+- Reads `meridian.model.*` VS Code settings to select LLM model family per domain (git, hygiene, chat)
+- Falls back to `meridian.model.default` when domain-specific setting absent
+
+**result-handler.ts** — Result Surfacing
+- Converts `Result<T>` to user-facing notifications (info/warn/error)
+- Routes output to VS Code OutputChannel and notification toasts
+
+**telemetry.ts** — Telemetry Tracker
+- `TelemetryTracker` with pluggable sinks (`TelemetrySink` interface)
+- `ConsoleTelemetrySink` for development; wired as middleware in `main.ts`
+- Event kinds: command lifecycle, git operations, workflow execution, error tracking
 
 **workspace.ts** — Workspace utilities
 - Workspace root detection
@@ -341,7 +360,7 @@ Every error message must be actionable, not generic:
 
 ### Detailed Error Handling Guide
 
-<!-- refactor/error-handling.md — planned, not yet written -->
+<!-- Planned: a standalone error handling patterns guide with before/after examples -->
 
 ---
 
@@ -446,7 +465,7 @@ ORDER BY successRate ASC;
 - **OpenTelemetry**: Emit spans and metrics
 - **CloudWatch**: Log to AWS CloudWatch
 
-<!-- refactor/telemetry-events.md — planned, not yet written -->
+<!-- Planned: a standalone telemetry event reference -->
 
 ---
 
@@ -474,14 +493,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 ### Environment Variables
 
-**Planned — not yet implemented.** No `process.env` reads exist in current code.
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `GIT_PATH` | `"git"` | Path to git executable |
-| `TELEMETRY_ENABLED` | `"true"` | Enable telemetry events |
-| `TELEMETRY_ENDPOINT` | None | Telemetry endpoint URL |
-| `LOG_LEVEL` | `"info"` | Logging level (debug, info, warn, error) |
+No `process.env` reads exist in current code. Environment variable support may be added as part of a future canonical config service.
 
 ---
 
@@ -613,12 +625,10 @@ const result = await workflowEngine.execute(workflow, commandContext, {
 });
 
 // Each step executes sequentially:
-// 1. lint: hygiene.lint (params interpolated)
-// 2. If success → test; if failure → exit
-// 3. test: hygiene.test
-// 4. If success → commit; if failure → exit
-// 5. commit: git.smartCommit
-// 6. If success → exit
+// 1. scan: hygiene.scan (params interpolated)
+// 2. If success → commit; if failure → exit
+// 3. commit: git.smartCommit
+// 4. If success → exit
 
 // Output passing:
 // Step N output available to step N+1 via $(outputKey)
@@ -849,49 +859,78 @@ expect(result.kind).toBe("ok");
 
 ```
 src/
-├── main.ts                          # Entry point, domain registration
+├── main.ts                          # Entry point, domain registration, command wiring
 ├── types.ts                         # Core types, Result monad
 ├── router.ts                        # CommandRouter implementation
+├── constants.ts                     # Centralized constants, thresholds, settings
 ├── domains/
 │   ├── git/
 │   │   ├── index.ts
 │   │   ├── service.ts
 │   │   ├── handlers.ts
-│   │   └── types.ts (Git-specific responses)
+│   │   ├── types.ts
+│   │   ├── analytics-handler.ts     # Git analytics command handler
+│   │   ├── analytics-service.ts     # Commit frequency, churn, author analysis
+│   │   ├── analytics-types.ts       # Analytics-specific types
+│   │   └── analytics-ui/            # Webview HTML/CSS/JS (Chart.js)
+│   │       ├── index.html
+│   │       ├── script.js
+│   │       └── styles.css
 │   ├── hygiene/
 │   │   ├── index.ts
 │   │   ├── service.ts
-│   │   └── handlers.ts
+│   │   ├── handlers.ts
+│   │   ├── types.ts
+│   │   ├── dead-code-analyzer.ts    # Unused export / unreferenced file detection
+│   │   ├── analytics-handler.ts     # Hygiene analytics command handler
+│   │   ├── analytics-service.ts     # Scan history and issue trends
+│   │   ├── analytics-types.ts
+│   │   └── analytics-ui/            # Webview HTML/CSS/JS
+│   │       ├── index.html
+│   │       ├── script.js
+│   │       └── styles.css
 │   ├── chat/
 │   │   ├── index.ts
 │   │   ├── service.ts
 │   │   └── handlers.ts
-│   ├── workflow/                    # NEW
+│   ├── workflow/
 │   │   ├── index.ts
 │   │   ├── service.ts
 │   │   ├── handlers.ts
 │   │   └── types.ts
-│   └── agent/                       # NEW
+│   └── agent/
 │       ├── index.ts
 │       ├── service.ts
 │       ├── handlers.ts
 │       └── types.ts
 ├── infrastructure/
-│   ├── logger.ts
-│   ├── config.ts
-│   ├── workspace.ts                 # NEW
-│   ├── workflow-engine.ts            # NEW
-│   └── agent-registry.ts             # NEW
+│   ├── logger.ts                    # Structured logger (in-memory buffer)
+│   ├── config.ts                    # Configuration provider (defaults-only)
+│   ├── error-codes.ts               # Centralized error codes and telemetry events
+│   ├── telemetry.ts                 # TelemetryTracker + ConsoleTelemetrySink
+│   ├── git-provider.ts              # Real git CLI wrapper (async execFile)
+│   ├── workspace-provider.ts        # Real fs/promises file operations
+│   ├── workspace.ts                 # Workspace root detection, path resolution
+│   ├── webview-provider.ts          # WebviewViewProvider for analytics panels
+│   ├── workflow-engine.ts           # Step execution engine
+│   ├── agent-registry.ts            # Agent discovery and validation
+│   ├── result-handler.ts            # Result → user notification helper
+│   └── model-selector.ts            # LLM model selection per domain
+├── ui/
+│   ├── chat-participant.ts          # VS Code Chat API participant with LLM classifier
+│   ├── lm-tools.ts                  # Language model tool definitions
+│   ├── smart-commit-quick-pick.ts   # SmartCommit approval UI (QuickPick + InputBox)
+│   └── tree-providers/
+│       ├── git-tree-provider.ts     # Sidebar: git repos + branch status
+│       ├── hygiene-tree-provider.ts # Sidebar: detected issues by category
+│       ├── workflow-tree-provider.ts# Sidebar: workflow listing
+│       └── agent-tree-provider.ts   # Sidebar: agent capabilities
 └── cross-cutting/
-    └── middleware.ts
+    └── middleware.ts                # Logging, audit, rate-limit, permission middleware
 
-.vscode/                             # NEW - Convention directories
-├── agents/                           # Agent definitions
-│   ├── git-operator.json
-│   └── ...
-└── workflows/                        # Workflow definitions
-    ├── lint-and-commit.json
-    └── ...
+.vscode/                             # Convention directories (workspace-level)
+├── agents/                           # Agent definitions (JSON)
+└── workflows/                        # Workflow definitions (JSON)
 ```
 
 ---
@@ -932,47 +971,44 @@ src/
 
 ---
 
-## Completed Refactoring
+## Implementation Status
 
-### Error Handling Audit & Fixes (✓ Complete)
+### Core Architecture (Complete)
 
+- [x] CommandRouter with middleware chain, registration, dispatch, teardown
+- [x] Result monad error handling throughout
+- [x] Centralized error codes (`error-codes.ts`) and telemetry events
 - [x] All GitProvider calls wrapped in Result<T> checks
-- [x] Null/undefined guards before property access
-- [x] Try-catch for async operations with proper error context
-- [x] File I/O errors caught and wrapped
-- [x] Parser errors from git output handled gracefully
-- [x] Graceful degradation (cache miss fallback)
-- [x] Webview message handling with error callbacks
+- [x] Null/undefined guards, try-catch with context, graceful degradation
 - [x] Workflow JSON schema validation
-- [x] Missing dispose/cleanup handlers implemented
+- [x] Dispose/cleanup handlers
 
-### Documentation (✓ Complete)
+### Providers (Complete)
 
-- [ ] **refactor/error-handling.md** — Error handling patterns with before/after examples
-- [ ] **refactor/telemetry-events.md** — Telemetry event reference
-- [ ] **TESTING.md** — Testing guide with mock usage and error path testing
-- [ ] **MIGRATION.md** — Breaking changes guide for callers
-- [x] **ARCHITECTURE.md** — This document (added error handling & telemetry sections)
+- [x] **GitProvider** — real git CLI via async `execFile` (status, pull, commit, diff, log, etc.)
+- [x] **WorkspaceProvider** — real `fs/promises` file operations (readdir, readFile, unlink)
+- [x] **WebviewProvider** — `WebviewViewProvider` for analytics panels
+- [x] **Model selector** — reads `meridian.model.*` VS Code settings per domain
 
-### Infrastructure (✓ Complete)
+### UI/UX (Complete)
 
-- [x] **error-codes.ts** — Centralized error codes and telemetry events
-- [x] Consistent error wrapping (code + message + details + context)
-- [x] Retry configuration and timeout constants
-- [x] Type-safe error codes (no string literals)
+- [x] VS Code command registration (COMMAND_MAP loop in `main.ts`)
+- [x] OutputChannel + notification toasts via `result-handler.ts`
+- [x] Sidebar tree providers (git, hygiene, workflow, agent)
+- [x] Git analytics webview (Chart.js — commit frequency, churn, author contributions)
+- [x] Hygiene analytics webview (scan history, issue trends, dead code)
+- [x] Chat participant with multi-tier intent classification (slash → keyword → LLM → fallback)
+- [x] Telemetry middleware (ConsoleTelemetrySink)
 
-## Next Steps (Not in Scope)
+### Remaining Work
 
-- [ ] Replace mock providers with real VS Code API wrappers
-- [ ] Implement background task scheduling (periodic hygiene scans)
-- [ ] Pre-commit hooks (git domain)
-- [ ] Full test suite (unit + integration) — See TESTING.md for framework
-- [ ] Publish to VS Code Marketplace
-- [ ] UI for workflow/agent management in VS Code sidebar
-- [ ] Conditional branching in workflows (beyond onSuccess/onFailure)
-- [ ] Complete refactoring of remaining domains (chat, agent, hygiene)
-- [ ] Timeout handling for long operations
-- [ ] Retry logic with exponential backoff
+- [ ] Canonical config service — unify direct `vscode.workspace.getConfiguration` calls into single provider
+- [ ] Wire `chat.delegate` into chat participant UX
+- [x] SmartCommit approval UI (QuickPick group selection + message editing via ApprovalUI callback)
+- [ ] Analytics path filtering (stub — `matchesPathPattern` returns true unconditionally)
+- [ ] ISO week bucketing for analytics trends (currently week-of-month)
+- [ ] Background task scheduling (periodic hygiene scans)
+- [ ] Context menus and keybindings in `package.json`
 
 ---
 
@@ -985,6 +1021,6 @@ src/
 
 ---
 
-**Last Updated**: Feb 25, 2026  
-**Architecture Version**: 2.0.0  
-**Recent Changes**: Error Handling Refactoring — Result monad, error codes, telemetry, documentation
+**Last Updated**: Mar 2, 2026
+**Architecture Version**: 3.0.0
+**Recent Changes**: Full UI/UX implementation (tree providers, webviews, chat participant, result surfacing), real providers (git CLI, fs), analytics (git + hygiene), dead code detection, config drift cleanup

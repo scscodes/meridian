@@ -6,12 +6,14 @@ import {
 } from "./fixtures";
 import { failure, success } from "../src/types";
 
+const mockProseFn = vi.fn().mockResolvedValue(success("mock prose"));
+
 describe("GitDomainService", () => {
   it("registers all expected git command handlers", () => {
     const git = new MockGitProvider();
     const logger = new MockLogger();
 
-    const domain = new GitDomainService(git as any, logger);
+    const domain = new GitDomainService(git as any, logger, process.cwd(), undefined, mockProseFn);
 
     const registeredCommands = Object.keys(domain.handlers);
     for (const cmd of GIT_COMMANDS) {
@@ -28,7 +30,7 @@ describe("GitDomainService", () => {
   it("initialize() calls gitProvider.status and returns ok on success", async () => {
     const git = new MockGitProvider();
     const logger = new MockLogger();
-    const domain = new GitDomainService(git as any, logger);
+    const domain = new GitDomainService(git as any, logger, process.cwd(), undefined, mockProseFn);
 
     const statusSpy = vi.spyOn(git, "status");
 
@@ -42,7 +44,7 @@ describe("GitDomainService", () => {
   it("initialize() returns GIT_UNAVAILABLE when status fails", async () => {
     const git = new MockGitProvider();
     const logger = new MockLogger();
-    const domain = new GitDomainService(git as any, logger);
+    const domain = new GitDomainService(git as any, logger, process.cwd(), undefined, mockProseFn);
 
     vi.spyOn(git, "status").mockResolvedValueOnce(
       failure({
@@ -63,7 +65,7 @@ describe("GitDomainService", () => {
   it("teardown() completes without throwing", async () => {
     const git = new MockGitProvider();
     const logger = new MockLogger();
-    const domain = new GitDomainService(git as any, logger);
+    const domain = new GitDomainService(git as any, logger, process.cwd(), undefined, mockProseFn);
 
     await expect(domain.teardown!()).resolves.toBeUndefined();
   });

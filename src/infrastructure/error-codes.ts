@@ -40,6 +40,10 @@ export const GIT_ERROR_CODES = {
   NO_CHANGES: "NO_CHANGES",
   NO_GROUPS_APPROVED: "NO_GROUPS_APPROVED",
   COMMIT_CANCELLED: "COMMIT_CANCELLED",
+  PR_GENERATION_ERROR: "PR_GENERATION_ERROR",
+  PR_REVIEW_ERROR: "PR_REVIEW_ERROR",
+  PR_COMMENT_ERROR: "PR_COMMENT_ERROR",
+  CONFLICT_RESOLUTION_ERROR: "CONFLICT_RESOLUTION_ERROR",
 } as const;
 
 // ============================================================================
@@ -102,6 +106,7 @@ export const INFRASTRUCTURE_ERROR_CODES = {
   WORKSPACE_WRITE_ERROR: "WORKSPACE_WRITE_ERROR",
   WEBVIEW_ERROR: "WEBVIEW_ERROR",
   LOGGER_ERROR: "LOGGER_ERROR",
+  MODEL_UNAVAILABLE: "MODEL_UNAVAILABLE",
 } as const;
 
 // ============================================================================

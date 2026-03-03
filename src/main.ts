@@ -37,6 +37,8 @@ import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider } from "./inf
 import { GitAnalyticsReport } from "./domains/git/analytics-types";
 import { HygieneAnalyticsReport, PruneConfig, PRUNE_DEFAULTS } from "./domains/hygiene/analytics-types";
 import { selectModel } from "./infrastructure/model-selector";
+import { generateProse } from "./infrastructure/prose-generator";
+import { UI_SETTINGS } from "./constants";
 
 /** Read user-configured prune settings, falling back to PRUNE_DEFAULTS */
 function readPruneConfig(): PruneConfig {
@@ -116,7 +118,23 @@ const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.exportJson",        "git.exportJson"],
   ["meridian.git.exportCsv",         "git.exportCsv"],
   ["meridian.hygiene.showAnalytics", "hygiene.showAnalytics"],
+  ["meridian.git.generatePR",         "git.generatePR"],
+  ["meridian.git.reviewPR",          "git.reviewPR"],
+  ["meridian.git.commentPR",         "git.commentPR"],
+  ["meridian.git.resolveConflicts",  "git.resolveConflicts"],
 ];
+
+// ============================================================================
+// Debounce Helper
+// ============================================================================
+
+function debounce(fn: () => void, ms: number): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(fn, ms);
+  };
+}
 
 // ============================================================================
 // Extension Activation
@@ -167,7 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Register domains
   const smartCommitApprovalUI = createSmartCommitApprovalUI();
-  const gitDomain = createGitDomain(gitProvider, logger, workspaceRoot, smartCommitApprovalUI);
+  const gitDomain = createGitDomain(gitProvider, logger, workspaceRoot, smartCommitApprovalUI, generateProse);
   const hygieneDomain = createHygieneDomain(workspaceProvider, logger);
   const chatDomain = createChatDomain(
     gitProvider,
@@ -253,6 +271,76 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
 
+        // git.generatePR copies to clipboard and shows in OutputChannel
+        if (commandName === "git.generatePR" && result.kind === "ok") {
+          const pr = result.value as any;
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${"─".repeat(60)}`);
+          outputChannel.appendLine(`[${new Date().toISOString()}] PR Description: ${pr.branch}`);
+          outputChannel.appendLine("─".repeat(60));
+          outputChannel.appendLine(pr.body);
+          outputChannel.appendLine("");
+          await vscode.env.clipboard.writeText(pr.body);
+          vscode.window.showInformationMessage(`PR description copied to clipboard (${pr.branch})`);
+          return;
+        }
+
+        // git.reviewPR — show review in OutputChannel + copy to clipboard
+        if (commandName === "git.reviewPR" && result.kind === "ok") {
+          const rv = result.value as any;
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${"─".repeat(60)}`);
+          outputChannel.appendLine(`[${new Date().toISOString()}] PR Review: ${rv.branch} — ${rv.verdict}`);
+          outputChannel.appendLine("─".repeat(60));
+          outputChannel.appendLine(`\n${rv.summary}\n`);
+          for (const c of rv.comments ?? []) {
+            outputChannel.appendLine(`[${c.severity}] ${c.file}: ${c.comment}`);
+          }
+          outputChannel.appendLine("");
+          const text = `${rv.summary}\n\n${(rv.comments ?? []).map((c: any) => `[${c.severity}] ${c.file}: ${c.comment}`).join("\n")}`;
+          await vscode.env.clipboard.writeText(text);
+          vscode.window.showInformationMessage(`PR review copied to clipboard (${rv.branch}: ${rv.verdict})`);
+          return;
+        }
+
+        // git.commentPR — show inline comments in OutputChannel + copy to clipboard
+        if (commandName === "git.commentPR" && result.kind === "ok") {
+          const cm = result.value as any;
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${"─".repeat(60)}`);
+          outputChannel.appendLine(`[${new Date().toISOString()}] PR Comments: ${cm.branch} — ${cm.comments?.length ?? 0} comment(s)`);
+          outputChannel.appendLine("─".repeat(60));
+          for (const c of cm.comments ?? []) {
+            const loc = c.line ? `:${c.line}` : "";
+            outputChannel.appendLine(`${c.file}${loc}: ${c.comment}`);
+          }
+          outputChannel.appendLine("");
+          const text = (cm.comments ?? []).map((c: any) => `${c.file}${c.line ? `:${c.line}` : ""}: ${c.comment}`).join("\n");
+          await vscode.env.clipboard.writeText(text);
+          vscode.window.showInformationMessage(`${cm.comments?.length ?? 0} PR comment(s) copied to clipboard`);
+          return;
+        }
+
+        // git.resolveConflicts — show resolution prose in OutputChannel
+        if (commandName === "git.resolveConflicts" && result.kind === "ok") {
+          const cr = result.value as any;
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${"─".repeat(60)}`);
+          outputChannel.appendLine(`[${new Date().toISOString()}] Conflict Resolution — ${cr.perFile?.length ?? 0} file(s)`);
+          outputChannel.appendLine("─".repeat(60));
+          outputChannel.appendLine(`\n${cr.overview}\n`);
+          for (const f of cr.perFile ?? []) {
+            outputChannel.appendLine(`${f.path} → ${f.strategy}`);
+            outputChannel.appendLine(`  ${f.rationale}`);
+            for (const step of f.suggestedSteps ?? []) {
+              outputChannel.appendLine(`  • ${step}`);
+            }
+          }
+          outputChannel.appendLine("");
+          vscode.window.showInformationMessage(`Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output`);
+          return;
+        }
+
         const { level, message } = formatResultMessage(commandName, result);
         outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
         if (level === "info") {
@@ -285,6 +373,108 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("meridian.hygiene.refresh",  () => hygieneTree.refresh()),
     vscode.commands.registerCommand("meridian.workflow.refresh", () => workflowTree.refresh()),
     vscode.commands.registerCommand("meridian.agent.refresh",    () => agentTree.refresh()),
+  );
+
+  // ── Status bar item ────────────────────────────────────────────────────
+  const statusBar = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    50
+  );
+  statusBar.name = "Meridian";
+  statusBar.command = "meridian.statusBar.clicked";
+  context.subscriptions.push(statusBar);
+
+  async function updateStatusBar(): Promise<void> {
+    const status = await gitProvider.status();
+    if (status.kind === "ok") {
+      const s = status.value;
+      const dirty = s.isDirty ? "$(circle-filled)" : "$(check)";
+      const changes = s.staged + s.unstaged + s.untracked;
+      statusBar.text = changes > 0
+        ? `$(source-control) ${s.branch} ${dirty} ${changes}`
+        : `$(source-control) ${s.branch} ${dirty}`;
+      statusBar.tooltip = [
+        `Branch: ${s.branch}`,
+        `Staged: ${s.staged}`,
+        `Unstaged: ${s.unstaged}`,
+        `Untracked: ${s.untracked}`,
+        ``,
+        `Click for Meridian actions`,
+      ].join("\n");
+    } else {
+      statusBar.text = "$(source-control) Meridian";
+      statusBar.tooltip = "Git unavailable — click for Meridian actions";
+    }
+    statusBar.show();
+  }
+
+  // ── File watchers: auto-refresh tree views ────────────────────────────
+  const debouncedGitRefresh = debounce(() => {
+    gitTree.refresh();
+    updateStatusBar();
+  }, UI_SETTINGS.WATCHER_DEBOUNCE_MS);
+
+  const debouncedHygieneRefresh = debounce(() => {
+    hygieneTree.refresh();
+  }, UI_SETTINGS.WATCHER_DEBOUNCE_MS);
+
+  const debouncedDefinitionsRefresh = debounce(() => {
+    workflowTree.refresh();
+    agentTree.refresh();
+  }, UI_SETTINGS.WATCHER_DEBOUNCE_MS);
+
+  // Git state: branch switches, staging, commits
+  const gitWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(workspaceRoot, ".git/{HEAD,index,refs/**}")
+  );
+  gitWatcher.onDidChange(debouncedGitRefresh);
+  gitWatcher.onDidCreate(debouncedGitRefresh);
+
+  // Workspace files: create/delete affects hygiene scan
+  const fileWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(workspaceRoot, "**/*")
+  );
+  fileWatcher.onDidCreate(debouncedHygieneRefresh);
+  fileWatcher.onDidDelete(debouncedHygieneRefresh);
+
+  // Agent/workflow definitions
+  const defWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(workspaceRoot, ".vscode/{agents,workflows}/*.json")
+  );
+  defWatcher.onDidChange(debouncedDefinitionsRefresh);
+  defWatcher.onDidCreate(debouncedDefinitionsRefresh);
+  defWatcher.onDidDelete(debouncedDefinitionsRefresh);
+
+  context.subscriptions.push(gitWatcher, fileWatcher, defWatcher);
+
+  // ── Status bar click → QuickPick with top actions ─────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("meridian.statusBar.clicked", async () => {
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "$(git-commit) Smart Commit",  command: "meridian.git.smartCommit" },
+          { label: "$(search) Hygiene Scan",       command: "meridian.hygiene.scan" },
+          { label: "$(graph) Git Analytics",       command: "meridian.git.showAnalytics" },
+          { label: "$(graph) Hygiene Analytics",   command: "meridian.hygiene.showAnalytics" },
+          { label: "$(refresh) Refresh All Views", command: "meridian.refreshAll" },
+        ],
+        { placeHolder: "Meridian — choose an action" }
+      );
+      if (pick) {
+        vscode.commands.executeCommand((pick as any).command);
+      }
+    })
+  );
+
+  // ── Refresh All command ───────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("meridian.refreshAll", () => {
+      gitTree.refresh();
+      hygieneTree.refresh();
+      workflowTree.refresh();
+      agentTree.refresh();
+      updateStatusBar();
+    })
   );
 
   // workflow.run — registered after tree providers so workflowTree is in scope.
@@ -409,6 +599,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register LM tools so Copilot and @meridian can invoke Meridian commands autonomously
   const toolDisposables = registerMeridianTools(router, cmdCtx, logger);
   context.subscriptions.push(...toolDisposables);
+
+  // Initial status bar update
+  updateStatusBar();
 
   logger.info(
     `Extension activated with ${router.listDomains().length} domains`,

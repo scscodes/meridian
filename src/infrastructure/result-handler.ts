@@ -10,6 +10,7 @@ import { CommandName } from "../types";
 const ERROR_MESSAGES: Partial<Record<string, string>> = {
   NO_CHANGES:               "No changes to commit.",
   NO_GROUPS_APPROVED:       "No commit groups were approved.",
+  COMMIT_CANCELLED:         "Smart commit cancelled.",
   GIT_UNAVAILABLE:          "Git is not available in this workspace.",
   GIT_STATUS_ERROR:         "Failed to read git status.",
   GIT_PULL_ERROR:           "Git pull failed.",
@@ -54,6 +55,22 @@ export function formatResultMessage(
     case "git.smartCommit": {
       const sc = v as any;
       return { level: "info", message: `Smart commit: ${sc.totalGroups} group(s), ${sc.totalFiles} file(s)` };
+    }
+    case "git.generatePR": {
+      const pr = v as any;
+      return { level: "info", message: `PR description generated for "${pr.branch}" — copied to clipboard` };
+    }
+    case "git.reviewPR": {
+      const rv = v as any;
+      return { level: "info", message: `PR review for "${rv.branch}": ${rv.verdict} — ${rv.comments?.length ?? 0} comment(s)` };
+    }
+    case "git.commentPR": {
+      const cm = v as any;
+      return { level: "info", message: `${cm.comments?.length ?? 0} inline comment(s) generated for "${cm.branch}"` };
+    }
+    case "git.resolveConflicts": {
+      const cr = v as any;
+      return { level: "info", message: `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output` };
     }
     case "hygiene.scan": {
       const dead = ((v.deadFiles as unknown[]) ?? []).length;

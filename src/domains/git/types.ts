@@ -86,6 +86,20 @@ export interface ApprovalItem {
 export type ApprovalUI = (groups: ChangeGroup[]) => Promise<ApprovalItem[] | null>;
 
 // ============================================================================
+// PR Generation Types
+// ============================================================================
+
+export interface PRGenerationParams {
+  targetBranch?: string;  // default: "main"
+}
+
+export interface GeneratedPR {
+  title: string;
+  body: string;
+  branch: string;
+}
+
+// ============================================================================
 // Inbound Changes Analysis Types
 // ============================================================================
 
@@ -126,4 +140,73 @@ export interface InboundChanges {
   conflicts: ConflictFile[]; // Overlapping changes
   summary: ChangesSummary;
   diffLink: string; // Clickable link to view diff
+}
+
+// ============================================================================
+// Shared PR Context
+// ============================================================================
+
+export interface PRContext {
+  branch: string;
+  targetBranch: string;
+  commits: Array<{ shortHash: string; message: string; author: string; insertions: number; deletions: number }>;
+  changes: Array<{ path: string; status: "A" | "M" | "D" | "R"; additions: number; deletions: number }>;
+  diff: string;
+}
+
+// ============================================================================
+// PR Review Types
+// ============================================================================
+
+export interface PRReviewParams {
+  targetBranch?: string;  // default: "main"
+}
+
+export interface PRReviewComment {
+  file: string;
+  severity: "critical" | "suggestion" | "nit";
+  comment: string;
+}
+
+export interface GeneratedPRReview {
+  branch: string;
+  summary: string;
+  comments: PRReviewComment[];
+  verdict: "approve" | "request-changes" | "comment";
+}
+
+// ============================================================================
+// PR Comments Types
+// ============================================================================
+
+export interface PRCommentParams {
+  targetBranch?: string;
+  paths?: string[];       // optional filter to specific files
+}
+
+export interface InlineComment {
+  file: string;
+  line?: number;
+  comment: string;
+}
+
+export interface GeneratedPRComments {
+  branch: string;
+  comments: InlineComment[];
+}
+
+// ============================================================================
+// Conflict Resolution Prose Types
+// ============================================================================
+
+export interface ConflictResolutionProse {
+  overview: string;
+  perFile: ConflictResolution[];
+}
+
+export interface ConflictResolution {
+  path: string;
+  strategy: "keep-ours" | "keep-theirs" | "manual-merge" | "review-needed";
+  rationale: string;
+  suggestedSteps: string[];
 }

@@ -1,258 +1,167 @@
-  Project Understanding — Architecture & Intent
+# Meridian — Roadmap
 
-  Meridian is a VS Code extension built on DDD + Aiogram-style command routing. The core idea is a general-purpose extension framework
-  with:
+## Architecture
 
-  - A CommandRouter that dispatches typed commands through a middleware chain
-  - Domain services (Git, Hygiene, Chat, Workflow, Agent) that register handlers at startup
-  - A Result monad ({kind: "ok"|"err"}) for explicit error handling — no thrown exceptions in normal flow
-  - Middleware (logging, audit) applied declaratively before handler dispatch
-  - Workflow engine that executes JSON-defined step sequences
-  - Agent registry that discovers local agent definitions from .vscode/agents/
+Meridian is a VS Code extension built on DDD + Aiogram-style command routing:
 
-  ---
-  Feature State Analysis
-
-  ┌─────────────────────────────────┬───────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
-  │             Feature             │        Status         │                                            Notes                                            │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ CommandRouter + Middleware      │ Solid                 │ Fully implemented: registration, dispatch, validation, teardown, middleware chain           │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Result monad / error handling   │ Solid                 │ Comprehensive. Centralized error codes in error-codes.ts + constants.ts                     │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Git domain — status/pull/commit │ Functional (mock)     │ Handlers are complete but use MockGitProvider — no real git CLI execution                   │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Git domain — smartCommit        │ Functional (mock)     │ Full pipeline: ChangeGrouper, CommitMessageSuggester, BatchCommitter with rollback          │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Git domain — analyzeInbound     │ Functional (mock)     │ InboundAnalyzer: fetch, diff, conflict detection, diff link generation                      │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Git domain — analytics          │ Functional (real git) │ GitAnalyzer calls actual git log via execSync. Webview HTML/JS/CSS exist                    │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Hygiene domain                  │ Stub                  │ Handlers registered but workspace scanning uses mock provider                               │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Chat domain                     │ Stub                  │ Context gathering + delegation stubs exist                                                  │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Workflow domain                 │ Functional            │ WorkflowEngine with step execution, variable interpolation, conditional branching           │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Agent domain                    │ Functional            │ AgentRegistry with JSON loading, capability/trigger queries                                 │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Telemetry                       │ Wired                 │ TelemetryTracker + ConsoleTelemetrySink wired as middleware in main.ts (activate)           │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Config                          │ Implemented           │ Typed config with VS Code settings contribution points                                      │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Constants                       │ Solid                 │ Centralized in constants.ts — command names, thresholds, cache settings, performance bounds │
-  ├─────────────────────────────────┼───────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
-  │ Tests                           │ Solid                 │ 14 test files covering router, result monad, workflow engine, all git subsystems            │
-  └─────────────────────────────────┴───────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
-
-  ---
-  UI/UX Surface Analysis
-
-  This is the area you flagged as potentially lacking — and that assessment is accurate. Here's what exists vs. what's missing:
-
-  What Exists
-
-  1. Command palette commands (10 registered in package.json contributes.commands) — this is the primary user touchpoint today
-  2. VS Code settings (4 declared: git.autofetch, hygiene.enabled, hygiene.scanInterval, log.level)
-  3. Git Analytics webview — HTML/CSS/JS in src/domains/git/analytics-ui/ with Chart.js visualization (commit frequency, churn, author contributions, volatility
-  scatter). The AnalyticsWebviewProvider exists in infrastructure/webview-provider.ts
-
-  What's Missing / Not Connected
-
-  1. No sidebar/panel registration — no views or viewsContainers in package.json contributes. There's no persistent UI presence (tree views, panels, etc.)
-  2. Webview provider not wired — AnalyticsWebviewProvider (src/infrastructure/webview-provider.ts) is a mock that doesn't implement vscode.WebviewViewProvider.
-     It's not registered in main.ts activation. Needs:
-     - Implement vscode.WebviewViewProvider interface (resolveWebviewView method)
-     - Register in main.ts via context.subscriptions.push(vscode.window.registerWebviewViewProvider(...))
-     - Add views contribution point in package.json (e.g., "views.meridian": [{ "id": "meridian.analytics", ... }])
-  3. [DONE] VS Code command wiring — main.ts fully wired: COMMAND_MAP maps prefixed IDs → internal CommandName, all 10 commands registered via registerCommand(),
-     getCommandContext() implemented, activate() accepts vscode.ExtensionContext, telemetry middleware wired.
-     Remaining: output channel + user-facing notifications (info/error messages).
-  4. No user-facing output — commands dispatch and return Result objects, but there's no vscode.window.showInformationMessage, no Output Channel, no notification.
-     Results go nowhere a user can see. Needs:
-     - Create vscode.OutputChannel in activate() and attach to context.subscriptions
-     - Add helper: resultToUserMessage() that converts Result → notification (info/warn/error)
-     - Call vscode.window.showInformationMessage / showErrorMessage in command handlers
-  5. SmartCommit interactivity is stubbed — lines 206-217 in src/domains/git/handlers.ts: the "present to user for approval" step just auto-approves; there's no QuickPick,
-     InputBox, or webview dialog. Needs:
-     - Implement vscode.window.showQuickPick() to display groups with suggested messages
-     - Allow user to edit/approve each message or skip group
-     - Return filtered groups for batch commit
-  6. No menus, keybindings, or when-clauses — commands exist in palette but no context menu entries, no keyboard shortcuts, no conditional visibility.
-     Needs in package.json:
-     - "menus": { "commandPalette": [...], "explorer/context": [...] } — add git/hygiene commands to file explorer context
-     - "keybindings": [...] — define shortcuts (e.g., "Ctrl+Shift+G" for git.smartCommit)
-     - "when" clause conditions (e.g., "git.status" only when gitRepository context)
-  7. Workflow/Agent management has no UI — listed in ARCHITECTURE.md "Next Steps" as needing sidebar UI.
-  8. Chat domain — VS Code Chat API / Copilot integration not wired. Needs:
-     - Register as chat participant: vscode.chat.createChatParticipant() if targeting GitHub Copilot Chat
-     - OR implement language model access: vscode.lm.selectChatModels() for built-in LM
-     - Map chat.context → chat session setup; chat.delegate → participant tools/functions
-     - Add "chatParticipants" contribution point in package.json if using chat participant API
-
-  Summary
-
-  The backend/domain architecture is well-structured and complete. VS Code command wiring is done (all 10 commands registered, context builder implemented, telemetry
-  middleware active). The remaining gap is user-facing output (Output Channel, notifications), sidebar tree views, the analytics webview, SmartCommit approval UI,
-  and chat/Copilot integration. Also: package.json displayName is still "VS Code Scaffold POC" — should be updated to "Meridian".
+- **CommandRouter** dispatches typed commands through a middleware chain (telemetry, logging, audit)
+- **Domain services** (Git, Hygiene, Chat, Workflow, Agent) register handlers at startup
+- **Result monad** (`{kind: "ok"|"err"}`) for explicit error handling — no thrown exceptions in normal flow
+- **Workflow engine** executes JSON-defined step sequences with conditional branching + variable interpolation
+- **Agent registry** discovers local agent definitions from `.vscode/agents/`
 
 ---
-## UI/UX Phase — Remaining Work
 
-### Group 1: VS Code Command Wiring (Result Surfacing)
+## Current State
 
-- **[DONE] VS Code command registration** — All 10 commands registered via COMMAND_MAP loop in activate(); getCommandContext() derives workspace metadata from ExtensionContext.
-- **[DONE] Telemetry middleware** — ConsoleTelemetrySink wired as first middleware; tracks COMMAND_STARTED/COMPLETED/FAILED.
+### Feature Status
 
-- **[REMAINING] Create Output Channel in `src/main.ts`**
-  - In `activate()`, instantiate `const outputChannel = vscode.window.createOutputChannel("Meridian")` before router creation.
-  - Push to `context.subscriptions` for auto-cleanup.
+| Feature | Status | Notes |
+|---------|--------|-------|
+| CommandRouter + Middleware | Solid | Registration, dispatch, validation, teardown, middleware chain |
+| Result monad / error handling | Solid | Centralized error codes in `error-codes.ts` |
+| Git — core commands | Real | Async `execFile` — status, pull, commit, diff, log, stage, reset |
+| Git — SmartCommit | Real | ChangeGrouper + CommitMessageSuggester + BatchCommitter with rollback |
+| Git — InboundAnalyzer | Real | Fetch, diff, conflict detection, severity scoring, diff link generation |
+| Git — Analytics | Real | Commit frequency, churn, author analysis, volatility, trend detection |
+| Hygiene — scan/cleanup | Real | Multi-category fs scan, dead code via TS Compiler API, safe deletion |
+| Hygiene — analytics | Real | File categorization, temporal bucketing, prune recommendations |
+| Chat / Copilot | Wired | Chat participant, LLM classifier, slash commands, keyword map, LM tools |
+| Workflow engine | Real | Step execution, conditionals, variable interpolation, output passing |
+| Agent registry | Minimal | JSON discovery + capability queries. No execution |
+| Telemetry | Wired | ConsoleTelemetrySink as middleware. No remote sink |
+| UI — Sidebar | Done | 4 tree providers (git, hygiene, workflow, agent) with auto-refresh via FileSystemWatcher |
+| UI — Webviews | Done | Git analytics + hygiene analytics (Chart.js) |
+| UI — Output/Notifications | Done | OutputChannel + result-handler.ts for info/warn/error toasts |
+| UI — Status Bar | Done | Branch + dirty indicator, QuickPick action menu, auto-updates on git state changes |
+| UI — Menus/Keybindings | Done | Explorer context menus, command palette when-clauses, chord keybindings |
+| Tests | Solid | 14 test files, 123 tests covering router, result monad, workflow engine, all git subsystems |
+| Constants | Solid | Centralized in `constants.ts` — no magic numbers |
 
-- **[REMAINING] Add result-to-message helper in `src/infrastructure/result-handler.ts` (new file)**
-  - Create `function resultToUserMessage(result: Result<unknown>): {type: 'info'|'warn'|'error', message: string}`
-  - Convert error codes (e.g., NO_CHANGES, GIT_COMMIT_ERROR) to human-readable messages.
+### UI/UX Phase — Complete
 
-- **[REMAINING] Wrap command handlers in `src/main.ts` (lines 163–186)**
-  - Replace logger.info/error calls with:
-    - `outputChannel.appendLine()` for all result statuses
-    - `vscode.window.showInformationMessage()` on success
-    - `vscode.window.showErrorMessage()` on failure (error.code + error.message)
-  - Append timestamp and command ID to all output channel logs.
+All 6 groups shipped:
 
----
-### Group 2: Panel View / Sidebar (Tree Data Providers)
-
-- **Add viewsContainers + views to `package.json` contributes**
-  - Add `"viewsContainers": {"activityBar": [{"id": "meridian-explorer", "title": "Meridian", "icon": "media/icon.svg"}]}`
-  - Add `"views": {"meridian-explorer": [{"id": "meridian.git.view", "name": "Git Repos"}, {"id": "meridian.hygiene.view", "name": "Hygiene"}, {"id": "meridian.workflow.view", "name": "Workflows"}, {"id": "meridian.agent.view", "name": "Agents"}]}`
-
-- **Create `src/ui/tree-providers/git-tree-provider.ts`**
-  - Implement `vscode.TreeDataProvider<GitRepoItem>` to list workspace repos + branch status.
-  - Query from `gitProvider.status()` on `getChildren()` refresh.
-  - Show dirty/clean state via icons; emit `onDidChangeTreeData` when git state changes.
-
-- **Create `src/ui/tree-providers/hygiene-tree-provider.ts`**
-  - Implement `vscode.TreeDataProvider<HygieneIssueItem>` to list detected issues.
-  - Call hygiene domain's scan handler on refresh; group issues by category (unused files, dead code, etc.).
-
-- **Create `src/ui/tree-providers/workflow-tree-provider.ts`**
-  - Implement `vscode.TreeDataProvider<WorkflowItem>` listing workflows from agent registry.
-  - Each item has command trigger: `vscode.Uri.parse("command:meridian.workflow.run?..." )` for one-click execution.
-
-- **Create `src/ui/tree-providers/agent-tree-provider.ts`**
-  - Implement `vscode.TreeDataProvider<AgentItem>` listing discovered agents + their capabilities.
-  - Each capability is a child node; clicking opens agent details in webview or quick info.
-
-- **Register all tree providers in `src/main.ts`**
-  - For each provider, call `vscode.window.registerTreeDataProvider(viewId, provider)` and push to subscriptions.
-  - Pass logger, gitProvider, workspaceProvider, and dispatcher (router) to provider constructors.
+1. **Command wiring + result surfacing** — COMMAND_MAP loop, OutputChannel, notification toasts
+2. **Sidebar tree providers** — git, hygiene, workflow, agent views in activity bar
+3. **Webview analytics panels** — Chart.js visualizations for git + hygiene
+4. **Chat / Copilot integration** — multi-tier intent classification, LM tool definitions
+5. **SmartCommit approval UI** — QuickPick group selection + InputBox message editing
+6. **Menus, keybindings, context clauses** — explorer context menus, chord bindings, when-clauses
+7. **FileSystemWatcher + Status Bar** — auto-refresh tree views, persistent branch/status indicator
 
 ---
-### Group 3: Webview (Git Analytics Panel)
 
-- **Update `src/infrastructure/webview-provider.ts` to implement `vscode.WebviewViewProvider`**
-  - Remove MockWebviewPanel; change signature: `class AnalyticsWebviewProvider implements vscode.WebviewViewProvider`
-  - Implement `resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): Promise<void>`
-  - In resolver: set `webviewView.webview.html` to content from `src/domains/git/analytics-ui/index.html` (read at runtime).
-  - Set webview options: `localResourceRoots: [vscode.Uri.joinPath(context.extension.extensionUri, 'src/domains/git/analytics-ui')]`
+## Technical Debt
 
-- **Wire message routing in `resolveWebviewView()`**
-  - Subscribe to `webviewView.webview.onDidReceiveMessage()` to handle "filter" and "export" messages from UI.
-  - On filter: dispatch `analytics.rerun` command with filter params; post updated data back to webview.
-  - On export: dispatch analytics command with export format, return file path via postMessage.
+Known bugs in `src/domains/git/analytics-service.ts` that affect analytics accuracy:
 
-- **Register webview provider in `src/main.ts`**
-  - Call `vscode.window.registerWebviewViewProvider('meridian.analytics', provider, {webviewOptions: {...}})`
-  - Push disposable to subscriptions.
+### 1. `matchesPathPattern` is a stub
 
-- **Update `package.json` to add analytics view**
-  - Add to views under a new viewsContainer or existing explorer:
-    - `{"id": "meridian.analytics", "name": "Git Analytics", "when": "gitRepository"}`
+**Location:** `analytics-service.ts` ~line 234
 
-- **Load analytics-ui HTML/CSS/JS at runtime in webview provider**
-  - Read `/src/domains/git/analytics-ui/index.html` and rewrite `<script src="script.js">` to use `vscode.Uri.joinPath()` so VS Code can serve local assets.
-  - Do the same for `styles.css`; ensure relative paths in HTML are absolute vscode-resource URIs.
+The `pathPattern` option in `AnalyticsOptions` is accepted but silently ignored — the filter dropdown in the analytics UI has no effect. Fix: iterate `commit.files` and match via `micromatch.isMatch` (already imported).
 
----
-### Group 4: Chat / Copilot Integration
+### 2. Trend normalization uses fixed divisor
 
-- **Create `src/ui/chat-participant.ts` (if targeting GitHub Copilot Chat API)**
-  - Export `createChatParticipant()` that:
-    - Returns a participant with id: "meridian", name: "Meridian", description: "..."
-    - Registers 2–3 tools: "analyze-git" (delegates to analytics), "run-workflow" (delegates to workflow.run), "scan-hygiene" (delegates to hygiene.scan)
-    - Each tool invokes router.dispatch() via injected dispatcher.
+**Location:** `analytics-service.ts` ~line 346, `constants.ts` (`ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS`)
 
-- **Alternatively, use native VS Code Chat API (if vscode.lm available)**
-  - In `src/ui/chat-integration.ts`: call `vscode.lm.selectChatModels()` and create a language model-backed chat handler.
-  - Wire context via `createContextHandler` from chat domain; add tools matching workflow/git/hygiene commands.
+Commit trend splits into two halves and divides each by a fixed `4` weeks regardless of actual period. A 3-month window and 12-month window both use the same divisor. Absolute values are meaningless; thresholds break across periods. Fix: compute actual weeks from `since`/`until` dates.
 
-- **Wire chat handlers in `src/main.ts`**
-  - If using participant API: `const participant = createChatParticipant(router, logger); vscode.chat.registerChatParticipant(participant); context.subscriptions.push(...)`
-  - OR if using LM: wrap LM access and route to router.dispatch().
+### 3. Week bucketing uses week-of-month, not ISO week
 
-- **Add `package.json` contribution (if participant API)**
-  - Add `"chatParticipants": [{"id": "meridian", "fullName": "Meridian Assistant", "icon": "...", "isDefault": false}]`
+**Location:** `analytics-service.ts` ~line 448
 
-- **Map chat domain handlers to chat API**
-  - `chat.context` → chat session initialization (gathers git branch, file, workspace context; sent to LM)
-  - `chat.delegate` → tool invocation (user requests "run workflow X"; send as tool call to LM)
-  - LM response → post to chat UI; allow user to accept/reject suggested workflow.
+`Math.ceil(date.getDate() / 7)` produces 1–5 (week within month). Commits in the same calendar week but different months get different bucket keys, fragmenting the frequency chart. Fix: use ISO 8601 week number calculation.
+
+### 4. `chat.delegate` unreachable from chat UX
+
+Backend handler exists but no chat participant route maps to it. Low priority — the routing infra works, just needs a keyword/slash entry.
 
 ---
-### Group 5: SmartCommit Approval UI
 
-- **Replace auto-approval stub in `src/domains/git/handlers.ts` (lines 251–264)**
-  - Change: Remove the `else { approvedGroups = groupsWithMessages }` fallback.
-  - Call new helper: `const approvedGroups = await presentSmartCommitApprovalUI(groupsWithMessages, vscode)`
-  - Helper must be injected as a dependency (passed to handler factory) or stored in context.
+## Next Phase: Analysis-to-Prose Pipeline
 
-- **Create `src/ui/smart-commit-quick-pick.ts` (new file)**
-  - Export `async function presentSmartCommitApprovalUI(groups: ChangeGroup[], vscode: typeof import('vscode')): Promise<ChangeGroup[]>`
-  - Use `vscode.window.showQuickPick()` with multi-select items:
-    - Each group is one item with label (e.g., "feature: auth flow (5 files)"), description (suggested message), picked: true
-    - User toggles picks; selections are returned.
-  - For each picked group, optionally show `vscode.window.showInputBox()` to edit the suggested message before confirming.
-  - Return array of approved groups with user-edited messages (if changed).
+### The Pattern
 
-- **Inject UI helper into handler in `src/domains/git/service.ts` (handler factory)**
-  - Modify `createSmartCommitHandler()` signature to accept `approvalUI?: (groups) => Promise<ChangeGroup[]>`
-  - If provided (and autoApprove=false), call it; otherwise fallback to auto-approve for backward compatibility.
+The highest-value features Meridian can ship next all share a common design:
 
-- **Wire in `src/main.ts`**
-  - After activating gitDomain, pass the UI helper:
-    ```
-    const smartCommitHandler = createSmartCommitHandler(
-      gitProvider, logger, grouper, suggester, committer,
-      presentSmartCommitApprovalUI // <-- pass UI callback
-    );
-    ```
-  - OR extend gitDomain factory to accept UI callback parameter.
+```
+<context> → analyze → synthesize prose
+```
 
----
-### Group 6: Menus, Keybindings & Context Clauses (Optional But Recommended)
+PR descriptions, PR reviews, conflict resolution, session recovery, worktree monitoring — they're all the same pipeline with different inputs and output templates. Build the pattern once as a reusable primitive, then stamp out features.
 
-- **Add context menu entries to `package.json` contributes**
-  - `"menus": {"explorer/context": [{"command": "meridian.git.status", "group": "meridian@1"}, {"command": "meridian.hygiene.scan", "group": "meridian@2"}]}` (filter by file/folder)
-  - Conditionally show: add `"when": "explorerResourceIsFolder"` to folder-level git commands.
+**Core primitive:** A function that takes structured analysis output (from any domain) and an LLM prompt template, then produces formatted prose via the VS Code Language Model API. This sits in `src/infrastructure/` and any domain can call it.
 
-- **Add keybindings to `package.json` contributes**
-  - `"keybindings": [{"command": "meridian.git.smartCommit", "key": "ctrl+shift+g"}, {"command": "meridian.hygiene.scan", "key": "ctrl+shift+h"}]`
-  - Platform-specific variants for macOS: `"mac": "cmd+shift+g"`
+### Priority Features
 
-- **Add when-clauses to command definitions**
-  - `"meridian.git.status"`: add `"when": "gitRepository"`
-  - `"meridian.hygiene.scan"`: add `"when": "workspaceFolderCount > 0"`
-  - Prevents palette clutter when not applicable.
+#### Tier 1 — Builds directly on existing infrastructure
 
----
-## Summary of Wiring Order
+**1. PR Description Generator** (`git.generatePR`) — **SHIPPED**
+- Prose primitive (`src/infrastructure/prose-generator.ts`) + first consumer
+- `generateProse()` / `streamProse()` — reusable by all future consumers
+- `GenerateProseFn` injected via DI to keep domain layer free of `vscode` imports
+- Output: Markdown to clipboard + OutputChannel display
+- Keybinding: `Ctrl+M Ctrl+P`
 
-1. **Commands** → Output Channel + notifications (Group 1)
-2. **Sidebar Views** → Tree providers for Git, Hygiene, Workflow, Agent (Group 2)
-3. **Git Analytics Webview** → WebviewViewProvider + local asset serving (Group 3)
-4. **Chat/Copilot** → Participant registration or LM integration (Group 4)
-5. **SmartCommit UI** → QuickPick approval flow (Group 5)
-6. **Polish** → Menus, keybindings, when-clauses (Group 6)
+**2. PR Review** (`git.reviewPR`) — **SHIPPED**
+- Uses `gatherPRContext()` → JSON-structured prompt → parsed verdict + per-file comments
+- Output: OutputChannel + clipboard. Keybinding: `Ctrl+M Ctrl+V`
 
-Each group is independent; start with Group 1 (highest ROI) and iterate.
+**3. PR Comments** (`git.commentPR`) — **SHIPPED**
+- Uses `gatherPRContext()` → JSON-structured prompt → inline comments with optional line refs
+- Supports `paths` filter for scoping to specific files
+- Output: OutputChannel + clipboard. Keybinding: `Ctrl+M Ctrl+I`
 
+**4. Conflict Resolution Assistant** (`git.resolveConflicts`) — **SHIPPED**
+- Uses `InboundAnalyzer.analyze()` + per-conflict `gitProvider.diff()` for actual file diffs
+- Produces per-file strategy (keep-ours/keep-theirs/manual-merge/review-needed) with rationale
+- Output: OutputChannel. Keybinding: `Ctrl+M Ctrl+X`
+
+**5. Session Context Recovery** (`meridian.sessionBriefing`)
+- Input: git status + last N commits + stale branches + uncommitted changes + open TODOs
+- Analysis: Aggregate from existing git.status + git.analytics + hygiene.scan
+- Prose: "Morning briefing" — where you left off, what's pending, what needs attention
+- Output: Webview panel or OutputChannel on workspace open
+- Why: Eliminates the 10-15 min "where was I?" tax after context switches
+
+### Implementation Notes — Git Prose Consumers (2-4)
+
+**Infrastructure built:**
+- `gatherPRContext()` — shared context gather used by generatePR, reviewPR, commentPR
+- `parseFileChanges()` — exported helper for domain/fileType metadata
+- All handlers conditionally wired in `GitDomainService` when `generateProseFn` is provided
+- JSON-structured prompts with text fallback parsing for all consumers
+
+**GitProvider gaps** (not blocking, needed for accuracy):
+- `getCommitRange(base, head)` — branch-scoped commits (vs. global `getRecentCommits(N)`)
+- Merge-base detection — `getDiff()` returns working-tree diff, not `merge-base..HEAD`
+- `estimateChanges()` in InboundAnalyzer is a stub — returns hashed values, not real stats
+
+#### Tier 2 — New capabilities
+
+**5. Pre-built Workflow Templates**
+- Ship 4-5 built-in workflows: "Start Feature Branch", "Pre-Push Checks", "Morning Sync", "Prepare PR"
+- Makes the workflow sidebar immediately useful instead of empty
+- Each workflow chains existing Meridian commands — no new handlers needed
+
+**6. Code Impact Analysis** (`hygiene.impactAnalysis`)
+- Input: A file path or function name
+- Analysis: TS Compiler API (already used for dead code) to trace imports, references, test coverage
+- Prose: "Changing this file affects 4 importers and 2 test files. Blast radius: medium."
+- Why: No other extension surfaces this as a one-click operation
+
+**7. Agent Execution**
+- Agents currently only have metadata — no execution capability
+- Make agents callable: run shell commands, chain Meridian commands, report results
+- Example: a "code reviewer" agent that runs hygiene scan + dead code + analytics and produces a summary
+
+### Deferred
+
+These are real but low-leverage right now:
+
+- Canonical config service (internal cleanup, zero user value)
+- Remote telemetry sink (no destination exists)
+- Additional analytics chart types (diminishing returns)
+- `chat.delegate` routing (solving a problem nobody has yet)

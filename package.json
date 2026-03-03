@@ -211,6 +211,36 @@
         "title": "Hygiene: Show Analytics",
         "icon": "$(graph)",
         "category": "Hygiene"
+      },
+      {
+        "command": "meridian.git.generatePR",
+        "title": "Git: Generate PR Description",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.git.reviewPR",
+        "title": "Git: Review PR (AI)",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.git.commentPR",
+        "title": "Git: Generate PR Comments",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.git.resolveConflicts",
+        "title": "Git: Resolve Conflicts (AI)",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.statusBar.clicked",
+        "title": "Meridian: Quick Actions",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.refreshAll",
+        "title": "Meridian: Refresh All Views",
+        "category": "Meridian"
       }
     ],
     "configuration": {
@@ -283,6 +313,36 @@
         "key": "ctrl+m ctrl+a",
         "mac": "cmd+m cmd+a",
         "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.refreshAll",
+        "key": "ctrl+m ctrl+r",
+        "mac": "cmd+m cmd+r",
+        "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.git.generatePR",
+        "key": "ctrl+m ctrl+p",
+        "mac": "cmd+m cmd+p",
+        "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.git.reviewPR",
+        "key": "ctrl+m ctrl+v",
+        "mac": "cmd+m cmd+v",
+        "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.git.commentPR",
+        "key": "ctrl+m ctrl+i",
+        "mac": "cmd+m cmd+i",
+        "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.git.resolveConflicts",
+        "key": "ctrl+m ctrl+x",
+        "mac": "cmd+m cmd+x",
+        "when": "workspaceFolderCount > 0"
       }
     ],
     "menus": {
@@ -311,6 +371,10 @@
         { "command": "meridian.git.showAnalytics",     "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
         { "command": "meridian.git.exportJson",        "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
         { "command": "meridian.git.exportCsv",         "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
+        { "command": "meridian.git.generatePR",        "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
+        { "command": "meridian.git.reviewPR",          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
+        { "command": "meridian.git.commentPR",         "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
+        { "command": "meridian.git.resolveConflicts",  "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
         { "command": "meridian.git.refresh",           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
         { "command": "meridian.hygiene.scan",          "when": "workspaceFolderCount > 0" },
         { "command": "meridian.hygiene.cleanup",       "when": "workspaceFolderCount > 0" },
@@ -324,7 +388,9 @@
         { "command": "meridian.workflow.run",          "when": "workspaceFolderCount > 0" },
         { "command": "meridian.workflow.refresh",      "when": "workspaceFolderCount > 0" },
         { "command": "meridian.agent.list",            "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.agent.refresh",         "when": "workspaceFolderCount > 0" }
+        { "command": "meridian.agent.refresh",         "when": "workspaceFolderCount > 0" },
+        { "command": "meridian.statusBar.clicked",   "when": "workspaceFolderCount > 0" },
+        { "command": "meridian.refreshAll",          "when": "workspaceFolderCount > 0" }
       ],
       "view/title": [
         { "command": "meridian.git.refresh",       "when": "view == meridian.git.view",      "group": "navigation" },

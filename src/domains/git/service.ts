@@ -26,6 +26,11 @@ import {
   createCommitHandler,
   createSmartCommitHandler,
   createAnalyzeInboundHandler,
+  createGeneratePRHandler,
+  createReviewPRHandler,
+  createCommentPRHandler,
+  createResolveConflictsHandler,
+  GenerateProseFn,
 } from "./handlers";
 import {
   createShowAnalyticsHandler,
@@ -908,6 +913,7 @@ export const GIT_COMMANDS: GitCommandName[] = [
   "git.commit",
   "git.smartCommit",
   "git.analyzeInbound",
+  "git.generatePR",
 ];
 
 export class GitDomainService implements DomainService {
@@ -928,7 +934,7 @@ export class GitDomainService implements DomainService {
   // Analytics component
   public analyzer: GitAnalyzer;
 
-  constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot: string = process.cwd(), approvalUI?: ApprovalUI) {
+  constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot: string = process.cwd(), approvalUI?: ApprovalUI, generateProseFn?: GenerateProseFn) {
     this.gitProvider = gitProvider;
     this.logger = logger;
 
@@ -972,6 +978,14 @@ export class GitDomainService implements DomainService {
         this.analyzer,
         logger
       ) as any,
+      ...(generateProseFn
+        ? {
+            "git.generatePR": createGeneratePRHandler(gitProvider, logger, generateProseFn) as any,
+            "git.reviewPR": createReviewPRHandler(gitProvider, logger, generateProseFn) as any,
+            "git.commentPR": createCommentPRHandler(gitProvider, logger, generateProseFn) as any,
+            "git.resolveConflicts": createResolveConflictsHandler(gitProvider, logger, this.inboundAnalyzer, generateProseFn) as any,
+          }
+        : {}),
     };
   }
 
@@ -1026,7 +1040,8 @@ export function createGitDomain(
   gitProvider: GitProvider,
   logger: Logger,
   workspaceRoot: string = process.cwd(),
-  approvalUI?: ApprovalUI
+  approvalUI?: ApprovalUI,
+  generateProseFn?: GenerateProseFn
 ): GitDomainService {
-  return new GitDomainService(gitProvider, logger, workspaceRoot, approvalUI);
+  return new GitDomainService(gitProvider, logger, workspaceRoot, approvalUI, generateProseFn);
 }

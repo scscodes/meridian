@@ -57,7 +57,11 @@ export type GitCommandName =
   | "git.analyzeInbound"
   | "git.showAnalytics"
   | "git.exportJson"
-  | "git.exportCsv";
+  | "git.exportCsv"
+  | "git.generatePR"
+  | "git.reviewPR"
+  | "git.commentPR"
+  | "git.resolveConflicts";
 export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics";
 export type ChatCommandName = "chat.context" | "chat.delegate";
 export type WorkflowCommandName = "workflow.list" | "workflow.run";

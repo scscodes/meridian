@@ -9,6 +9,13 @@ export {
   createCommitHandler,
   createSmartCommitHandler,
   createAnalyzeInboundHandler,
+  createGeneratePRHandler,
+  createReviewPRHandler,
+  createCommentPRHandler,
+  createResolveConflictsHandler,
+  gatherPRContext,
+  parseFileChanges,
+  GenerateProseFn,
 } from "./handlers";
 export {
   createShowAnalyticsHandler,
@@ -29,6 +36,17 @@ export {
   InboundChanges,
   ConflictFile,
   ChangesSummary,
+  PRGenerationParams,
+  GeneratedPR,
+  PRContext,
+  PRReviewParams,
+  GeneratedPRReview,
+  PRReviewComment,
+  PRCommentParams,
+  GeneratedPRComments,
+  InlineComment,
+  ConflictResolutionProse,
+  ConflictResolution,
 } from "./types";
 export {
   AnalyticsPeriod,

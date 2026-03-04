@@ -22,35 +22,15 @@ Meridian is built on Domain-Driven Design with composable command routing:
 
 **Goal**: Make natural language the primary interaction surface for `@meridian`. Slash commands become accelerators, not the primary path.
 
-**Current problem**: Intent classification order is `slash → keyword map → LLM classifier → chat.context fallback`. The LLM classifier does real work but sits at position 3. Keyword map is a leaky abstraction that will rot as commands grow.
+**Completed.** All 6 tasks done. Final architecture:
 
-**Target architecture**:
-1. Slash commands — exact match shortcuts, direct dispatch (keep all 10 existing)
-2. Natural language → `chat.delegate` — single classification authority, eliminates dual-classifier problem
-3. LM tools — expanded surface so Copilot agent mode can autonomously chain commands
+1. Slash commands → `SLASH_MAP` direct dispatch (11 commands including `/impact`)
+2. `"run <name>"` shorthand → `workflow.run` dispatch
+3. All other NL → `chat.delegate` (single classification authority via `DELEGATE_CLASSIFIER_PROMPT` + `KNOWN_COMMANDS`)
+4. 14 LM tools registered for Copilot agent mode autonomous chaining
+5. `RESULT_FORMATTERS` map — adding new command formatters requires one map entry, not dispatch logic changes
 
-**Current state (from deep dive):**
-
-| Layer | Gap |
-|-------|-----|
-| Keyword map (17 entries) | Leaky middle layer — bypasses LLM, will rot as commands grow |
-| `chat.delegate` KNOWN_COMMANDS | Missing: `hygiene.impactAnalysis`, `agent.execute`, `hygiene.cleanup`, `hygiene.showAnalytics` — partially closed last session |
-| LM tools (7 registered) | Missing: `git.generatePR`, `git.reviewPR`, `git.commentPR`, `git.resolveConflicts`, `git.sessionBriefing`, `hygiene.impactAnalysis`, `agent.execute` |
-| Unreachable via any chat surface | `git.exportJson`, `git.exportCsv` |
-
-**Tasks (in order):**
-
-1. ~~**Route NL through `chat.delegate`**~~ — Done. Chat participant NL path now routes through `router.dispatch("chat.delegate")`. Inline classifier and `VALID_COMMANDS` deleted. `formatCommandResult()` extracted as shared formatter. `workflow.run:<name>` prefix parsing added to delegate handler.
-
-2. **Expand `chat.delegate` KNOWN_COMMANDS** — Add `hygiene.impactAnalysis`, `agent.execute`, `hygiene.cleanup`, `hygiene.showAnalytics`. Update the classification system prompt to describe each. Mirror changes in `VALID_COMMANDS` in chat-participant.ts.
-
-3. **Drop the keyword map** — Remove `KEYWORD_MAP` from chat-participant.ts. Single-word queries ("status", "scan", "agents") are handled correctly by the classifier; the map adds no value and diverges over time.
-
-4. **Add `/impact` slash command** — `package.json` chatParticipants entry + `SLASH_MAP` entry + result formatter in `handleDirectDispatch` (prompts for file path via the active editor, matching the keybinding behavior).
-
-5. **Expand LM tools** — Add the 7 missing tools to `TOOL_DEFS` in `lm-tools.ts` and corresponding `languageModelTools` declarations in `package.json`. Prose tools (`generatePR`, `reviewPR`, etc.) return their prose as the tool result text. `hygiene.impactAnalysis` accepts `filePath` and `functionName` as input schema params.
-
-6. **Generalize result formatter** — `handleDirectDispatch` currently has hardcoded per-command formatting. Extract to a command→formatter map so adding new commands doesn't require touching the dispatch logic.
+**Remaining gap**: `git.exportJson` and `git.exportCsv` are not reachable via chat (export commands — low priority).
 
 ---
 

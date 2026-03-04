@@ -132,13 +132,12 @@ async function handleDirectDispatch(
 }
 
 // ── Result formatting (shared by direct dispatch + chat.delegate path) ───────
+// Add new formatters here — no need to touch dispatch logic.
 
-function formatCommandResult(
-  commandName: CommandName,
-  value: unknown,
-  stream: vscode.ChatResponseStream,
-): void {
-  if (commandName === "chat.context") {
+type ResultFormatter = (value: unknown, stream: vscode.ChatResponseStream) => void;
+
+const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
+  "chat.context": (value, stream) => {
     const v = value as Record<string, unknown>;
     const gitStatus = v.gitStatus as Record<string, unknown> | undefined;
     const branch = v.gitBranch ?? gitStatus?.branch ?? "unknown";
@@ -147,35 +146,50 @@ function formatCommandResult(
     stream.markdown(
       `**Branch:** \`${branch}\` (${dirty})\n\n` +
       `**Active file:** \`${file}\`\n\n` +
-      `Slash commands: \`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` \`/workflows\` \`/agents\` \`/analytics\`\n\n` +
+      `Slash commands: \`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` \`/workflows\` \`/agents\` \`/analytics\` \`/impact\`\n\n` +
       `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
     );
-  } else if (commandName === "git.sessionBriefing") {
+  },
+  "git.sessionBriefing": (value, stream) => {
     stream.markdown(value as string);
-  } else if (commandName === "git.generatePR") {
-    const pr = value as any;
-    stream.markdown(pr.body);
-  } else if (commandName === "git.reviewPR") {
+  },
+  "git.generatePR": (value, stream) => {
+    stream.markdown((value as any).body);
+  },
+  "git.reviewPR": (value, stream) => {
     const rv = value as any;
     stream.markdown(`**Verdict:** ${rv.verdict}\n\n${rv.summary}\n\n`);
     for (const c of rv.comments ?? []) {
       stream.markdown(`- **[${c.severity}]** \`${c.file}\`: ${c.comment}\n`);
     }
-  } else if (commandName === "git.resolveConflicts") {
+  },
+  "git.resolveConflicts": (value, stream) => {
     const cr = value as any;
     stream.markdown(`${cr.overview}\n\n`);
     for (const f of cr.perFile ?? []) {
       stream.markdown(`**\`${f.path}\`** → \`${f.strategy}\`\n${f.rationale}\n`);
     }
-  } else if (commandName === "hygiene.impactAnalysis") {
-    const ia = value as any;
-    stream.markdown(ia.summary);
-  } else {
-    const msg = formatResultMessage(commandName, { kind: "ok", value });
-    stream.markdown(msg.message);
-    if (commandName === "workflow.list" || commandName === "agent.list") {
-      stream.markdown("\n\n```json\n" + JSON.stringify(value, null, 2) + "\n```");
-    }
+  },
+  "hygiene.impactAnalysis": (value, stream) => {
+    stream.markdown((value as any).summary);
+  },
+};
+
+function formatCommandResult(
+  commandName: CommandName,
+  value: unknown,
+  stream: vscode.ChatResponseStream,
+): void {
+  const formatter = RESULT_FORMATTERS[commandName];
+  if (formatter) {
+    formatter(value, stream);
+    return;
+  }
+  // Default: generic message + optional JSON for list commands
+  const msg = formatResultMessage(commandName, { kind: "ok", value });
+  stream.markdown(msg.message);
+  if (commandName === "workflow.list" || commandName === "agent.list") {
+    stream.markdown("\n\n```json\n" + JSON.stringify(value, null, 2) + "\n```");
   }
 }
 

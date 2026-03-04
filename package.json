@@ -90,6 +90,10 @@
           {
             "name": "conflicts",
             "description": "Suggest resolution strategies for detected git conflicts"
+          },
+          {
+            "name": "impact",
+            "description": "Trace the blast radius of a file or function change"
           }
         ]
       }

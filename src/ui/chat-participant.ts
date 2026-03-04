@@ -5,8 +5,7 @@
  *   1. request.command  — VS Code routes /slash commands here (no leading slash)
  *   2. SLASH_MAP        — explicit "/keyword" in prompt (legacy fallback)
  *   3. "run <name>"     — shorthand for workflow.run
- *   4. KEYWORD_MAP      — single-word natural language ("status", "agents", etc.)
- *   5. chat.delegate    — NL classification + dispatch via single authority
+ *   4. chat.delegate    — NL classification + dispatch via single authority
  */
 
 import * as vscode from "vscode";
@@ -27,27 +26,7 @@ const SLASH_MAP: Record<string, CommandName> = {
   "/review":    "git.reviewPR",
   "/briefing":  "git.sessionBriefing",
   "/conflicts": "git.resolveConflicts",
-};
-
-// Single-word natural language keywords → direct dispatch, no LLM needed
-const KEYWORD_MAP: Record<string, CommandName> = {
-  "status":    "git.status",
-  "scan":      "hygiene.scan",
-  "hygiene":   "hygiene.scan",
-  "workflows": "workflow.list",
-  "workflow":  "workflow.list",
-  "agents":    "agent.list",
-  "agent":     "agent.list",
-  "analytics": "git.showAnalytics",
-  "commit":    "git.smartCommit",
-  "pull":      "git.pull",
-  "context":   "chat.context",
-  "pr":        "git.generatePR",
-  "review":    "git.reviewPR",
-  "briefing":  "git.sessionBriefing",
-  "session":   "git.sessionBriefing",
-  "conflicts": "git.resolveConflicts",
-  "resolve":   "git.resolveConflicts",
+  "/impact":    "hygiene.impactAnalysis",
 };
 
 export function createChatParticipant(
@@ -66,7 +45,7 @@ export function createChatParticipant(
     //    e.g. "@meridian /status"  →  request.command = "status"
     if (request.command) {
       const cmd = request.command.toLowerCase();
-      const commandName = SLASH_MAP[`/${cmd}`] ?? KEYWORD_MAP[cmd];
+      const commandName = SLASH_MAP[`/${cmd}`];
       if (commandName) {
         logger.info(`Routing via request.command: ${cmd} → ${commandName}`, "ChatParticipant");
         stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
@@ -91,14 +70,7 @@ export function createChatParticipant(
       return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger);
     }
 
-    // ── 4. KEYWORD_MAP: single-word natural language ─────────────────────────
-    if (firstWord in KEYWORD_MAP) {
-      const commandName = KEYWORD_MAP[firstWord];
-      stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
-    }
-
-    // ── 5. NL → chat.delegate (single classification authority) ──────────────
+    // ── 4. NL → chat.delegate (single classification authority) ──────────────
     if (text.length > 0) {
       stream.progress("Figuring out what you need...");
       const delegateResult = await router.dispatch(
@@ -139,6 +111,15 @@ async function handleDirectDispatch(
   stream: vscode.ChatResponseStream,
   logger: Logger
 ): Promise<void> {
+  // Auto-populate filePath for impact analysis from active editor
+  if (commandName === "hygiene.impactAnalysis" && !params.filePath) {
+    if (!ctx.activeFilePath) {
+      stream.markdown("Open a TypeScript file first, then try `/impact` again.");
+      return;
+    }
+    params = { ...params, filePath: ctx.activeFilePath };
+  }
+
   const cmd: Command = { name: commandName, params };
   const result = await router.dispatch(cmd, ctx);
 
@@ -186,6 +167,9 @@ function formatCommandResult(
     for (const f of cr.perFile ?? []) {
       stream.markdown(`**\`${f.path}\`** → \`${f.strategy}\`\n${f.rationale}\n`);
     }
+  } else if (commandName === "hygiene.impactAnalysis") {
+    const ia = value as any;
+    stream.markdown(ia.summary);
   } else {
     const msg = formatResultMessage(commandName, { kind: "ok", value });
     stream.markdown(msg.message);

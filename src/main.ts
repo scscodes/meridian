@@ -111,7 +111,7 @@ const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.smartCommit", "git.smartCommit"],
   ["meridian.hygiene.scan",    "hygiene.scan"],
   ["meridian.hygiene.cleanup", "hygiene.cleanup"],
-  ["meridian.hygiene.impactAnalysis", "hygiene.impactAnalysis"],
+  // hygiene.impactAnalysis — dedicated registration below (active-file fallback + function name prompt)
   ["meridian.chat.context",    "chat.context"],
   ["meridian.workflow.list",   "workflow.list"],
   ["meridian.agent.list",        "agent.list"],
@@ -621,6 +621,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         outputChannel.appendLine("\n");
       } catch (err) {
         outputChannel.appendLine(`[Error] Review failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
+  );
+
+  // hygiene.impactAnalysis — dedicated registration: resolves active file, prompts for function name
+  context.subscriptions.push(
+    vscode.commands.registerCommand("meridian.hygiene.impactAnalysis", async (item: any) => {
+      const filePath: string | undefined =
+        item instanceof vscode.Uri ? item.fsPath :
+        item?.filePath ??
+        vscode.window.activeTextEditor?.document.uri.fsPath;
+
+      if (!filePath) {
+        vscode.window.showErrorMessage("Impact Analysis: open a TypeScript file first.");
+        return;
+      }
+
+      const functionName = await vscode.window.showInputBox({
+        prompt: "Function or symbol to trace (leave blank to analyze the whole file)",
+        placeHolder: "e.g. createStatusHandler",
+      });
+      if (functionName === undefined) return; // user pressed Escape
+
+      const freshCtx = getCommandContext(context);
+      const params: Record<string, unknown> = { filePath };
+      if (functionName) params.functionName = functionName;
+
+      const result = await router.dispatch({ name: "hygiene.impactAnalysis", params }, freshCtx);
+      if (result.kind === "ok") {
+        const val = result.value as any;
+        outputChannel.show(true);
+        outputChannel.appendLine(`\n${"─".repeat(60)}`);
+        outputChannel.appendLine(`[${new Date().toISOString()}] Impact Analysis: ${nodePath.basename(filePath)}`);
+        outputChannel.appendLine("─".repeat(60));
+        outputChannel.appendLine(val.summary ?? "No summary available.");
+        outputChannel.appendLine("");
+        await vscode.env.clipboard.writeText(val.summary ?? "");
+        vscode.window.showInformationMessage("Impact analysis copied to clipboard.");
+      } else {
+        vscode.window.showErrorMessage(`Impact Analysis failed: ${result.error.message}`);
       }
     }),
   );

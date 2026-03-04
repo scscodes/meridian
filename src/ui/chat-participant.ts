@@ -68,6 +68,10 @@ hygiene.scan         – scan workspace for large files, dead files, stale logs
 workflow.list        – list all available workflows
 workflow.run:<name>  – run a named workflow (replace <name>)
 agent.list           – list all available agents and their capabilities
+hygiene.cleanup          – delete specified files (dry-run safe)
+hygiene.showAnalytics    – open hygiene analytics dashboard (scan history, issue trends)
+hygiene.impactAnalysis   – trace blast radius of a file or function via TS Compiler API
+agent.execute:<id>:<cmd> – execute agent <id> with command or workflow <cmd>
 chat.context         – show branch, active file, and available commands
 
 Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`;
@@ -253,8 +257,12 @@ async function handleClassifier(
       "git.resolveConflicts": "git.resolveConflicts",
       "git.sessionBriefing":  "git.sessionBriefing",
       "hygiene.scan":         "hygiene.scan",
+      "hygiene.cleanup":        "hygiene.cleanup",
+      "hygiene.showAnalytics":  "hygiene.showAnalytics",
+      "hygiene.impactAnalysis": "hygiene.impactAnalysis",
       "workflow.list":        "workflow.list",
       "agent.list":           "agent.list",
+      "agent.execute":          "agent.execute",
       "chat.context":         "chat.context",
     };
 

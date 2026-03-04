@@ -102,8 +102,12 @@ git.resolveConflicts  – suggest conflict resolution strategies
 git.sessionBriefing   – generate a morning session briefing
 hygiene.scan          – scan workspace for dead files, large files, logs
 hygiene.showAnalytics – show hygiene analytics
+hygiene.cleanup       – delete flagged files from a hygiene scan (dry-run safe)
+hygiene.impactAnalysis – trace blast radius of a file or function
 workflow.list         – list available workflows
+workflow.run          – execute a named workflow
 agent.list            – list available agents
+agent.execute         – run a named agent with a target command or workflow
 
 Respond with ONLY the command ID. Nothing else.`;
 
@@ -111,8 +115,8 @@ const KNOWN_COMMANDS = new Set([
   "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
   "git.showAnalytics", "git.generatePR", "git.reviewPR", "git.commentPR",
   "git.resolveConflicts", "git.sessionBriefing",
-  "hygiene.scan", "hygiene.showAnalytics",
-  "workflow.list", "agent.list",
+  "hygiene.scan", "hygiene.showAnalytics", "hygiene.cleanup", "hygiene.impactAnalysis",
+  "workflow.list", "workflow.run", "agent.list", "agent.execute",
 ]);
 
 /**

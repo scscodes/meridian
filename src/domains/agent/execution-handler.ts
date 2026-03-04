@@ -23,9 +23,6 @@ import {
 import { ExecuteAgentParams, AgentExecutionResult, ExecutionLog } from "./types";
 import { loadAgents } from "../../infrastructure/agent-registry";
 
-/**
- * Execution context — tracks state across workflow steps or command dispatch.
- */
 interface ExecutionState {
   agentId: string;
   targetCommand?: string;
@@ -37,9 +34,6 @@ interface ExecutionState {
   error?: string;
 }
 
-/**
- * Agent Executor Service — orchestrates agent execution.
- */
 class AgentExecutor {
   constructor(
     private logger: Logger,
@@ -48,10 +42,6 @@ class AgentExecutor {
     private extensionPath?: string
   ) {}
 
-  /**
-   * Execute agent with specified target (command or workflow).
-   * Returns structured execution report.
-   */
   async execute(
     agentId: string,
     targetCommand?: string,
@@ -171,9 +161,6 @@ class AgentExecutor {
     }
   }
 
-  /**
-   * Execute a single command via the injected dispatcher.
-   */
   private async executeCommand(
     commandName: string,
     params: Record<string, unknown>,
@@ -190,9 +177,6 @@ class AgentExecutor {
     return this.commandDispatcher(cmd, ctx);
   }
 
-  /**
-   * Log a message to execution state.
-   */
   private log(state: ExecutionState, message: string): void {
     const entry: ExecutionLog = {
       timestamp: new Date().toISOString(),
@@ -203,9 +187,6 @@ class AgentExecutor {
     this.logger.info(message, "AgentExecutor");
   }
 
-  /**
-   * Build final execution result.
-   */
   private buildResult(state: ExecutionState, agent: AgentDefinition): AgentExecutionResult {
     return {
       agentId: state.agentId,
@@ -221,10 +202,6 @@ class AgentExecutor {
   }
 }
 
-/**
- * Handler Factory — create agent execution handler.
- * Requires command dispatcher (CommandRouter) and workspace context.
- */
 export function createExecuteAgentHandler(
   logger: Logger,
   commandDispatcher: (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>>,

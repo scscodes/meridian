@@ -294,6 +294,11 @@
         "category": "Hygiene"
       },
       {
+        "command": "meridian.hygiene.impactAnalysis",
+        "title": "Hygiene: Impact Analysis",
+        "category": "Hygiene"
+      },
+      {
         "command": "meridian.git.generatePR",
         "title": "Git: Generate PR Description",
         "category": "Meridian"
@@ -449,6 +454,12 @@
         "key": "ctrl+m ctrl+b",
         "mac": "cmd+m cmd+b",
         "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.hygiene.impactAnalysis",
+        "key": "ctrl+m ctrl+t",
+        "mac": "cmd+m cmd+t",
+        "when": "workspaceFolderCount > 0"
       }
     ],
     "menus": {
@@ -467,6 +478,11 @@
           "command": "meridian.hygiene.reviewFile",
           "when": "workspaceFolderCount > 0 && resourceExtname == .md",
           "group": "meridian@3"
+        },
+        {
+          "command": "meridian.hygiene.impactAnalysis",
+          "when": "workspaceFolderCount > 0 && resourceExtname == .ts",
+          "group": "meridian@4"
         }
       ],
       "commandPalette": [
@@ -548,6 +564,10 @@
         },
         {
           "command": "meridian.hygiene.showAnalytics",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.impactAnalysis",
           "when": "workspaceFolderCount > 0"
         },
         {

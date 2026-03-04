@@ -22,17 +22,11 @@ import {
 import { generateProse, ProseRequest } from "../../infrastructure/prose-generator";
 import { CACHE_SETTINGS } from "../../constants";
 
-/**
- * Impact analysis input — file path or function name.
- */
 export interface ImpactAnalysisParams {
   filePath?: string; // Absolute or relative path to a .ts file
   functionName?: string; // Name of a function to analyze
 }
 
-/**
- * Impact analysis result — prose summary of blast radius.
- */
 export interface ImpactAnalysisResult {
   summary: string; // Markdown prose output from LLM
   metrics: {
@@ -45,9 +39,6 @@ export interface ImpactAnalysisResult {
   targetFunction?: string;
 }
 
-/**
- * Internal context for impact analysis — passed to prose generator.
- */
 interface ImpactContext {
   target: string; // File path or function name
   importers: string[]; // Files that import the target
@@ -57,9 +48,6 @@ interface ImpactContext {
   analysisType: "file" | "function";
 }
 
-/**
- * Impact Analysis Visitor — traverses AST to find imports and references.
- */
 class ImpactAnalysisVisitor {
   private importers: Set<string> = new Set();
   private callSites: string[] = [];
@@ -71,9 +59,6 @@ class ImpactAnalysisVisitor {
     private targetFunction?: string
   ) {}
 
-  /**
-   * Traverse AST to find all imports of target file and all calls to target function.
-   */
   analyze(): { importers: string[]; callSites: string[]; testFiles: string[] } {
     const sourceFiles = this.program.getSourceFiles();
 
@@ -99,9 +84,6 @@ class ImpactAnalysisVisitor {
     };
   }
 
-  /**
-   * Recursively visit AST nodes looking for imports and references.
-   */
   private visitNode(node: ts.Node | undefined, fileName: string): void {
     if (!node) return;
     // Check for import statements
@@ -126,9 +108,6 @@ class ImpactAnalysisVisitor {
     });
   }
 
-  /**
-   * Extract import path from import statement.
-   */
   private extractImportPath(node: ts.Node): string | null {
     if (ts.isImportDeclaration(node)) {
       const moduleSpecifier = node.moduleSpecifier;
@@ -144,19 +123,13 @@ class ImpactAnalysisVisitor {
     return null;
   }
 
-  /**
-   * Check if an import path resolves to the target file.
-   * Simple heuristic: check if path contains target filename stem.
-   */
+  // Simple heuristic: check if path contains target filename stem.
   private pathsResolveToTarget(importPath: string): boolean {
     const targetStem = path.parse(this.targetFile).name;
     // Match ".../name" or "./name" or "../name"
     return importPath.endsWith(`/${targetStem}`) || importPath.endsWith(`\/${targetStem}`);
   }
 
-  /**
-   * Extract function name from a call expression.
-   */
   private extractCallName(node: ts.CallExpression): string | null {
     const expression = node.expression;
     if (ts.isIdentifier(expression)) {
@@ -168,25 +141,16 @@ class ImpactAnalysisVisitor {
     return null;
   }
 
-  /**
-   * Check if a file is a test file.
-   */
   private isTestFile(fileName: string): boolean {
     return /\.test\.(ts|js)$/.test(fileName) || /\.spec\.(ts|js)$/.test(fileName);
   }
 }
 
-/**
- * Impact Analyzer Service — orchestrates analysis using TS Compiler API.
- */
 class ImpactAnalyzer {
   private cache = new Map<string, ImpactContext>();
 
   constructor(private logger: Logger) {}
 
-  /**
-   * Analyze impact of a file or function change.
-   */
   analyze(
     workspaceRoot: string,
     filePath?: string,
@@ -262,9 +226,6 @@ class ImpactAnalyzer {
   }
 }
 
-/**
- * Handler Factory — create impact analysis handler.
- */
 export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnalysisParams, ImpactAnalysisResult> {
   const analyzer = new ImpactAnalyzer(logger);
 

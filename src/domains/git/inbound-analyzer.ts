@@ -278,7 +278,7 @@ export class InboundAnalyzer {
 
           // Conflict: both sides modified same file
           if (localStatus === "M" && remoteStatus === "M") {
-            const localChanges = await this.estimateChanges(path, "local");
+            const localChanges = await this.estimateChanges(path, "HEAD");
             const remoteChanges = await this.estimateChanges(
               path,
               `origin/${branch}`
@@ -295,7 +295,7 @@ export class InboundAnalyzer {
           }
           // Conflict: we modified, they deleted
           else if (localStatus === "M" && remoteStatus === "D") {
-            const localChanges = await this.estimateChanges(path, "local");
+            const localChanges = await this.estimateChanges(path, "HEAD");
 
             conflicts.push({
               path,
@@ -324,7 +324,7 @@ export class InboundAnalyzer {
           }
           // Low severity: both added (could have same content)
           else if (localStatus === "A" && remoteStatus === "A") {
-            const localChanges = await this.estimateChanges(path, "local");
+            const localChanges = await this.estimateChanges(path, "HEAD");
             const remoteChanges = await this.estimateChanges(
               path,
               `origin/${branch}`
@@ -358,37 +358,17 @@ export class InboundAnalyzer {
   }
 
   /**
-   * Estimate change count for a file (simplified)
-   * In a real implementation, this would call git diff --stat
+   * Count actual line changes for a file at a given ref using git diff --numstat.
    */
   private async estimateChanges(path: string, ref: string): Promise<number> {
-    try {
-      // Guard: validate inputs
-      if (!path || !ref) {
-        this.logger.debug(
-          "estimateChanges: missing path or ref, returning 0",
-          "InboundAnalyzer.estimateChanges"
-        );
-        return 0;
-      }
-
-      // Deterministic heuristic based on path + ref; this is a placeholder
-      // that provides a stable, non-negative estimate without external I/O.
-      const key = `${path}|${ref}`;
-      let hash = 0;
-      for (let i = 0; i < key.length; i++) {
-        const code = key.charCodeAt(i);
-        hash = (hash * 31 + code) | 0;
-      }
-      const estimate = Math.abs(hash % 100) + 1;
-      return estimate;
-    } catch (err) {
-      this.logger.warn(
-        `Failed to estimate changes for ${path}; returning 0`,
-        "InboundAnalyzer.estimateChanges"
-      );
-      return 0; // Graceful degradation
+    if (!path || !ref) {
+      return 0;
     }
+    const result = await this.gitProvider.diff(ref, ["--numstat", "--", path]);
+    if (result.kind === "err") return 0;
+    const match = result.value.trim().match(/^(\d+)\s+(\d+)/);
+    if (!match) return 0;
+    return parseInt(match[1] ?? "0", 10) + parseInt(match[2] ?? "0", 10);
   }
 
   /**

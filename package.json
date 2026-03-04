@@ -25,10 +25,22 @@
     },
     "views": {
       "meridian-explorer": [
-        { "id": "meridian.git.view",      "name": "Git" },
-        { "id": "meridian.hygiene.view",  "name": "Hygiene" },
-        { "id": "meridian.workflow.view", "name": "Workflows" },
-        { "id": "meridian.agent.view",    "name": "Agents" }
+        {
+          "id": "meridian.git.view",
+          "name": "Git"
+        },
+        {
+          "id": "meridian.hygiene.view",
+          "name": "Hygiene"
+        },
+        {
+          "id": "meridian.workflow.view",
+          "name": "Workflows"
+        },
+        {
+          "id": "meridian.agent.view",
+          "name": "Agents"
+        }
       ]
     },
     "chatParticipants": [
@@ -39,12 +51,46 @@
         "description": "Git, hygiene, workflow, and agent assistant for your workspace",
         "isDefault": false,
         "commands": [
-          { "name": "status",    "description": "Show current git branch and file change counts" },
-          { "name": "scan",      "description": "Scan workspace for hygiene issues (large files, dead files, logs)" },
-          { "name": "workflows", "description": "List all available Meridian workflows" },
-          { "name": "agents",    "description": "List all available Meridian agents and their capabilities" },
-          { "name": "analytics", "description": "Open the Git Analytics report" },
-          { "name": "context",   "description": "Show workspace context: branch, active file, and available commands" }
+          {
+            "name": "status",
+            "description": "Show current git branch and file change counts"
+          },
+          {
+            "name": "scan",
+            "description": "Scan workspace for hygiene issues (large files, dead files, logs)"
+          },
+          {
+            "name": "workflows",
+            "description": "List all available Meridian workflows"
+          },
+          {
+            "name": "agents",
+            "description": "List all available Meridian agents and their capabilities"
+          },
+          {
+            "name": "analytics",
+            "description": "Open the Git Analytics report"
+          },
+          {
+            "name": "context",
+            "description": "Show workspace context: branch, active file, and available commands"
+          },
+          {
+            "name": "pr",
+            "description": "Generate a pull request description for the current branch"
+          },
+          {
+            "name": "review",
+            "description": "Review current branch changes — verdict and per-file comments"
+          },
+          {
+            "name": "briefing",
+            "description": "Generate a session briefing: branch state, recent commits, uncommitted work"
+          },
+          {
+            "name": "conflicts",
+            "description": "Suggest resolution strategies for detected git conflicts"
+          }
         ]
       }
     ],
@@ -53,25 +99,37 @@
         "name": "meridian_git_status",
         "displayName": "Meridian: Git Status",
         "modelDescription": "Check the current git branch, whether the working tree is dirty, and counts of staged, unstaged, and untracked files.",
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       },
       {
         "name": "meridian_git_smart_commit",
         "displayName": "Meridian: Smart Commit",
         "modelDescription": "Automatically group staged file changes by semantic type, suggest commit messages, and commit all groups in batch.",
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       },
       {
         "name": "meridian_git_analyze_inbound",
         "displayName": "Meridian: Analyze Inbound Changes",
         "modelDescription": "Fetch and analyze incoming changes from the remote branch, detecting conflicts and summarizing diffs before merging.",
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       },
       {
         "name": "meridian_hygiene_scan",
         "displayName": "Meridian: Hygiene Scan",
         "modelDescription": "Scan the workspace for hygiene issues such as unused files, dead code, and oversized log files.",
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       },
       {
         "name": "meridian_workflow_run",
@@ -79,7 +137,9 @@
         "modelDescription": "Execute a named workflow from the .vscode/agents/ directory. Use meridian_workflow_list first if you don't know the workflow name.",
         "inputSchema": {
           "type": "object",
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "properties": {
             "name": {
               "type": "string",
@@ -97,8 +157,29 @@
           "properties": {
             "period": {
               "type": "string",
-              "enum": ["3mo", "6mo", "12mo"],
+              "enum": [
+                "3mo",
+                "6mo",
+                "12mo"
+              ],
               "description": "Time period for the analytics report. Defaults to 3mo."
+            }
+          }
+        }
+      },
+      {
+        "name": "meridian_chat_delegate",
+        "displayName": "Meridian: Delegate Task",
+        "modelDescription": "Route a natural language task description to the appropriate Meridian command. Use when you need to analyze, review, brief, or perform a git/hygiene operation but don't know the exact command. Provide a clear task description and Meridian will classify and execute the right command.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "task"
+          ],
+          "properties": {
+            "task": {
+              "type": "string",
+              "description": "Natural language description of what you want to do (e.g. 'generate a PR description', 'review my changes', 'session briefing')"
             }
           }
         }
@@ -233,6 +314,11 @@
         "category": "Meridian"
       },
       {
+        "command": "meridian.git.sessionBriefing",
+        "title": "Git: Session Briefing (AI)",
+        "category": "Meridian"
+      },
+      {
         "command": "meridian.statusBar.clicked",
         "title": "Meridian: Quick Actions",
         "category": "Meridian"
@@ -288,9 +374,23 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["markdown", "log", "config", "backup", "temp", "source", "artifact", "other"]
+            "enum": [
+              "markdown",
+              "log",
+              "config",
+              "backup",
+              "temp",
+              "source",
+              "artifact",
+              "other"
+            ]
           },
-          "default": ["backup", "temp", "log", "artifact"],
+          "default": [
+            "backup",
+            "temp",
+            "log",
+            "artifact"
+          ],
           "description": "File categories that are automatically flagged as prune candidates when older than minAgeDays."
         }
       }
@@ -343,6 +443,12 @@
         "key": "ctrl+m ctrl+x",
         "mac": "cmd+m cmd+x",
         "when": "workspaceFolderCount > 0"
+      },
+      {
+        "command": "meridian.git.sessionBriefing",
+        "key": "ctrl+m ctrl+b",
+        "mac": "cmd+m cmd+b",
+        "when": "workspaceFolderCount > 0"
       }
     ],
     "menus": {
@@ -364,54 +470,199 @@
         }
       ],
       "commandPalette": [
-        { "command": "meridian.git.status",            "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.pull",              "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.commit",            "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.smartCommit",       "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.showAnalytics",     "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.exportJson",        "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.exportCsv",         "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.generatePR",        "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.reviewPR",          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.commentPR",         "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.resolveConflicts",  "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.git.refresh",           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0" },
-        { "command": "meridian.hygiene.scan",          "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.hygiene.cleanup",       "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.hygiene.deleteFile",    "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.hygiene.ignoreFile",    "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.hygiene.reviewFile",    "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.hygiene.refresh",       "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.hygiene.showAnalytics", "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.chat.context",          "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.workflow.list",         "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.workflow.run",          "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.workflow.refresh",      "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.agent.list",            "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.agent.refresh",         "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.statusBar.clicked",   "when": "workspaceFolderCount > 0" },
-        { "command": "meridian.refreshAll",          "when": "workspaceFolderCount > 0" }
+        {
+          "command": "meridian.git.status",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.pull",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.commit",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.smartCommit",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.showAnalytics",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.exportJson",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.exportCsv",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.generatePR",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.reviewPR",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.commentPR",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.resolveConflicts",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.sessionBriefing",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.git.refresh",
+          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.scan",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.cleanup",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.deleteFile",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.ignoreFile",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.reviewFile",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.refresh",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.hygiene.showAnalytics",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.chat.context",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.workflow.list",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.workflow.run",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.workflow.refresh",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.agent.list",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.agent.refresh",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.statusBar.clicked",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.refreshAll",
+          "when": "workspaceFolderCount > 0"
+        }
       ],
       "view/title": [
-        { "command": "meridian.git.refresh",       "when": "view == meridian.git.view",      "group": "navigation" },
-        { "command": "meridian.hygiene.refresh",   "when": "view == meridian.hygiene.view",  "group": "navigation" },
-        { "command": "meridian.workflow.refresh",  "when": "view == meridian.workflow.view", "group": "navigation" },
-        { "command": "meridian.agent.refresh",     "when": "view == meridian.agent.view",    "group": "navigation" },
-        { "command": "meridian.git.showAnalytics",     "when": "view == meridian.git.view",     "group": "navigation" },
-        { "command": "meridian.hygiene.showAnalytics", "when": "view == meridian.hygiene.view", "group": "navigation" }
+        {
+          "command": "meridian.git.refresh",
+          "when": "view == meridian.git.view",
+          "group": "navigation"
+        },
+        {
+          "command": "meridian.hygiene.refresh",
+          "when": "view == meridian.hygiene.view",
+          "group": "navigation"
+        },
+        {
+          "command": "meridian.workflow.refresh",
+          "when": "view == meridian.workflow.view",
+          "group": "navigation"
+        },
+        {
+          "command": "meridian.agent.refresh",
+          "when": "view == meridian.agent.view",
+          "group": "navigation"
+        },
+        {
+          "command": "meridian.git.showAnalytics",
+          "when": "view == meridian.git.view",
+          "group": "navigation"
+        },
+        {
+          "command": "meridian.hygiene.showAnalytics",
+          "when": "view == meridian.hygiene.view",
+          "group": "navigation"
+        }
       ],
       "view/item/context": [
-        { "command": "meridian.git.smartCommit", "when": "view == meridian.git.view && viewItem == branch",       "group": "git@1" },
-        { "command": "meridian.git.pull",        "when": "view == meridian.git.view && viewItem == branch",       "group": "git@2" },
-        { "command": "meridian.hygiene.cleanup",    "when": "view == meridian.hygiene.view && viewItem =~ /file/", "group": "hygiene@1" },
-        { "command": "meridian.hygiene.deleteFile", "when": "view == meridian.hygiene.view && viewItem =~ /file/", "group": "hygiene@2" },
-        { "command": "meridian.hygiene.ignoreFile", "when": "view == meridian.hygiene.view && viewItem =~ /file/", "group": "hygiene@3" },
-        { "command": "meridian.hygiene.reviewFile", "when": "view == meridian.hygiene.view && viewItem == markdownFile", "group": "hygiene@4" },
-        { "command": "meridian.workflow.run",    "when": "view == meridian.workflow.view && viewItem == workflow", "group": "workflow@1" }
+        {
+          "command": "meridian.git.smartCommit",
+          "when": "view == meridian.git.view && viewItem == branch",
+          "group": "git@1"
+        },
+        {
+          "command": "meridian.git.pull",
+          "when": "view == meridian.git.view && viewItem == branch",
+          "group": "git@2"
+        },
+        {
+          "command": "meridian.hygiene.cleanup",
+          "when": "view == meridian.hygiene.view && viewItem =~ /file/",
+          "group": "hygiene@1"
+        },
+        {
+          "command": "meridian.hygiene.deleteFile",
+          "when": "view == meridian.hygiene.view && viewItem =~ /file/",
+          "group": "hygiene@2"
+        },
+        {
+          "command": "meridian.hygiene.ignoreFile",
+          "when": "view == meridian.hygiene.view && viewItem =~ /file/",
+          "group": "hygiene@3"
+        },
+        {
+          "command": "meridian.hygiene.reviewFile",
+          "when": "view == meridian.hygiene.view && viewItem == markdownFile",
+          "group": "hygiene@4"
+        },
+        {
+          "command": "meridian.workflow.run",
+          "when": "view == meridian.workflow.view && viewItem == workflow",
+          "group": "workflow@1"
+        }
       ],
       "view/item/inline": [
-        { "command": "meridian.workflow.run",      "when": "view == meridian.workflow.view && viewItem == workflow",  "group": "inline" },
-        { "command": "meridian.git.showAnalytics", "when": "view == meridian.git.view && viewItem == branch",         "group": "inline" }
+        {
+          "command": "meridian.workflow.run",
+          "when": "view == meridian.workflow.view && viewItem == workflow",
+          "group": "inline"
+        },
+        {
+          "command": "meridian.git.showAnalytics",
+          "when": "view == meridian.git.view && viewItem == branch",
+          "group": "inline"
+        }
       ]
     }
   },
@@ -431,6 +682,7 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@types/micromatch": "^4.0.10",
     "@types/node": "^22.19.0",
     "@types/vscode": "^1.80.0",
     "@vitest/coverage-v8": "^1.0.4",

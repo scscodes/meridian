@@ -122,6 +122,8 @@ const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.reviewPR",          "git.reviewPR"],
   ["meridian.git.commentPR",         "git.commentPR"],
   ["meridian.git.resolveConflicts",  "git.resolveConflicts"],
+  ["meridian.git.sessionBriefing",   "git.sessionBriefing"],
+  ["meridian.chat.delegate",         "chat.delegate"],
 ];
 
 // ============================================================================
@@ -190,7 +192,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const chatDomain = createChatDomain(
     gitProvider,
     logger,
-    (cmd, ctx) => router.dispatch(cmd, ctx)
+    (cmd, ctx) => router.dispatch(cmd, ctx),
+    generateProse
   );
   const workflowDomain = createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath);
   const agentDomain = createAgentDomain(logger, workspaceRoot, extensionPath);
@@ -321,6 +324,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
 
+        // git.sessionBriefing — show in OutputChannel + copy to clipboard
+        if (commandName === "git.sessionBriefing" && result.kind === "ok") {
+          const text = result.value as string;
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${"─".repeat(60)}`);
+          outputChannel.appendLine(`[${new Date().toISOString()}] Session Briefing`);
+          outputChannel.appendLine("─".repeat(60));
+          outputChannel.appendLine(text);
+          outputChannel.appendLine("");
+          await vscode.env.clipboard.writeText(text);
+          vscode.window.showInformationMessage("Session briefing copied to clipboard");
+          return;
+        }
+
         // git.resolveConflicts — show resolution prose in OutputChannel
         if (commandName === "git.resolveConflicts" && result.kind === "ok") {
           const cr = result.value as any;
@@ -338,6 +355,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           }
           outputChannel.appendLine("");
           vscode.window.showInformationMessage(`Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output`);
+          return;
+        }
+
+        // chat.delegate — log delegated command result
+        if (commandName === "chat.delegate" && result.kind === "ok") {
+          const dr = result.value as any;
+          const { message } = formatResultMessage(dr.commandName, { kind: "ok", value: dr.result });
+          outputChannel.appendLine(`[${new Date().toISOString()}] Delegated → ${dr.commandName}: ${message}`);
+          vscode.window.showInformationMessage(`Delegated → ${dr.commandName}`);
           return;
         }
 
@@ -533,7 +559,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.window.showInformationMessage(`Deleted: ${filename}`);
         hygieneTree.refresh();
       } else {
-        vscode.window.showErrorMessage(`Delete failed: ${(result as any).error.message}`);
+        vscode.window.showErrorMessage(`Delete failed: ${result.error.message}`);
       }
     }),
     vscode.commands.registerCommand("meridian.hygiene.ignoreFile", async (item: any) => {

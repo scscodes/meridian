@@ -47,12 +47,16 @@ export async function gatherPRContext(
   if (branchResult.kind === "err") return branchResult;
   const branch = branchResult.value.trim();
 
-  // 2. Get commits on this branch since it diverged from targetBranch
-  const commitsResult = await gitProvider.getCommitRange(targetBranch, "HEAD");
+  // 2. Resolve the true merge-base to avoid including commits from targetBranch
+  const mergeBaseResult = await gitProvider.getMergeBase(branch, targetBranch);
+  const rangeBase = mergeBaseResult.kind === "ok" ? mergeBaseResult.value : targetBranch;
+
+  // 3. Get commits on this branch since it diverged from targetBranch
+  const commitsResult = await gitProvider.getCommitRange(rangeBase, "HEAD");
   if (commitsResult.kind === "err") return commitsResult;
 
-  // 3. Get file-level change stats via numstat diff against targetBranch
-  const rangeRef = `${targetBranch}...HEAD`;
+  // 4. Get file-level change stats via numstat diff against merge-base
+  const rangeRef = `${rangeBase}...HEAD`;
   const numstatResult = await gitProvider.diff(rangeRef, ["--numstat"]);
   if (numstatResult.kind === "err") return numstatResult;
 
@@ -66,7 +70,7 @@ export async function gatherPRContext(
     });
   }
 
-  // 4. Get full diff for LLM context (non-fatal if fails)
+  // 5. Get full diff for LLM context (non-fatal if fails)
   const diffResult = await gitProvider.diff(rangeRef);
 
   return success({
@@ -94,7 +98,11 @@ function parseNumstatOutput(
     const deletions = parseInt(parts[1] ?? "0", 10) || 0;
     const path = (parts[2] ?? "").trim();
     if (!path) continue;
-    results.push({ path, status: "M", additions, deletions });
+    // Derive status from line counts: numstat doesn't carry explicit status codes
+    const status: "A" | "M" | "D" =
+      additions === 0 && deletions > 0 ? "D" :
+      deletions === 0 && additions > 0 ? "A" : "M";
+    results.push({ path, status, additions, deletions });
   }
   return results;
 }

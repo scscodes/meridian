@@ -148,13 +148,7 @@ export class GitAnalyzer {
             const filesLines = commitLines.get(currentCommit.hash) || [];
             this.aggregateCommitFiles(currentCommit as CommitMetric, filesLines);
             if (opts.pathPattern !== undefined) {
-              const matched = (currentCommit as CommitMetric).files.filter(f =>
-                micromatch.isMatch(f.path, opts.pathPattern!)
-              );
-              (currentCommit as CommitMetric).files = matched;
-              (currentCommit as CommitMetric).filesChanged = matched.length;
-              (currentCommit as CommitMetric).insertions = matched.reduce((s, f) => s + f.insertions, 0);
-              (currentCommit as CommitMetric).deletions  = matched.reduce((s, f) => s + f.deletions, 0);
+              this.applyPathFilter(currentCommit as CommitMetric, opts.pathPattern);
             }
             if (opts.pathPattern === undefined || this.matchesPathPattern(currentCommit as CommitMetric, opts.pathPattern)) {
               commits.push(currentCommit as CommitMetric);
@@ -188,13 +182,7 @@ export class GitAnalyzer {
         const filesLines = commitLines.get(currentCommit.hash) || [];
         this.aggregateCommitFiles(currentCommit as CommitMetric, filesLines);
         if (opts.pathPattern !== undefined) {
-          const matched = (currentCommit as CommitMetric).files.filter(f =>
-            micromatch.isMatch(f.path, opts.pathPattern!)
-          );
-          (currentCommit as CommitMetric).files = matched;
-          (currentCommit as CommitMetric).filesChanged = matched.length;
-          (currentCommit as CommitMetric).insertions = matched.reduce((s, f) => s + f.insertions, 0);
-          (currentCommit as CommitMetric).deletions  = matched.reduce((s, f) => s + f.deletions, 0);
+          this.applyPathFilter(currentCommit as CommitMetric, opts.pathPattern);
         }
         if (opts.pathPattern === undefined || this.matchesPathPattern(currentCommit as CommitMetric, opts.pathPattern)) {
           commits.push(currentCommit as CommitMetric);
@@ -240,6 +228,19 @@ export class GitAnalyzer {
     commit.filesChanged = files.length;
     commit.insertions = totalInsertions;
     commit.deletions = totalDeletions;
+  }
+
+  /**
+   * Trim a commit's file list to only those matching pattern,
+   * and recompute the derived insertion/deletion/filesChanged totals.
+   * Must be called before matchesPathPattern().
+   */
+  private applyPathFilter(commit: CommitMetric, pattern: string): void {
+    const matched = commit.files.filter(f => micromatch.isMatch(f.path, pattern));
+    commit.files        = matched;
+    commit.filesChanged = matched.length;
+    commit.insertions   = matched.reduce((s, f) => s + f.insertions, 0);
+    commit.deletions    = matched.reduce((s, f) => s + f.deletions, 0);
   }
 
   /**

@@ -111,9 +111,11 @@ const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.smartCommit", "git.smartCommit"],
   ["meridian.hygiene.scan",    "hygiene.scan"],
   ["meridian.hygiene.cleanup", "hygiene.cleanup"],
+  ["meridian.hygiene.impactAnalysis", "hygiene.impactAnalysis"],
   ["meridian.chat.context",    "chat.context"],
   ["meridian.workflow.list",   "workflow.list"],
   ["meridian.agent.list",        "agent.list"],
+  ["meridian.agent.execute",     "agent.execute"],
   ["meridian.git.showAnalytics",     "git.showAnalytics"],
   ["meridian.git.exportJson",        "git.exportJson"],
   ["meridian.git.exportCsv",         "git.exportCsv"],
@@ -196,7 +198,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     generateProse
   );
   const workflowDomain = createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath);
-  const agentDomain = createAgentDomain(logger, workspaceRoot, extensionPath);
+  const agentDomain = createAgentDomain(
+    logger,
+    workspaceRoot,
+    extensionPath,
+    (cmd: Command, ctx: CommandContext) => router.dispatch(cmd, ctx)
+  );
 
   router.registerDomain(gitDomain);
   router.registerDomain(hygieneDomain);

@@ -11,14 +11,22 @@ import {
   failure,
   success,
   AgentDefinition,
+  Command,
+  CommandContext,
 } from "../../types";
 import { createListAgentsHandler } from "./handlers";
+import { createExecuteAgentHandler } from "./execution-handler";
 import { loadAgents } from "../../infrastructure/agent-registry";
+
+/**
+ * Command dispatcher function signature — used by agent executor.
+ */
+export type CommandDispatcher = (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>>;
 
 /**
  * Agent domain commands.
  */
-export const AGENT_COMMANDS: AgentCommandName[] = ["agent.list"];
+export const AGENT_COMMANDS: AgentCommandName[] = ["agent.list", "agent.execute"];
 
 export class AgentDomainService implements DomainService {
   readonly name = "agent";
@@ -29,7 +37,12 @@ export class AgentDomainService implements DomainService {
   private extensionPath?: string;
   private agentCache: Map<string, AgentDefinition> = new Map();
 
-  constructor(logger: Logger, workspaceRoot?: string, extensionPath?: string) {
+  constructor(
+    logger: Logger,
+    workspaceRoot?: string,
+    extensionPath?: string,
+    commandDispatcher?: CommandDispatcher
+  ) {
     this.logger = logger;
     this.workspaceRoot = workspaceRoot;
     this.extensionPath = extensionPath;
@@ -40,6 +53,16 @@ export class AgentDomainService implements DomainService {
         this.discoverAgents()
       ) as any,
     };
+
+    // Wire execution handler if dispatcher available
+    if (commandDispatcher) {
+      this.handlers["agent.execute"] = createExecuteAgentHandler(
+        this.logger,
+        commandDispatcher,
+        workspaceRoot,
+        extensionPath
+      ) as any;
+    }
   }
 
   /**
@@ -95,7 +118,8 @@ export class AgentDomainService implements DomainService {
 export function createAgentDomain(
   logger: Logger,
   workspaceRoot?: string,
-  extensionPath?: string
+  extensionPath?: string,
+  commandDispatcher?: CommandDispatcher
 ): AgentDomainService {
-  return new AgentDomainService(logger, workspaceRoot, extensionPath);
+  return new AgentDomainService(logger, workspaceRoot, extensionPath, commandDispatcher);
 }

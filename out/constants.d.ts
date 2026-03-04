@@ -101,12 +101,6 @@ export declare const ANALYTICS_SETTINGS: {
     readonly TREND_CONFIDENCE: 0.75;
     /** Minimum slope magnitude to classify a trend as "up" or "down" vs "stable" */
     readonly TREND_SLOPE_THRESHOLD: 0.5;
-    /**
-     * Divisor used to normalize each trend half-period to a per-week rate.
-     * NOTE: Currently a fixed estimate. See docs/TODO.md for the known limitation
-     * (does not account for actual period length — tracked for future fix).
-     */
-    readonly TREND_NORMALIZE_WEEKS: 4;
 };
 /**
  * TypeScript diagnostic codes surfaced by the dead code scanner.
@@ -118,4 +112,8 @@ export declare const ANALYTICS_SETTINGS: {
  * 6205 — 'X' is read but never used
  */
 export declare const DEAD_CODE_DIAGNOSTIC_CODES: Set<number>;
+export declare const UI_SETTINGS: {
+    /** Debounce delay for file watcher → tree refresh (ms) */
+    readonly WATCHER_DEBOUNCE_MS: 500;
+};
 //# sourceMappingURL=constants.d.ts.map

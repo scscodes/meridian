@@ -29,6 +29,12 @@ export declare class GitAnalyzer {
      */
     private aggregateCommitFiles;
     /**
+     * Trim a commit's file list to only those matching pattern,
+     * and recompute the derived insertion/deletion/filesChanged totals.
+     * Must be called before matchesPathPattern().
+     */
+    private applyPathFilter;
+    /**
      * Check if commit matches path pattern filter
      */
     private matchesPathPattern;
@@ -41,7 +47,7 @@ export declare class GitAnalyzer {
      */
     private aggregateAuthors;
     /**
-     * Calculate trend metrics
+     * Calculate trend metrics, normalized by actual period length.
      */
     private calculateTrends;
     /**
@@ -61,7 +67,8 @@ export declare class GitAnalyzer {
      */
     private buildCommitFrequency;
     /**
-     * Get week key for grouping (YYYY-W##)
+     * Get ISO 8601 week key for grouping (YYYY-W##).
+     * Avoids week-of-month fragmentation at month boundaries.
      */
     private getWeekKey;
     /**

@@ -63,10 +63,10 @@ export type GitCommandName =
   | "git.commentPR"
   | "git.resolveConflicts"
   | "git.sessionBriefing";
-export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics";
+export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics" | "hygiene.impactAnalysis";
 export type ChatCommandName = "chat.context" | "chat.delegate";
 export type WorkflowCommandName = "workflow.list" | "workflow.run";
-export type AgentCommandName = "agent.list";
+export type AgentCommandName = "agent.list" | "agent.execute";
 
 // ============================================================================
 // Handler Interface (Aiogram-style Router Pattern)

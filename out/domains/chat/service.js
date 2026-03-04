@@ -15,13 +15,13 @@ exports.CHAT_COMMANDS = [
     "chat.delegate",
 ];
 class ChatDomainService {
-    constructor(gitProvider, logger, dispatcher) {
+    constructor(gitProvider, logger, dispatcher, generateProseFn) {
         this.name = "chat";
         this.handlers = {};
         this.logger = logger;
         this.handlers = {
             "chat.context": (0, handlers_1.createContextHandler)(gitProvider, logger),
-            "chat.delegate": (0, handlers_1.createDelegateHandler)(dispatcher, logger),
+            "chat.delegate": (0, handlers_1.createDelegateHandler)(dispatcher, logger, generateProseFn),
         };
     }
     async initialize() {
@@ -46,7 +46,7 @@ exports.ChatDomainService = ChatDomainService;
 /**
  * Factory function — creates and returns chat domain service.
  */
-function createChatDomain(gitProvider, logger, dispatcher) {
-    return new ChatDomainService(gitProvider, logger, dispatcher);
+function createChatDomain(gitProvider, logger, dispatcher, generateProseFn) {
+    return new ChatDomainService(gitProvider, logger, dispatcher, generateProseFn);
 }
 //# sourceMappingURL=service.js.map

@@ -2,12 +2,13 @@
 /**
  * Git Analytics Service — Parse git history and generate telemetry
  */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GitAnalyzer = void 0;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { execSync } = require("child_process");
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const micromatch = require("micromatch");
+const child_process_1 = require("child_process");
+const micromatch_1 = __importDefault(require("micromatch"));
 const constants_1 = require("../../constants");
 /** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
 const ANALYTICS_EXCLUDE = [
@@ -52,7 +53,7 @@ class GitAnalyzer {
         const files = this.aggregateFiles(commits);
         const authors = this.aggregateAuthors(commits);
         // Calculate trends
-        const trends = this.calculateTrends(commits);
+        const trends = this.calculateTrends(commits, since);
         // Build summary
         const summary = this.buildSummary(commits, files, authors, since, until);
         // Build frequency data
@@ -100,7 +101,7 @@ class GitAnalyzer {
             if (opts.author) {
                 cmd += ` --author="${opts.author}"`;
             }
-            const output = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"], cwd: this.workspaceRoot });
+            const output = (0, child_process_1.execSync)(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"], cwd: this.workspaceRoot });
             const commits = [];
             let currentCommit = null;
             const commitLines = new Map();
@@ -114,6 +115,9 @@ class GitAnalyzer {
                     if (currentCommit && currentCommit.hash) {
                         const filesLines = commitLines.get(currentCommit.hash) || [];
                         this.aggregateCommitFiles(currentCommit, filesLines);
+                        if (opts.pathPattern !== undefined) {
+                            this.applyPathFilter(currentCommit, opts.pathPattern);
+                        }
                         if (opts.pathPattern === undefined || this.matchesPathPattern(currentCommit, opts.pathPattern)) {
                             commits.push(currentCommit);
                         }
@@ -144,6 +148,9 @@ class GitAnalyzer {
             if (currentCommit && currentCommit.hash) {
                 const filesLines = commitLines.get(currentCommit.hash) || [];
                 this.aggregateCommitFiles(currentCommit, filesLines);
+                if (opts.pathPattern !== undefined) {
+                    this.applyPathFilter(currentCommit, opts.pathPattern);
+                }
                 if (opts.pathPattern === undefined || this.matchesPathPattern(currentCommit, opts.pathPattern)) {
                     commits.push(currentCommit);
                 }
@@ -183,12 +190,22 @@ class GitAnalyzer {
         commit.deletions = totalDeletions;
     }
     /**
+     * Trim a commit's file list to only those matching pattern,
+     * and recompute the derived insertion/deletion/filesChanged totals.
+     * Must be called before matchesPathPattern().
+     */
+    applyPathFilter(commit, pattern) {
+        const matched = commit.files.filter(f => micromatch_1.default.isMatch(f.path, pattern));
+        commit.files = matched;
+        commit.filesChanged = matched.length;
+        commit.insertions = matched.reduce((s, f) => s + f.insertions, 0);
+        commit.deletions = matched.reduce((s, f) => s + f.deletions, 0);
+    }
+    /**
      * Check if commit matches path pattern filter
      */
-    matchesPathPattern(_commit, _pattern) {
-        // For now, simple path filtering
-        // In a full implementation, would parse numstat and check file paths
-        return true; // TODO: implement path filtering
+    matchesPathPattern(commit, pattern) {
+        return commit.files.some((f) => micromatch_1.default.isMatch(f.path, pattern));
     }
     /**
      * Aggregate file-level statistics
@@ -199,7 +216,7 @@ class GitAnalyzer {
             for (const fileChange of commit.files) {
                 const { path, insertions, deletions } = fileChange;
                 // Skip build artifacts and ignored directories
-                if (micromatch.isMatch(path, ANALYTICS_EXCLUDE)) {
+                if (micromatch_1.default.isMatch(path, ANALYTICS_EXCLUDE)) {
                     continue;
                 }
                 if (!fileMap.has(path)) {
@@ -273,31 +290,34 @@ class GitAnalyzer {
         return Array.from(authorMap.values()).sort((a, b) => b.commits - a.commits);
     }
     /**
-     * Calculate trend metrics
+     * Calculate trend metrics, normalized by actual period length.
      */
-    calculateTrends(commits) {
-        // Simple slope calculation: compare first half vs second half
+    calculateTrends(commits, _since) {
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
         const mid = Math.floor(commits.length / 2);
-        const firstHalf = commits.slice(0, mid);
-        const secondHalf = commits.slice(mid);
-        const firstAvg = firstHalf.length > 0 ? firstHalf.length / constants_1.ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS : 0;
-        const secondAvg = secondHalf.length > 0 ? secondHalf.length / constants_1.ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS : 0;
-        const commitSlope = secondAvg - firstAvg;
-        const commitDirection = this.getDirection(commitSlope);
-        // Volatility trend
-        const firstVolatility = this.getAverageVolatility(firstHalf);
-        const secondVolatility = this.getAverageVolatility(secondHalf);
-        const volatilitySlope = secondVolatility - firstVolatility;
-        const volatilityDirection = this.getDirection(volatilitySlope);
+        const firstHalf = commits.slice(0, mid); // recent (git log: newest first)
+        const secondHalf = commits.slice(mid); // older
+        // Normalize each half by its own actual time span so density is comparable
+        const spanWeeks = (half) => {
+            if (half.length < 2)
+                return 1;
+            const ms = Math.abs(half[0].date.getTime() - half[half.length - 1].date.getTime());
+            return Math.max(1, ms / WEEK_MS);
+        };
+        const firstAvg = firstHalf.length / spanWeeks(firstHalf);
+        const secondAvg = secondHalf.length / spanWeeks(secondHalf);
+        // recent − older: positive = increasing activity = "up"
+        const commitSlope = firstAvg - secondAvg;
+        const volatilitySlope = this.getAverageVolatility(firstHalf) - this.getAverageVolatility(secondHalf);
         return {
             commitTrend: {
                 slope: commitSlope,
-                direction: commitDirection,
+                direction: this.getDirection(commitSlope),
                 confidence: constants_1.ANALYTICS_SETTINGS.TREND_CONFIDENCE,
             },
             volatilityTrend: {
                 slope: volatilitySlope,
-                direction: volatilityDirection,
+                direction: this.getDirection(volatilitySlope),
             },
         };
     }
@@ -357,12 +377,16 @@ class GitAnalyzer {
         return { labels, data };
     }
     /**
-     * Get week key for grouping (YYYY-W##)
+     * Get ISO 8601 week key for grouping (YYYY-W##).
+     * Avoids week-of-month fragmentation at month boundaries.
      */
     getWeekKey(date) {
-        const d = new Date(date);
-        const week = Math.ceil(d.getDate() / 7);
-        return `${d.getFullYear()}-W${week.toString().padStart(2, "0")}`;
+        const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - day);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+        return `${d.getUTCFullYear()}-W${week.toString().padStart(2, "0")}`;
     }
     /**
      * Get period start date

@@ -105,14 +105,15 @@ Each domain is isolated, owns its command space, and exports:
   - Error recovery and rollback
 
 #### Agent Domain (`agent/`) — NEW
-- **Commands**: `agent.list`
+- **Commands**: `agent.list`, `agent.execute`
 - **Patterns**:
   - Discovery (`agent.list`) — enumerate all agents in `.vscode/agents/`
-  - Local reference (definitions only, no spawning)
+  - Execution (`agent.execute`) — validate capability, dispatch command or workflow via `AgentExecutor`
 - **Features**:
   - JSON-based agent definitions
-  - Capability discovery (what commands can this agent execute)
-  - Workflow trigger mapping
+  - Capability validation before execution
+  - Command dispatch + workflow dispatch with structured result reporting
+  - Execution logs with ISO timestamps
 
 ### 3. Infrastructure (src/infrastructure/)
 
@@ -1005,8 +1006,8 @@ src/
 - [ ] Canonical config service — unify direct `vscode.workspace.getConfiguration` calls into single provider
 - [ ] Wire `chat.delegate` into chat participant UX
 - [x] SmartCommit approval UI (QuickPick group selection + message editing via ApprovalUI callback)
-- [ ] Analytics path filtering (stub — `matchesPathPattern` returns true unconditionally)
-- [ ] ISO week bucketing for analytics trends (currently week-of-month)
+- [x] Analytics path filtering (`matchesPathPattern` via micromatch — tested)
+- [x] ISO week bucketing for analytics trends (UTC-based `getWeekKey` — tested)
 - [ ] Background task scheduling (periodic hygiene scans)
 - [ ] Context menus and keybindings in `package.json`
 

@@ -21,23 +21,38 @@ describe('GitAnalyzer', () => {
   beforeEach(() => {
     analyzer = new GitAnalyzer();
     analyzer.clearCache();
+    mockedExecSync.mockClear();
   });
 
   // Test 1: parseGitLog() with valid output
-  it('should parse valid git log output', () => {
-    const gitLog = createTestGitLog(3);
-    
-    // Note: In real tests, we'd mock execSync to return this
-    // For now, test the analyzer's structure and cache behavior
-    expect(analyzer).toBeDefined();
+  it('should parse valid git log output', async () => {
+    const gitLog = [
+      'abc1234|Alice|2026-02-20T10:30:00Z|feat(api): add endpoint',
+      '10\t2\tsrc/api/handler.ts',
+      '',
+      'def5678|Bob|2026-02-19T09:00:00Z|fix(core): resolve bug',
+      '5\t3\tsrc/core/service.ts',
+      '2\t1\tsrc/core/types.ts',
+    ].join('\n');
+    mockedExecSync.mockReturnValue(gitLog);
+
+    const report = await analyzer.analyze({ period: '3mo' });
+
+    expect(report.commits).toHaveLength(2);
+    expect(report.summary.totalCommits).toBe(2);
+    expect(report.summary.totalLinesAdded).toBeGreaterThan(0);
   });
 
   // Test 2: parseGitLog() with malformed input (graceful)
-  it('should gracefully handle malformed input', () => {
-    const analyzer2 = new GitAnalyzer();
-    
-    // Analyzer should not throw on bad input, it should handle gracefully
-    expect(analyzer2).toBeDefined();
+  it('should gracefully handle malformed input', async () => {
+    mockedExecSync.mockReturnValue('notvalid\ngarbage\n|||');
+
+    const report = await analyzer.analyze({ period: '3mo' });
+
+    // Should not throw; returns an empty or partial result
+    expect(report).toBeDefined();
+    expect(report.commits).toBeDefined();
+    expect(Array.isArray(report.commits)).toBe(true);
   });
 
   // Test 3: aggregateByAuthor() groups correctly
@@ -118,33 +133,49 @@ describe('GitAnalyzer', () => {
   });
 
   // Test 5: cache hit returns memoized results
-  it('should return memoized results on cache hit', () => {
-    const analyzer2 = new GitAnalyzer();
+  it('should return memoized results on cache hit', async () => {
+    const gitLog = [
+      'abc1234|Alice|2026-02-20T10:30:00Z|feat: add feature',
+      '10\t2\tsrc/feature.ts',
+    ].join('\n');
+    mockedExecSync.mockReturnValue(gitLog);
 
-    // Simulate cache: first call should cache, second should return cached
-    const cacheKey = 'test|author|pattern';
-    
-    // Verify cache mechanism exists
-    expect(analyzer2).toBeDefined();
-    analyzer2.clearCache();
+    // First call — populates cache
+    await analyzer.analyze({ period: '3mo' });
+    // Second call — should hit cache, not call execSync again
+    await analyzer.analyze({ period: '3mo' });
+
+    expect(mockedExecSync).toHaveBeenCalledTimes(1);
   });
 
   // Test 6: cache invalidation on new input
-  it('should invalidate cache when input changes', () => {
-    const analyzer2 = new GitAnalyzer();
-    
-    // Cache should be cleared when parameters change
-    analyzer2.clearCache();
-    
-    // After clear, cache should be empty
-    expect(analyzer2).toBeDefined();
+  it('should invalidate cache when input changes', async () => {
+    const gitLog = [
+      'abc1234|Alice|2026-02-20T10:30:00Z|feat: initial',
+      '5\t1\tsrc/file.ts',
+    ].join('\n');
+    mockedExecSync.mockReturnValue(gitLog);
+
+    // First call
+    await analyzer.analyze({ period: '3mo' });
+
+    // Invalidate cache
+    analyzer.clearCache();
+
+    // Second call — cache cleared, execSync called again
+    await analyzer.analyze({ period: '3mo' });
+
+    expect(mockedExecSync).toHaveBeenCalledTimes(2);
   });
 
   // Test 7: handles empty git log
-  it('should handle empty git log gracefully', () => {
-    // Test that analyzer doesn't crash on empty input
-    const analyzer2 = new GitAnalyzer();
-    expect(analyzer2).toBeDefined();
+  it('should handle empty git log gracefully', async () => {
+    mockedExecSync.mockReturnValue('');
+
+    const report = await analyzer.analyze({ period: '3mo' });
+
+    expect(report.commits).toHaveLength(0);
+    expect(report.summary.totalCommits).toBe(0);
   });
 
   // Test 8: filters commits by path pattern

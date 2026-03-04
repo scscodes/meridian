@@ -4,8 +4,9 @@
  * Routing priority:
  *   1. request.command  — VS Code routes /slash commands here (no leading slash)
  *   2. SLASH_MAP        — explicit "/keyword" in prompt (legacy fallback)
- *   3. KEYWORD_MAP      — single-word natural language ("status", "agents", etc.)
- *   4. LLM classifier   — multi-word free-form; model picks command, we dispatch
+ *   3. "run <name>"     — shorthand for workflow.run
+ *   4. KEYWORD_MAP      — single-word natural language ("status", "agents", etc.)
+ *   5. chat.delegate    — NL classification + dispatch via single authority
  */
 
 import * as vscode from "vscode";
@@ -49,39 +50,12 @@ const KEYWORD_MAP: Record<string, CommandName> = {
   "resolve":   "git.resolveConflicts",
 };
 
-// Classifier prompt: tells the LLM to pick one command ID from a known list.
-// The model responds with ONLY the command name — no prose, no markdown.
-const CLASSIFIER_SYSTEM = `You are a command classifier for the Meridian VS Code extension.
-Given the user's request, respond with EXACTLY ONE command ID from this list, or "chat.context" if none apply.
-
-git.status           – check branch, staged/unstaged/untracked file counts
-git.smartCommit      – group and commit staged changes with AI-suggested messages
-git.pull             – pull latest changes from remote
-git.analyzeInbound   – analyze incoming remote changes for conflicts
-git.showAnalytics    – open the git analytics report (commits, churn, authors)
-git.generatePR       – generate a pull request description from current branch changes
-git.reviewPR         – review current branch changes, return verdict and per-file comments
-git.commentPR        – generate inline code review comments for changed files
-git.resolveConflicts – suggest resolution strategies for detected git conflicts
-git.sessionBriefing  – generate a morning briefing of branch state, recent commits, and uncommitted work
-hygiene.scan         – scan workspace for large files, dead files, stale logs
-workflow.list        – list all available workflows
-workflow.run:<name>  – run a named workflow (replace <name>)
-agent.list           – list all available agents and their capabilities
-hygiene.cleanup          – delete specified files (dry-run safe)
-hygiene.showAnalytics    – open hygiene analytics dashboard (scan history, issue trends)
-hygiene.impactAnalysis   – trace blast radius of a file or function via TS Compiler API
-agent.execute:<id>:<cmd> – execute agent <id> with command or workflow <cmd>
-chat.context         – show branch, active file, and available commands
-
-Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`;
-
 export function createChatParticipant(
   router: CommandRouter,
   ctx: CommandContext,
   logger: Logger
 ): vscode.Disposable {
-  const handler: vscode.ChatRequestHandler = async (request, _chatCtx, stream, token) => {
+  const handler: vscode.ChatRequestHandler = async (request, _chatCtx, stream, _token) => {
     // Debug: log incoming request shape so issues can be diagnosed
     logger.info(
       `Chat request — command: ${JSON.stringify(request.command)}, prompt: ${JSON.stringify(request.prompt)}`,
@@ -124,9 +98,22 @@ export function createChatParticipant(
       return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
     }
 
-    // ── 5. LLM classifier: multi-word free-form ──────────────────────────────
+    // ── 5. NL → chat.delegate (single classification authority) ──────────────
     if (text.length > 0) {
-      return handleClassifier(text, request, token, router, ctx, stream, logger);
+      stream.progress("Figuring out what you need...");
+      const delegateResult = await router.dispatch(
+        { name: "chat.delegate" as CommandName, params: { task: text } },
+        ctx
+      );
+      if (delegateResult.kind === "ok") {
+        const dr = delegateResult.value as { commandName: string; result: unknown };
+        stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
+        return formatCommandResult(dr.commandName as CommandName, dr.result, stream);
+      } else {
+        logger.warn("chat.delegate failed, falling back", "ChatParticipant", delegateResult.error);
+        stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
+        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger);
+      }
     }
 
     // ── 6. Empty prompt fallback ─────────────────────────────────────────────
@@ -156,126 +143,55 @@ async function handleDirectDispatch(
   const result = await router.dispatch(cmd, ctx);
 
   if (result.kind === "ok") {
-    if (commandName === "chat.context") {
-      const v = result.value as Record<string, unknown>;
-      const gitStatus = v.gitStatus as Record<string, unknown> | undefined;
-      const branch = v.gitBranch ?? gitStatus?.branch ?? "unknown";
-      const dirty = gitStatus?.isDirty ? "dirty" : "clean";
-      const file = v.activeFile ?? "none";
-      stream.markdown(
-        `**Branch:** \`${branch}\` (${dirty})\n\n` +
-        `**Active file:** \`${file}\`\n\n` +
-        `Slash commands: \`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` \`/workflows\` \`/agents\` \`/analytics\`\n\n` +
-        `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
-      );
-    } else if (commandName === "git.sessionBriefing") {
-      stream.markdown(result.value as string);
-    } else if (commandName === "git.generatePR") {
-      const pr = result.value as any;
-      stream.markdown(pr.body);
-    } else if (commandName === "git.reviewPR") {
-      const rv = result.value as any;
-      stream.markdown(`**Verdict:** ${rv.verdict}\n\n${rv.summary}\n\n`);
-      for (const c of rv.comments ?? []) {
-        stream.markdown(`- **[${c.severity}]** \`${c.file}\`: ${c.comment}\n`);
-      }
-    } else if (commandName === "git.resolveConflicts") {
-      const cr = result.value as any;
-      stream.markdown(`${cr.overview}\n\n`);
-      for (const f of cr.perFile ?? []) {
-        stream.markdown(`**\`${f.path}\`** → \`${f.strategy}\`\n${f.rationale}\n`);
-      }
-    } else {
-      const msg = formatResultMessage(commandName, result);
-      stream.markdown(msg.message);
-      if (commandName === "workflow.list" || commandName === "agent.list") {
-        stream.markdown("\n\n```json\n" + JSON.stringify(result.value, null, 2) + "\n```");
-      }
-    }
+    formatCommandResult(commandName, result.value, stream);
   } else {
     logger.warn(`Chat dispatch failed: ${commandName}`, "ChatParticipant", result.error);
     stream.markdown(`**Error** \`${result.error.code}\`: ${result.error.message}`);
   }
 }
 
-// ── LLM classifier path ──────────────────────────────────────────────────────
+// ── Result formatting (shared by direct dispatch + chat.delegate path) ───────
 
-async function handleClassifier(
-  text: string,
-  request: vscode.ChatRequest,
-  token: vscode.CancellationToken,
-  router: CommandRouter,
-  ctx: CommandContext,
+function formatCommandResult(
+  commandName: CommandName,
+  value: unknown,
   stream: vscode.ChatResponseStream,
-  logger: Logger
-): Promise<void> {
-  logger.info(`LLM classifier invoked for: "${text}"`, "ChatParticipant");
-  logger.info(`request.model available: ${!!request.model}`, "ChatParticipant");
-
-  if (!request.model) {
-    logger.warn("No model on request, falling back to chat.context", "ChatParticipant");
-    stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-    return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger);
-  }
-
-  stream.progress("Figuring out what you need...");
-
-  try {
-    const messages = [
-      vscode.LanguageModelChatMessage.User(`${CLASSIFIER_SYSTEM}\n\nUser request: "${text}"`),
-    ];
-
-    const response = await request.model.sendRequest(messages, {}, token);
-
-    let classification = "";
-    for await (const part of response.stream) {
-      if (part instanceof vscode.LanguageModelTextPart) {
-        classification += part.value;
-      }
-    }
-    classification = classification.trim().split("\n")[0].trim();
-
-    logger.info(`LLM classified as: "${classification}"`, "ChatParticipant");
-
-    // Handle "workflow.run:<name>"
-    if (classification.startsWith("workflow.run:")) {
-      const workflowName = classification.slice("workflow.run:".length).trim();
-      stream.markdown(`\`@meridian\` → \`workflow.run\` (${workflowName})\n\n`);
-      return handleDirectDispatch("workflow.run", { name: workflowName }, router, ctx, stream, logger);
-    }
-
-    // Map classifier output to a valid CommandName
-    const VALID_COMMANDS: Record<string, CommandName> = {
-      "git.status":           "git.status",
-      "git.smartCommit":      "git.smartCommit",
-      "git.pull":             "git.pull",
-      "git.analyzeInbound":   "git.analyzeInbound",
-      "git.showAnalytics":    "git.showAnalytics",
-      "git.generatePR":       "git.generatePR",
-      "git.reviewPR":         "git.reviewPR",
-      "git.commentPR":        "git.commentPR",
-      "git.resolveConflicts": "git.resolveConflicts",
-      "git.sessionBriefing":  "git.sessionBriefing",
-      "hygiene.scan":         "hygiene.scan",
-      "hygiene.cleanup":        "hygiene.cleanup",
-      "hygiene.showAnalytics":  "hygiene.showAnalytics",
-      "hygiene.impactAnalysis": "hygiene.impactAnalysis",
-      "workflow.list":        "workflow.list",
-      "agent.list":           "agent.list",
-      "agent.execute":          "agent.execute",
-      "chat.context":         "chat.context",
-    };
-
-    const commandName = VALID_COMMANDS[classification] ?? "chat.context";
-    stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-    return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
-
-  } catch (err) {
-    logger.warn(
-      `LLM classifier failed: ${err instanceof Error ? err.message : String(err)}`,
-      "ChatParticipant"
+): void {
+  if (commandName === "chat.context") {
+    const v = value as Record<string, unknown>;
+    const gitStatus = v.gitStatus as Record<string, unknown> | undefined;
+    const branch = v.gitBranch ?? gitStatus?.branch ?? "unknown";
+    const dirty = gitStatus?.isDirty ? "dirty" : "clean";
+    const file = v.activeFile ?? "none";
+    stream.markdown(
+      `**Branch:** \`${branch}\` (${dirty})\n\n` +
+      `**Active file:** \`${file}\`\n\n` +
+      `Slash commands: \`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` \`/workflows\` \`/agents\` \`/analytics\`\n\n` +
+      `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
     );
-    stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-    return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger);
+  } else if (commandName === "git.sessionBriefing") {
+    stream.markdown(value as string);
+  } else if (commandName === "git.generatePR") {
+    const pr = value as any;
+    stream.markdown(pr.body);
+  } else if (commandName === "git.reviewPR") {
+    const rv = value as any;
+    stream.markdown(`**Verdict:** ${rv.verdict}\n\n${rv.summary}\n\n`);
+    for (const c of rv.comments ?? []) {
+      stream.markdown(`- **[${c.severity}]** \`${c.file}\`: ${c.comment}\n`);
+    }
+  } else if (commandName === "git.resolveConflicts") {
+    const cr = value as any;
+    stream.markdown(`${cr.overview}\n\n`);
+    for (const f of cr.perFile ?? []) {
+      stream.markdown(`**\`${f.path}\`** → \`${f.strategy}\`\n${f.rationale}\n`);
+    }
+  } else {
+    const msg = formatResultMessage(commandName, { kind: "ok", value });
+    stream.markdown(msg.message);
+    if (commandName === "workflow.list" || commandName === "agent.list") {
+      stream.markdown("\n\n```json\n" + JSON.stringify(value, null, 2) + "\n```");
+    }
   }
 }
+

@@ -105,11 +105,11 @@ hygiene.showAnalytics – show hygiene analytics
 hygiene.cleanup       – delete flagged files from a hygiene scan (dry-run safe)
 hygiene.impactAnalysis – trace blast radius of a file or function
 workflow.list         – list available workflows
-workflow.run          – execute a named workflow
+workflow.run:<name>   – run a named workflow (replace <name>)
 agent.list            – list available agents
 agent.execute         – run a named agent with a target command or workflow
 
-Respond with ONLY the command ID. Nothing else.`;
+Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`;
 
 const KNOWN_COMMANDS = new Set([
   "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
@@ -155,11 +155,20 @@ export function createDelegateHandler(
       }
 
       const raw = classifyResult.value.trim().split("\n")[0].trim();
-      const commandName = KNOWN_COMMANDS.has(raw) ? raw : "chat.context";
+
+      // Handle parameterized command: workflow.run:<name>
+      let commandName: string;
+      let dispatchParams: Record<string, unknown> = {};
+      if (raw.startsWith("workflow.run:")) {
+        commandName = "workflow.run";
+        dispatchParams = { name: raw.slice("workflow.run:".length).trim() };
+      } else {
+        commandName = KNOWN_COMMANDS.has(raw) ? raw : "chat.context";
+      }
 
       logger.info(`Classified as: "${commandName}" (raw: "${raw}")`, "ChatDelegateHandler");
 
-      const dispatchResult = await dispatcher({ name: commandName as any, params: {} }, ctx);
+      const dispatchResult = await dispatcher({ name: commandName as any, params: dispatchParams }, ctx);
 
       if (dispatchResult.kind === "err") {
         logger.warn(

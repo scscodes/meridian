@@ -63,13 +63,12 @@ export function createContextHandler(
 
 export interface DelegateParams {
   task: string;
-  workflow?: string;
 }
 
 export interface DelegateResult {
   dispatched: boolean;
-  workflow?: string;
-  message: string;
+  commandName: string;
+  result: unknown;
 }
 
 /** Minimal dispatcher interface; satisfied by CommandRouter.dispatch */
@@ -79,60 +78,100 @@ export type CommandDispatcher = (
 ) => Promise<Result<unknown>>;
 
 /**
- * chat.delegate — Backend command dispatcher.
- * If params.workflow is provided, dispatches "workflow.run" via the injected dispatcher.
- * No LLM calls, no chat UI — pure backend routing.
+ * Minimal prose generation interface — compatible with generateProse from infrastructure
+ * without introducing a cross-domain import.
+ */
+export type GenerateProseFn = (req: {
+  domain: "hygiene" | "git" | "chat";
+  systemPrompt: string;
+  data: Record<string, unknown>;
+}) => Promise<Result<string>>;
+
+const DELEGATE_CLASSIFIER_PROMPT = `You are a command router for the Meridian VS Code extension.
+Given a task description, respond with EXACTLY ONE command ID that best handles it.
+
+git.status            – check branch state
+git.smartCommit       – group and commit staged changes
+git.pull              – pull remote changes
+git.analyzeInbound    – analyze incoming remote changes for conflicts
+git.showAnalytics     – show git analytics report
+git.generatePR        – generate a PR description
+git.reviewPR          – review branch changes (verdict + comments)
+git.commentPR         – generate inline review comments
+git.resolveConflicts  – suggest conflict resolution strategies
+git.sessionBriefing   – generate a morning session briefing
+hygiene.scan          – scan workspace for dead files, large files, logs
+hygiene.showAnalytics – show hygiene analytics
+workflow.list         – list available workflows
+agent.list            – list available agents
+
+Respond with ONLY the command ID. Nothing else.`;
+
+const KNOWN_COMMANDS = new Set([
+  "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
+  "git.showAnalytics", "git.generatePR", "git.reviewPR", "git.commentPR",
+  "git.resolveConflicts", "git.sessionBriefing",
+  "hygiene.scan", "hygiene.showAnalytics",
+  "workflow.list", "agent.list",
+]);
+
+/**
+ * chat.delegate — Programmatic task router.
+ * Uses the LLM to classify a free-form task description into a command, then
+ * dispatches it. Intended for workflows, LM tools, and future agents — not the
+ * chat UX (which routes directly via SLASH_MAP/KEYWORD_MAP/classifier).
  */
 export function createDelegateHandler(
   dispatcher: CommandDispatcher,
-  logger: Logger
+  logger: Logger,
+  generateProseFn?: GenerateProseFn
 ): Handler<DelegateParams, DelegateResult> {
   return async (ctx: CommandContext, params: DelegateParams) => {
     try {
-      const { task, workflow } = params;
+      const { task } = params;
 
-      if (!workflow) {
-        logger.warn(
-          `Delegate called for task "${task}" with no workflow target`,
-          "ChatDelegateHandler"
-        );
+      if (!generateProseFn) {
         return failure({
-          code: "CHAT_DELEGATE_NO_TARGET",
-          message: "No delegation target: provide a workflow name",
+          code: "CHAT_DELEGATE_NO_GENERATE_FN",
+          message: "chat.delegate requires a prose generation function (is Copilot enabled?)",
           context: "chat.delegate",
         });
       }
 
-      logger.info(
-        `Delegating task "${task}" to workflow "${workflow}"`,
-        "ChatDelegateHandler"
-      );
+      logger.info(`Classifying task: "${task}"`, "ChatDelegateHandler");
 
-      const command: Command<{ name: string; task: string }> = {
-        name: "workflow.run",
-        params: { name: workflow, task },
-      };
+      const classifyResult = await generateProseFn({
+        domain: "chat",
+        systemPrompt: DELEGATE_CLASSIFIER_PROMPT,
+        data: { task },
+      });
 
-      const result = await dispatcher(command, ctx);
-
-      if (result.kind === "err") {
-        logger.warn(
-          `Workflow dispatch failed for "${workflow}": ${result.error.message}`,
-          "ChatDelegateHandler",
-          result.error
-        );
-        return failure(result.error);
+      if (classifyResult.kind === "err") {
+        return failure(classifyResult.error);
       }
 
-      logger.info(
-        `Workflow "${workflow}" dispatched successfully`,
-        "ChatDelegateHandler"
-      );
+      const raw = classifyResult.value.trim().split("\n")[0].trim();
+      const commandName = KNOWN_COMMANDS.has(raw) ? raw : "chat.context";
+
+      logger.info(`Classified as: "${commandName}" (raw: "${raw}")`, "ChatDelegateHandler");
+
+      const dispatchResult = await dispatcher({ name: commandName as any, params: {} }, ctx);
+
+      if (dispatchResult.kind === "err") {
+        logger.warn(
+          `Dispatch failed for "${commandName}": ${dispatchResult.error.message}`,
+          "ChatDelegateHandler",
+          dispatchResult.error
+        );
+        return failure(dispatchResult.error);
+      }
+
+      logger.info(`Delegated "${task}" → "${commandName}" successfully`, "ChatDelegateHandler");
 
       return success({
         dispatched: true,
-        workflow,
-        message: `Workflow "${workflow}" dispatched for task "${task}"`,
+        commandName,
+        result: dispatchResult.value,
       });
     } catch (err) {
       return failure({

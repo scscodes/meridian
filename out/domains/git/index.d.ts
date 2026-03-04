@@ -5,6 +5,6 @@ export { GitDomainService, createGitDomain, GIT_COMMANDS, ChangeGrouper, CommitM
 export { createStatusHandler, createPullHandler, createCommitHandler, createSmartCommitHandler, createAnalyzeInboundHandler, } from "./handlers";
 export { createShowAnalyticsHandler, createExportJsonHandler, createExportCsvHandler, } from "./analytics-handler";
 export { GitAnalyzer } from "./analytics-service";
-export { FileChange, ChangeGroup, CommitType, SuggestedMessage, CommitInfo, SmartCommitBatchResult, SmartCommitParams, InboundChanges, ConflictFile, ChangesSummary, } from "./types";
+export { FileChange, ChangeGroup, CommitType, SuggestedMessage, CommitInfo, SmartCommitBatchResult, SmartCommitParams, ApprovalItem, ApprovalUI, InboundChanges, ConflictFile, ChangesSummary, } from "./types";
 export { AnalyticsPeriod, AnalyticsOptions, AnalyticsSummary, AuthorMetric, CachedAnalytics, CommitMetric, CommitTrend, FileMetric, FileRiskLevel, GitAnalyticsReport, TrendData, VolatilityTrend, AnalyticsWebviewMessage, AnalyticsWebviewMessageType, } from "./analytics-types";
 //# sourceMappingURL=index.d.ts.map

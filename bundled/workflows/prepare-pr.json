@@ -1,0 +1,28 @@
+{
+  "name": "prepare-pr",
+  "description": "Review branch changes for issues, then generate a PR description ready to copy.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "id": "status",
+      "command": "git.status",
+      "params": {},
+      "onSuccess": "review",
+      "onFailure": "exit"
+    },
+    {
+      "id": "review",
+      "command": "git.reviewPR",
+      "params": {},
+      "onSuccess": "generate",
+      "onFailure": "generate"
+    },
+    {
+      "id": "generate",
+      "command": "git.generatePR",
+      "params": {},
+      "onSuccess": "exit",
+      "onFailure": "exit"
+    }
+  ]
+}

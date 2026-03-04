@@ -10,7 +10,7 @@
  * ✓ Missing dispose/cleanup handlers
  */
 import { DomainService, GitCommandName, Handler, Logger, GitProvider, Result } from "../../types";
-import { FileChange, ChangeGroup, SuggestedMessage, CommitInfo, InboundChanges } from "./types";
+import { FileChange, ChangeGroup, SuggestedMessage, CommitInfo, InboundChanges, ApprovalUI } from "./types";
 import { GitAnalyzer } from "./analytics-service";
 export declare class ChangeGrouper {
     /**
@@ -125,7 +125,7 @@ export declare class GitDomainService implements DomainService {
     batchCommitter: BatchCommitter;
     inboundAnalyzer: InboundAnalyzer;
     analyzer: GitAnalyzer;
-    constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot?: string);
+    constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot?: string, approvalUI?: ApprovalUI);
     /**
      * Initialize domain — verify git is available, check repo state.
      */
@@ -138,5 +138,5 @@ export declare class GitDomainService implements DomainService {
 /**
  * Factory function — creates and returns git domain service.
  */
-export declare function createGitDomain(gitProvider: GitProvider, logger: Logger, workspaceRoot?: string): GitDomainService;
+export declare function createGitDomain(gitProvider: GitProvider, logger: Logger, workspaceRoot?: string, approvalUI?: ApprovalUI): GitDomainService;
 //# sourceMappingURL=service.d.ts.map

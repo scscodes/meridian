@@ -1,0 +1,28 @@
+{
+  "name": "pre-push-checks",
+  "description": "Safety check before pushing: scan for hygiene issues, check for inbound conflicts, verify branch state.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "id": "scan",
+      "command": "hygiene.scan",
+      "params": {},
+      "onSuccess": "inbound",
+      "onFailure": "inbound"
+    },
+    {
+      "id": "inbound",
+      "command": "git.analyzeInbound",
+      "params": {},
+      "onSuccess": "status",
+      "onFailure": "status"
+    },
+    {
+      "id": "status",
+      "command": "git.status",
+      "params": {},
+      "onSuccess": "exit",
+      "onFailure": "exit"
+    }
+  ]
+}

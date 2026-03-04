@@ -61,6 +61,7 @@ const hygiene_tree_provider_1 = require("./ui/tree-providers/hygiene-tree-provid
 const workflow_tree_provider_1 = require("./ui/tree-providers/workflow-tree-provider");
 const agent_tree_provider_1 = require("./ui/tree-providers/agent-tree-provider");
 const chat_participant_1 = require("./ui/chat-participant");
+const smart_commit_quick_pick_1 = require("./ui/smart-commit-quick-pick");
 const lm_tools_1 = require("./ui/lm-tools");
 const webview_provider_1 = require("./infrastructure/webview-provider");
 const analytics_types_1 = require("./domains/hygiene/analytics-types");
@@ -170,7 +171,8 @@ async function activate(context) {
         return result;
     };
     // Register domains
-    const gitDomain = (0, service_1.createGitDomain)(gitProvider, logger, workspaceRoot);
+    const smartCommitApprovalUI = (0, smart_commit_quick_pick_1.createSmartCommitApprovalUI)();
+    const gitDomain = (0, service_1.createGitDomain)(gitProvider, logger, workspaceRoot, smartCommitApprovalUI);
     const hygieneDomain = (0, service_2.createHygieneDomain)(workspaceProvider, logger);
     const chatDomain = (0, service_3.createChatDomain)(gitProvider, logger, (cmd, ctx) => router.dispatch(cmd, ctx));
     const workflowDomain = (0, service_4.createWorkflowDomain)(logger, stepRunner, workspaceRoot, extensionPath);

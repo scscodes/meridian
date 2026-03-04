@@ -61,7 +61,8 @@ export type GitCommandName =
   | "git.generatePR"
   | "git.reviewPR"
   | "git.commentPR"
-  | "git.resolveConflicts";
+  | "git.resolveConflicts"
+  | "git.sessionBriefing";
 export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics";
 export type ChatCommandName = "chat.context" | "chat.delegate";
 export type WorkflowCommandName = "workflow.list" | "workflow.run";
@@ -120,6 +121,8 @@ export interface GitProvider {
   getCurrentBranch(): Promise<Result<string>>; // Get current branch name
   diff(revision: string, options?: string[]): Promise<Result<string>>; // Advanced diff with options
   getRecentCommits(count: number): Promise<Result<RecentCommit[]>>;
+  getCommitRange(from: string, to?: string): Promise<Result<RecentCommit[]>>;
+  getMergeBase(branch: string, base?: string): Promise<Result<string>>;
 }
 
 export interface WorkspaceProvider {

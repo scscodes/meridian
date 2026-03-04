@@ -36,6 +36,7 @@ exports.GIT_ERROR_CODES = {
     // Validation
     NO_CHANGES: "NO_CHANGES",
     NO_GROUPS_APPROVED: "NO_GROUPS_APPROVED",
+    COMMIT_CANCELLED: "COMMIT_CANCELLED",
 };
 // ============================================================================
 // Hygiene Domain Error Codes

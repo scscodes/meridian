@@ -47,9 +47,10 @@ describe("InboundAnalyzer.analyze", () => {
     const logger = new MockLogger();
     const analyzer = new InboundAnalyzer(git as any, logger);
 
-    vi.spyOn(git, "diff").mockResolvedValueOnce(
-      success("M\tsrc/conflict.ts")
-    );
+    vi.spyOn(git, "diff")
+      .mockResolvedValueOnce(success("M\tsrc/conflict.ts"))   // inbound diff
+      .mockResolvedValueOnce(success("5\t2\tsrc/conflict.ts")) // estimateChanges local
+      .mockResolvedValueOnce(success("3\t1\tsrc/conflict.ts")); // estimateChanges remote
     vi.spyOn(git, "getAllChanges").mockResolvedValueOnce(
       success([{ path: "src/conflict.ts", status: "M", additions: 5, deletions: 2 }])
     );

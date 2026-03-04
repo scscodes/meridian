@@ -16,6 +16,7 @@ import {
   createContextHandler,
   createDelegateHandler,
   CommandDispatcher,
+  GenerateProseFn,
 } from "./handlers";
 
 /**
@@ -35,13 +36,14 @@ export class ChatDomainService implements DomainService {
   constructor(
     gitProvider: GitProvider,
     logger: Logger,
-    dispatcher: CommandDispatcher
+    dispatcher: CommandDispatcher,
+    generateProseFn?: GenerateProseFn
   ) {
     this.logger = logger;
 
     this.handlers = {
       "chat.context": createContextHandler(gitProvider, logger) as Handler,
-      "chat.delegate": createDelegateHandler(dispatcher, logger) as Handler,
+      "chat.delegate": createDelegateHandler(dispatcher, logger, generateProseFn) as Handler,
     };
   }
 
@@ -76,7 +78,8 @@ export class ChatDomainService implements DomainService {
 export function createChatDomain(
   gitProvider: GitProvider,
   logger: Logger,
-  dispatcher: CommandDispatcher
+  dispatcher: CommandDispatcher,
+  generateProseFn?: GenerateProseFn
 ): ChatDomainService {
-  return new ChatDomainService(gitProvider, logger, dispatcher);
+  return new ChatDomainService(gitProvider, logger, dispatcher, generateProseFn);
 }

@@ -24,6 +24,7 @@ const TOOL_DEFS: readonly ToolDef[] = [
   { name: "meridian_hygiene_scan",        commandName: "hygiene.scan"       },
   { name: "meridian_workflow_run",        commandName: "workflow.run"       },
   { name: "meridian_git_show_analytics",  commandName: "git.showAnalytics"  },
+  { name: "meridian_chat_delegate",       commandName: "chat.delegate"      },
 ] as const;
 
 export function registerMeridianTools(

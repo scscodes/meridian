@@ -120,7 +120,7 @@ function createCommitHandler(gitProvider, logger) {
  * Example: git.smartCommit — Interactive staged commit with validation.
  * Demonstrates complex workflow: stage → diff → validate message → commit.
  */
-function createSmartCommitHandler(gitProvider, logger, changeGrouper, messageSuggester, batchCommitter) {
+function createSmartCommitHandler(gitProvider, logger, changeGrouper, messageSuggester, batchCommitter, approvalUI) {
     return async (_ctx, params = {}) => {
         const startTime = Date.now();
         try {
@@ -172,15 +172,31 @@ function createSmartCommitHandler(gitProvider, logger, changeGrouper, messageSug
             }));
             // Step 5: Present to user for approval (or auto-approve)
             let approvedGroups;
-            if (params.autoApprove) {
+            if (params.autoApprove || !approvalUI) {
+                // Programmatic path: skip UI entirely
                 approvedGroups = groupsWithMessages;
-                logger.info("Auto-approving all groups (autoApprove enabled)", "GitSmartCommitHandler");
+                logger.info(`Auto-approving all ${groupsWithMessages.length} group(s)`, "GitSmartCommitHandler");
             }
             else {
-                // In a real UI context, this would show a dialog/prompt
-                // For now, we'll just auto-approve as a default
-                approvedGroups = groupsWithMessages;
-                logger.info(`Presenting ${groupsWithMessages.length} groups for user approval`, "GitSmartCommitHandler");
+                // Interactive path: show approval UI
+                logger.info(`Presenting ${groupsWithMessages.length} group(s) for user approval`, "GitSmartCommitHandler");
+                const approvalResult = await approvalUI(groupsWithMessages);
+                // null = user cancelled (Escape)
+                if (approvalResult === null) {
+                    return (0, types_1.failure)({
+                        code: "COMMIT_CANCELLED",
+                        message: "Smart commit cancelled by user",
+                        context: "git.smartCommit",
+                    });
+                }
+                // Patch approved messages back onto groups for BatchCommitter
+                approvedGroups = approvalResult.map((item) => ({
+                    ...item.group,
+                    suggestedMessage: {
+                        ...item.group.suggestedMessage,
+                        full: item.approvedMessage,
+                    },
+                }));
             }
             if (approvedGroups.length === 0) {
                 return (0, types_1.failure)({

@@ -72,6 +72,8 @@ export function formatResultMessage(
       const cr = v as any;
       return { level: "info", message: `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output` };
     }
+    case "git.sessionBriefing":
+      return { level: "info", message: "Session briefing generated — see Output" };
     case "hygiene.scan": {
       const dead = ((v.deadFiles as unknown[]) ?? []).length;
       const large = ((v.largeFiles as unknown[]) ?? []).length;
@@ -94,8 +96,10 @@ export function formatResultMessage(
       return { level: "info", message: `Found ${v.count ?? 0} agent(s)` };
     case "chat.context":
       return { level: "info", message: "Chat context gathered." };
-    case "chat.delegate":
-      return { level: "info", message: `Delegated: ${(v as any).message ?? "OK"}` };
+    case "chat.delegate": {
+      const dr = v as any;
+      return { level: "info", message: `Delegated → ${dr.commandName ?? "unknown"}` };
+    }
     default:
       return { level: "info", message: `[${commandName}] OK` };
   }

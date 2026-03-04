@@ -1,0 +1,28 @@
+{
+  "name": "morning-sync",
+  "description": "Start-of-day briefing: generate a session summary, pull latest changes, then show branch state.",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "id": "briefing",
+      "command": "git.sessionBriefing",
+      "params": {},
+      "onSuccess": "pull",
+      "onFailure": "pull"
+    },
+    {
+      "id": "pull",
+      "command": "git.pull",
+      "params": {},
+      "onSuccess": "status",
+      "onFailure": "status"
+    },
+    {
+      "id": "status",
+      "command": "git.status",
+      "params": {},
+      "onSuccess": "exit",
+      "onFailure": "exit"
+    }
+  ]
+}

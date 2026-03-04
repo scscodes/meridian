@@ -25,6 +25,7 @@ export {
   gatherPRContext,
   GenerateProseFn,
 } from "./pr-handlers";
+export { createSessionBriefingHandler } from "./session-handler";
 export {
   createShowAnalyticsHandler,
   createExportJsonHandler,

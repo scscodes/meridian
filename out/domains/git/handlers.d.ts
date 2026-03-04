@@ -3,7 +3,7 @@
  * Includes enhanced smartCommit with change grouping and batch commits.
  */
 import { Handler, GitStatus, Logger, GitProvider } from "../../types";
-import { SmartCommitParams, SmartCommitBatchResult, InboundChanges } from "./types";
+import { SmartCommitParams, SmartCommitBatchResult, InboundChanges, ApprovalUI } from "./types";
 import { ChangeGrouper, CommitMessageSuggester, BatchCommitter, InboundAnalyzer } from "./service";
 /**
  * Example: git.status — Read-only operation.
@@ -24,7 +24,7 @@ export declare function createCommitHandler(gitProvider: GitProvider, logger: Lo
  * Example: git.smartCommit — Interactive staged commit with validation.
  * Demonstrates complex workflow: stage → diff → validate message → commit.
  */
-export declare function createSmartCommitHandler(gitProvider: GitProvider, logger: Logger, changeGrouper: ChangeGrouper, messageSuggester: CommitMessageSuggester, batchCommitter: BatchCommitter): Handler<SmartCommitParams, SmartCommitBatchResult>;
+export declare function createSmartCommitHandler(gitProvider: GitProvider, logger: Logger, changeGrouper: ChangeGrouper, messageSuggester: CommitMessageSuggester, batchCommitter: BatchCommitter, approvalUI?: ApprovalUI): Handler<SmartCommitParams, SmartCommitBatchResult>;
 /**
  * Example: git.analyzeInbound — Analyze remote changes without pulling.
  * Detects conflicts between local and remote modifications.

@@ -22,6 +22,10 @@ const SLASH_MAP: Record<string, CommandName> = {
   "/agents":    "agent.list",
   "/analytics": "git.showAnalytics",
   "/context":   "chat.context",
+  "/pr":        "git.generatePR",
+  "/review":    "git.reviewPR",
+  "/briefing":  "git.sessionBriefing",
+  "/conflicts": "git.resolveConflicts",
 };
 
 // Single-word natural language keywords → direct dispatch, no LLM needed
@@ -37,6 +41,12 @@ const KEYWORD_MAP: Record<string, CommandName> = {
   "commit":    "git.smartCommit",
   "pull":      "git.pull",
   "context":   "chat.context",
+  "pr":        "git.generatePR",
+  "review":    "git.reviewPR",
+  "briefing":  "git.sessionBriefing",
+  "session":   "git.sessionBriefing",
+  "conflicts": "git.resolveConflicts",
+  "resolve":   "git.resolveConflicts",
 };
 
 // Classifier prompt: tells the LLM to pick one command ID from a known list.
@@ -44,16 +54,21 @@ const KEYWORD_MAP: Record<string, CommandName> = {
 const CLASSIFIER_SYSTEM = `You are a command classifier for the Meridian VS Code extension.
 Given the user's request, respond with EXACTLY ONE command ID from this list, or "chat.context" if none apply.
 
-git.status        – check branch, staged/unstaged/untracked file counts
-git.smartCommit   – group and commit staged changes with AI-suggested messages
-git.pull          – pull latest changes from remote
-git.analyzeInbound – analyze incoming remote changes for conflicts
-git.showAnalytics  – open the git analytics report (commits, churn, authors)
-hygiene.scan      – scan workspace for large files, dead files, stale logs
-workflow.list     – list all available workflows
-workflow.run:<name> – run a named workflow (replace <name>)
-agent.list        – list all available agents and their capabilities
-chat.context      – show branch, active file, and available commands
+git.status           – check branch, staged/unstaged/untracked file counts
+git.smartCommit      – group and commit staged changes with AI-suggested messages
+git.pull             – pull latest changes from remote
+git.analyzeInbound   – analyze incoming remote changes for conflicts
+git.showAnalytics    – open the git analytics report (commits, churn, authors)
+git.generatePR       – generate a pull request description from current branch changes
+git.reviewPR         – review current branch changes, return verdict and per-file comments
+git.commentPR        – generate inline code review comments for changed files
+git.resolveConflicts – suggest resolution strategies for detected git conflicts
+git.sessionBriefing  – generate a morning briefing of branch state, recent commits, and uncommitted work
+hygiene.scan         – scan workspace for large files, dead files, stale logs
+workflow.list        – list all available workflows
+workflow.run:<name>  – run a named workflow (replace <name>)
+agent.list           – list all available agents and their capabilities
+chat.context         – show branch, active file, and available commands
 
 Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`;
 
@@ -111,7 +126,7 @@ export function createChatParticipant(
     }
 
     // ── 6. Empty prompt fallback ─────────────────────────────────────────────
-    stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
+    stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/pr\`, \`/review\`, \`/briefing\`, \`/conflicts\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
   };
 
   const participant = vscode.chat.createChatParticipant("meridian", handler);
@@ -146,9 +161,26 @@ async function handleDirectDispatch(
       stream.markdown(
         `**Branch:** \`${branch}\` (${dirty})\n\n` +
         `**Active file:** \`${file}\`\n\n` +
-        `Slash commands: \`/status\` \`/scan\` \`/workflows\` \`/agents\` \`/analytics\`\n\n` +
+        `Slash commands: \`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` \`/workflows\` \`/agents\` \`/analytics\`\n\n` +
         `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
       );
+    } else if (commandName === "git.sessionBriefing") {
+      stream.markdown(result.value as string);
+    } else if (commandName === "git.generatePR") {
+      const pr = result.value as any;
+      stream.markdown(pr.body);
+    } else if (commandName === "git.reviewPR") {
+      const rv = result.value as any;
+      stream.markdown(`**Verdict:** ${rv.verdict}\n\n${rv.summary}\n\n`);
+      for (const c of rv.comments ?? []) {
+        stream.markdown(`- **[${c.severity}]** \`${c.file}\`: ${c.comment}\n`);
+      }
+    } else if (commandName === "git.resolveConflicts") {
+      const cr = result.value as any;
+      stream.markdown(`${cr.overview}\n\n`);
+      for (const f of cr.perFile ?? []) {
+        stream.markdown(`**\`${f.path}\`** → \`${f.strategy}\`\n${f.rationale}\n`);
+      }
     } else {
       const msg = formatResultMessage(commandName, result);
       stream.markdown(msg.message);
@@ -210,15 +242,20 @@ async function handleClassifier(
 
     // Map classifier output to a valid CommandName
     const VALID_COMMANDS: Record<string, CommandName> = {
-      "git.status":         "git.status",
-      "git.smartCommit":    "git.smartCommit",
-      "git.pull":           "git.pull",
-      "git.analyzeInbound": "git.analyzeInbound",
-      "git.showAnalytics":  "git.showAnalytics",
-      "hygiene.scan":       "hygiene.scan",
-      "workflow.list":      "workflow.list",
-      "agent.list":         "agent.list",
-      "chat.context":       "chat.context",
+      "git.status":           "git.status",
+      "git.smartCommit":      "git.smartCommit",
+      "git.pull":             "git.pull",
+      "git.analyzeInbound":   "git.analyzeInbound",
+      "git.showAnalytics":    "git.showAnalytics",
+      "git.generatePR":       "git.generatePR",
+      "git.reviewPR":         "git.reviewPR",
+      "git.commentPR":        "git.commentPR",
+      "git.resolveConflicts": "git.resolveConflicts",
+      "git.sessionBriefing":  "git.sessionBriefing",
+      "hygiene.scan":         "hygiene.scan",
+      "workflow.list":        "workflow.list",
+      "agent.list":           "agent.list",
+      "chat.context":         "chat.context",
     };
 
     const commandName = VALID_COMMANDS[classification] ?? "chat.context";

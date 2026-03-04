@@ -10,6 +10,25 @@ Meridian is a VS Code extension built on DDD + Aiogram-style command routing:
 - **Workflow engine** executes JSON-defined step sequences with conditional branching + variable interpolation
 - **Agent registry** discovers local agent definitions from `.vscode/agents/`
 
+### Git Domain File Layout
+
+The git domain was decomposed from two monolith files into focused modules:
+
+| File | Responsibility |
+|------|---------------|
+| `service.ts` | `GitDomainService` orchestrator only — wires components + handlers |
+| `smart-commit-service.ts` | `ChangeGrouper`, `CommitMessageSuggester`, `BatchCommitter` |
+| `inbound-analyzer.ts` | `InboundAnalyzer` — remote diff, conflict detection, severity scoring |
+| `handlers.ts` | Basic git ops: status, pull, commit |
+| `smart-commit-handler.ts` | `createSmartCommitHandler` — approval flow orchestration |
+| `pr-handlers.ts` | `generatePR`, `reviewPR`, `commentPR`, `resolveConflicts` + `gatherPRContext` |
+| `session-handler.ts` | `git.sessionBriefing` — morning briefing prose consumer |
+| `inbound-handler.ts` | `createAnalyzeInboundHandler` |
+| `analytics-service.ts` | `GitAnalyzer` — commit frequency, churn, trends |
+| `analytics-handler.ts` | Analytics webview + export handlers |
+
+Hygiene domain: `handlers.ts` deleted; replaced with `scan-handler.ts` + `cleanup-handler.ts`.
+
 ---
 
 ## Current State
@@ -24,9 +43,14 @@ Meridian is a VS Code extension built on DDD + Aiogram-style command routing:
 | Git — SmartCommit | Real | ChangeGrouper + CommitMessageSuggester + BatchCommitter with rollback |
 | Git — InboundAnalyzer | Real | Fetch, diff, conflict detection, severity scoring, diff link generation |
 | Git — Analytics | Real | Commit frequency, churn, author analysis, volatility, trend detection |
+| Git — PR Description | Real | `git.generatePR` — branch diff → markdown PR body via LLM. `Ctrl+M Ctrl+P` |
+| Git — PR Review | Real | `git.reviewPR` — verdict + per-file comments via LLM. `Ctrl+M Ctrl+V` |
+| Git — PR Comments | Real | `git.commentPR` — inline comments with optional line refs. `Ctrl+M Ctrl+I` |
+| Git — Conflict Resolution | Real | `git.resolveConflicts` — per-file strategy (keep/merge/review) via LLM. `Ctrl+M Ctrl+X` |
+| Git — Session Briefing | Real | `git.sessionBriefing` — branch state + recent commits + uncommitted changes via LLM. `Ctrl+M Ctrl+B` |
 | Hygiene — scan/cleanup | Real | Multi-category fs scan, dead code via TS Compiler API, safe deletion |
 | Hygiene — analytics | Real | File categorization, temporal bucketing, prune recommendations |
-| Chat / Copilot | Wired | Chat participant, LLM classifier, slash commands, keyword map, LM tools |
+| Chat / Copilot | Real | Chat participant, LLM classifier, slash commands (`/pr` `/review` `/briefing` `/conflicts` + 6 others), keyword map, LM tools, `chat.delegate` programmatic router |
 | Workflow engine | Real | Step execution, conditionals, variable interpolation, output passing |
 | Agent registry | Minimal | JSON discovery + capability queries. No execution |
 | Telemetry | Wired | ConsoleTelemetrySink as middleware. No remote sink |
@@ -35,133 +59,56 @@ Meridian is a VS Code extension built on DDD + Aiogram-style command routing:
 | UI — Output/Notifications | Done | OutputChannel + result-handler.ts for info/warn/error toasts |
 | UI — Status Bar | Done | Branch + dirty indicator, QuickPick action menu, auto-updates on git state changes |
 | UI — Menus/Keybindings | Done | Explorer context menus, command palette when-clauses, chord keybindings |
-| Tests | Solid | 14 test files, 123 tests covering router, result monad, workflow engine, all git subsystems |
+| Tests | Solid | 15 test files, 127 tests covering router, result monad, workflow engine, all git subsystems, chat.delegate |
 | Constants | Solid | Centralized in `constants.ts` — no magic numbers |
 
-### UI/UX Phase — Complete
+### Prose Pipeline — Complete
 
-All 6 groups shipped:
+All Tier 1 prose consumers shipped. The `<context> → analyze → synthesize prose` primitive is established in `src/infrastructure/prose-generator.ts` with `GenerateProseFn` injected via DI to keep domain code free of `vscode` imports.
 
-1. **Command wiring + result surfacing** — COMMAND_MAP loop, OutputChannel, notification toasts
-2. **Sidebar tree providers** — git, hygiene, workflow, agent views in activity bar
-3. **Webview analytics panels** — Chart.js visualizations for git + hygiene
-4. **Chat / Copilot integration** — multi-tier intent classification, LM tool definitions
-5. **SmartCommit approval UI** — QuickPick group selection + InputBox message editing
-6. **Menus, keybindings, context clauses** — explorer context menus, chord bindings, when-clauses
-7. **FileSystemWatcher + Status Bar** — auto-refresh tree views, persistent branch/status indicator
+`git.sessionBriefing` now surfaces correctly in the OutputChannel with clipboard copy (latent bug fixed). `chat.delegate` is wired as a programmatic task router — LLM classifies free-form tasks and dispatches the matching command. All prose commands are reachable from `@meridian` via `/pr`, `/review`, `/briefing`, `/conflicts` slash commands and natural language.
 
----
+**Shipped consumers:**
 
-## Technical Debt
+1. `git.generatePR` — branch diff → structured PR body
+2. `git.reviewPR` — `gatherPRContext()` → verdict + per-file comments
+3. `git.commentPR` — `gatherPRContext()` → inline comments with optional line refs
+4. `git.resolveConflicts` — `InboundAnalyzer` + per-conflict diff → per-file merge strategy
+5. `git.sessionBriefing` — branch state + recent commits + uncommitted changes → morning briefing
 
-Known bugs in `src/domains/git/analytics-service.ts` that affect analytics accuracy:
+**Shared infrastructure:**
+- `gatherPRContext()` in `pr-handlers.ts` — branch, commits, diff aggregation (now merge-base accurate)
+- `parseFileChanges()` — domain/fileType metadata extraction
+- All prose handlers conditionally wired in `GitDomainService` when `generateProseFn` is provided
+- JSON-structured prompts with text fallback parsing throughout
 
-### 1. `matchesPathPattern` is a stub
-
-**Location:** `analytics-service.ts` ~line 234
-
-The `pathPattern` option in `AnalyticsOptions` is accepted but silently ignored — the filter dropdown in the analytics UI has no effect. Fix: iterate `commit.files` and match via `micromatch.isMatch` (already imported).
-
-### 2. Trend normalization uses fixed divisor
-
-**Location:** `analytics-service.ts` ~line 346, `constants.ts` (`ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS`)
-
-Commit trend splits into two halves and divides each by a fixed `4` weeks regardless of actual period. A 3-month window and 12-month window both use the same divisor. Absolute values are meaningless; thresholds break across periods. Fix: compute actual weeks from `since`/`until` dates.
-
-### 3. Week bucketing uses week-of-month, not ISO week
-
-**Location:** `analytics-service.ts` ~line 448
-
-`Math.ceil(date.getDate() / 7)` produces 1–5 (week within month). Commits in the same calendar week but different months get different bucket keys, fragmenting the frequency chart. Fix: use ISO 8601 week number calculation.
-
-### 4. `chat.delegate` unreachable from chat UX
-
-Backend handler exists but no chat participant route maps to it. Low priority — the routing infra works, just needs a keyword/slash entry.
+**GitProvider accuracy (shipped):**
+- `getMergeBase(branch, base)` added to interface + impl — `gatherPRContext` now uses true merge-base
+- `estimateChanges()` in `InboundAnalyzer` replaced — now calls `git diff --numstat` for real counts
 
 ---
 
-## Next Phase: Analysis-to-Prose Pipeline
+## Next Phase
 
-### The Pattern
+### Priority Stack (highest ROI first)
 
-The highest-value features Meridian can ship next all share a common design:
+**1. ~~Pre-built Workflow Templates~~ — Done**
+- 6 bundled workflows in `bundled/workflows/`: `morning-sync`, `prepare-pr`, `pre-push-checks`, `sync-repo`, `lint-and-commit`, `scan-then-cleanup`
+- Sidebar is now useful on first install
 
-```
-<context> → analyze → synthesize prose
-```
+**5. Code Impact Analysis** (`hygiene.impactAnalysis`) — Medium ROI, high novelty
+- Input: file path or function name
+- TS Compiler API (already in use for dead code) traces imports, call sites, test coverage
+- Prose output: blast radius summary — "Changing this affects 4 importers and 2 test files"
+- No other extension surfaces this as a one-click operation
 
-PR descriptions, PR reviews, conflict resolution, session recovery, worktree monitoring — they're all the same pipeline with different inputs and output templates. Build the pattern once as a reusable primitive, then stamp out features.
-
-**Core primitive:** A function that takes structured analysis output (from any domain) and an LLM prompt template, then produces formatted prose via the VS Code Language Model API. This sits in `src/infrastructure/` and any domain can call it.
-
-### Priority Features
-
-#### Tier 1 — Builds directly on existing infrastructure
-
-**1. PR Description Generator** (`git.generatePR`) — **SHIPPED**
-- Prose primitive (`src/infrastructure/prose-generator.ts`) + first consumer
-- `generateProse()` / `streamProse()` — reusable by all future consumers
-- `GenerateProseFn` injected via DI to keep domain layer free of `vscode` imports
-- Output: Markdown to clipboard + OutputChannel display
-- Keybinding: `Ctrl+M Ctrl+P`
-
-**2. PR Review** (`git.reviewPR`) — **SHIPPED**
-- Uses `gatherPRContext()` → JSON-structured prompt → parsed verdict + per-file comments
-- Output: OutputChannel + clipboard. Keybinding: `Ctrl+M Ctrl+V`
-
-**3. PR Comments** (`git.commentPR`) — **SHIPPED**
-- Uses `gatherPRContext()` → JSON-structured prompt → inline comments with optional line refs
-- Supports `paths` filter for scoping to specific files
-- Output: OutputChannel + clipboard. Keybinding: `Ctrl+M Ctrl+I`
-
-**4. Conflict Resolution Assistant** (`git.resolveConflicts`) — **SHIPPED**
-- Uses `InboundAnalyzer.analyze()` + per-conflict `gitProvider.diff()` for actual file diffs
-- Produces per-file strategy (keep-ours/keep-theirs/manual-merge/review-needed) with rationale
-- Output: OutputChannel. Keybinding: `Ctrl+M Ctrl+X`
-
-**5. Session Context Recovery** (`meridian.sessionBriefing`)
-- Input: git status + last N commits + stale branches + uncommitted changes + open TODOs
-- Analysis: Aggregate from existing git.status + git.analytics + hygiene.scan
-- Prose: "Morning briefing" — where you left off, what's pending, what needs attention
-- Output: Webview panel or OutputChannel on workspace open
-- Why: Eliminates the 10-15 min "where was I?" tax after context switches
-
-### Implementation Notes — Git Prose Consumers (2-4)
-
-**Infrastructure built:**
-- `gatherPRContext()` — shared context gather used by generatePR, reviewPR, commentPR
-- `parseFileChanges()` — exported helper for domain/fileType metadata
-- All handlers conditionally wired in `GitDomainService` when `generateProseFn` is provided
-- JSON-structured prompts with text fallback parsing for all consumers
-
-**GitProvider gaps** (not blocking, needed for accuracy):
-- `getCommitRange(base, head)` — branch-scoped commits (vs. global `getRecentCommits(N)`)
-- Merge-base detection — `getDiff()` returns working-tree diff, not `merge-base..HEAD`
-- `estimateChanges()` in InboundAnalyzer is a stub — returns hashed values, not real stats
-
-#### Tier 2 — New capabilities
-
-**5. Pre-built Workflow Templates**
-- Ship 4-5 built-in workflows: "Start Feature Branch", "Pre-Push Checks", "Morning Sync", "Prepare PR"
-- Makes the workflow sidebar immediately useful instead of empty
-- Each workflow chains existing Meridian commands — no new handlers needed
-
-**6. Code Impact Analysis** (`hygiene.impactAnalysis`)
-- Input: A file path or function name
-- Analysis: TS Compiler API (already used for dead code) to trace imports, references, test coverage
-- Prose: "Changing this file affects 4 importers and 2 test files. Blast radius: medium."
-- Why: No other extension surfaces this as a one-click operation
-
-**7. Agent Execution**
-- Agents currently only have metadata — no execution capability
-- Make agents callable: run shell commands, chain Meridian commands, report results
-- Example: a "code reviewer" agent that runs hygiene scan + dead code + analytics and produces a summary
+**6. Agent Execution** — Lower ROI until templates are established
+- Agents currently have metadata only; no execution path
+- Make agents callable: shell commands + chained Meridian commands + result reporting
+- Natural fit once workflow templates exist to act as agent step definitions
 
 ### Deferred
 
-These are real but low-leverage right now:
-
-- Canonical config service (internal cleanup, zero user value)
-- Remote telemetry sink (no destination exists)
-- Additional analytics chart types (diminishing returns)
-- `chat.delegate` routing (solving a problem nobody has yet)
+- Canonical config service — internal cleanup, zero user value
+- Remote telemetry sink — no destination exists
+- Additional analytics chart types — diminishing returns on existing webviews

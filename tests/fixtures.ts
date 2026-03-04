@@ -12,6 +12,7 @@ import {
   GitPullResult,
   GitStageChange,
   GitFileChange,
+  RecentCommit,
   DeadCodeScan,
   Result,
   success,
@@ -154,6 +155,18 @@ export class MockGitProvider implements GitProvider {
 
   async diff(revision: string): Promise<Result<string>> {
     return success(`diff ${revision}\n${this.diffOutput}`);
+  }
+
+  async getRecentCommits(_count: number): Promise<Result<RecentCommit[]>> {
+    return success([]);
+  }
+
+  async getCommitRange(_from: string, _to?: string): Promise<Result<RecentCommit[]>> {
+    return this.getRecentCommits(20);
+  }
+
+  async getMergeBase(_branch: string, _base?: string): Promise<Result<string>> {
+    return success("abc0000");
   }
 }
 

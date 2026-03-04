@@ -32,6 +32,7 @@ import {
   createResolveConflictsHandler,
   GenerateProseFn,
 } from "./pr-handlers";
+import { createSessionBriefingHandler } from "./session-handler";
 import {
   createShowAnalyticsHandler,
   createExportJsonHandler,
@@ -127,6 +128,7 @@ export class GitDomainService implements DomainService {
             "git.reviewPR": createReviewPRHandler(gitProvider, logger, generateProseFn) as any,
             "git.commentPR": createCommentPRHandler(gitProvider, logger, generateProseFn) as any,
             "git.resolveConflicts": createResolveConflictsHandler(gitProvider, logger, this.inboundAnalyzer, generateProseFn) as any,
+            "git.sessionBriefing": createSessionBriefingHandler(gitProvider, logger, generateProseFn) as any,
           }
         : {}),
     };

@@ -704,7 +704,7 @@ exports.GIT_COMMANDS = [
     "git.analyzeInbound",
 ];
 class GitDomainService {
-    constructor(gitProvider, logger, workspaceRoot = process.cwd()) {
+    constructor(gitProvider, logger, workspaceRoot = process.cwd(), approvalUI) {
         this.name = "git";
         this.handlers = {};
         this.gitProvider = gitProvider;
@@ -722,7 +722,7 @@ class GitDomainService {
             "git.status": (0, handlers_1.createStatusHandler)(gitProvider, logger),
             "git.pull": (0, handlers_1.createPullHandler)(gitProvider, logger),
             "git.commit": (0, handlers_1.createCommitHandler)(gitProvider, logger),
-            "git.smartCommit": (0, handlers_1.createSmartCommitHandler)(gitProvider, logger, this.changeGrouper, this.messageSuggester, this.batchCommitter),
+            "git.smartCommit": (0, handlers_1.createSmartCommitHandler)(gitProvider, logger, this.changeGrouper, this.messageSuggester, this.batchCommitter, approvalUI),
             "git.analyzeInbound": (0, handlers_1.createAnalyzeInboundHandler)(this.inboundAnalyzer, logger),
             "git.showAnalytics": (0, analytics_handler_1.createShowAnalyticsHandler)(this.analyzer, logger),
             "git.exportJson": (0, analytics_handler_1.createExportJsonHandler)(this.analyzer, logger),
@@ -768,7 +768,7 @@ exports.GitDomainService = GitDomainService;
 /**
  * Factory function — creates and returns git domain service.
  */
-function createGitDomain(gitProvider, logger, workspaceRoot = process.cwd()) {
-    return new GitDomainService(gitProvider, logger, workspaceRoot);
+function createGitDomain(gitProvider, logger, workspaceRoot = process.cwd(), approvalUI) {
+    return new GitDomainService(gitProvider, logger, workspaceRoot, approvalUI);
 }
 //# sourceMappingURL=service.js.map

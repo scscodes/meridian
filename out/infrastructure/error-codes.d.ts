@@ -23,6 +23,7 @@ export declare const GIT_ERROR_CODES: {
     readonly EXPORT_ERROR: "EXPORT_ERROR";
     readonly NO_CHANGES: "NO_CHANGES";
     readonly NO_GROUPS_APPROVED: "NO_GROUPS_APPROVED";
+    readonly COMMIT_CANCELLED: "COMMIT_CANCELLED";
 };
 export declare const HYGIENE_ERROR_CODES: {
     readonly HYGIENE_INIT_ERROR: "HYGIENE_INIT_ERROR";
@@ -122,6 +123,7 @@ export declare const ERROR_CODES: {
     readonly EXPORT_ERROR: "EXPORT_ERROR";
     readonly NO_CHANGES: "NO_CHANGES";
     readonly NO_GROUPS_APPROVED: "NO_GROUPS_APPROVED";
+    readonly COMMIT_CANCELLED: "COMMIT_CANCELLED";
 };
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES];
 export declare enum TelemetryEvent {

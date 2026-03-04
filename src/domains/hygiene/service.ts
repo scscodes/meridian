@@ -17,6 +17,7 @@ import { createCleanupHandler } from "./cleanup-handler";
 import { HygieneAnalyzer } from "./analytics-service";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 import { createShowHygieneAnalyticsHandler } from "./analytics-handler";
+import { createImpactAnalysisHandler } from "./impact-analysis-handler";
 
 /**
  * Hygiene domain commands.
@@ -25,6 +26,7 @@ export const HYGIENE_COMMANDS: HygieneCommandName[] = [
   "hygiene.scan",
   "hygiene.cleanup",
   "hygiene.showAnalytics",
+  "hygiene.impactAnalysis",
 ];
 
 export class HygieneDomainService implements DomainService {
@@ -46,6 +48,7 @@ export class HygieneDomainService implements DomainService {
       "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer) as any,
       "hygiene.cleanup": createCleanupHandler(workspaceProvider, logger) as any,
       "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, this.deadCodeAnalyzer, logger) as any,
+      "hygiene.impactAnalysis": createImpactAnalysisHandler(logger) as any,
     };
   }
 

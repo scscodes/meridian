@@ -7,13 +7,14 @@ exports.AgentDomainService = exports.AGENT_COMMANDS = void 0;
 exports.createAgentDomain = createAgentDomain;
 const types_1 = require("../../types");
 const handlers_1 = require("./handlers");
+const execution_handler_1 = require("./execution-handler");
 const agent_registry_1 = require("../../infrastructure/agent-registry");
 /**
  * Agent domain commands.
  */
-exports.AGENT_COMMANDS = ["agent.list"];
+exports.AGENT_COMMANDS = ["agent.list", "agent.execute"];
 class AgentDomainService {
-    constructor(logger, workspaceRoot, extensionPath) {
+    constructor(logger, workspaceRoot, extensionPath, commandDispatcher) {
         this.name = "agent";
         this.handlers = {};
         this.agentCache = new Map();
@@ -24,6 +25,10 @@ class AgentDomainService {
         this.handlers = {
             "agent.list": (0, handlers_1.createListAgentsHandler)(this.logger, () => this.discoverAgents()),
         };
+        // Wire execution handler if dispatcher available
+        if (commandDispatcher) {
+            this.handlers["agent.execute"] = (0, execution_handler_1.createExecuteAgentHandler)(this.logger, commandDispatcher, workspaceRoot, extensionPath);
+        }
     }
     /**
      * Initialize domain — discover agents.
@@ -63,7 +68,7 @@ exports.AgentDomainService = AgentDomainService;
 /**
  * Factory function — creates and returns agent domain service.
  */
-function createAgentDomain(logger, workspaceRoot, extensionPath) {
-    return new AgentDomainService(logger, workspaceRoot, extensionPath);
+function createAgentDomain(logger, workspaceRoot, extensionPath, commandDispatcher) {
+    return new AgentDomainService(logger, workspaceRoot, extensionPath, commandDispatcher);
 }
 //# sourceMappingURL=service.js.map

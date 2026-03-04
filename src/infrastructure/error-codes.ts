@@ -56,6 +56,7 @@ export const HYGIENE_ERROR_CODES = {
   HYGIENE_CLEANUP_ERROR: "HYGIENE_CLEANUP_ERROR",
   FILE_READ_ERROR: "FILE_READ_ERROR",
   FILE_DELETE_ERROR: "FILE_DELETE_ERROR",
+  IMPACT_ANALYSIS_ERROR: "IMPACT_ANALYSIS_ERROR",
 } as const;
 
 // ============================================================================
@@ -79,6 +80,19 @@ export const WORKFLOW_ERROR_CODES = {
   STEP_TIMEOUT: "STEP_TIMEOUT",
   INTERPOLATION_ERROR: "INTERPOLATION_ERROR",
   INVALID_WORKFLOW: "INVALID_WORKFLOW",
+} as const;
+
+// ============================================================================
+// Agent Domain Error Codes
+// ============================================================================
+
+export const AGENT_ERROR_CODES = {
+  AGENT_INIT_ERROR: "AGENT_INIT_ERROR",
+  AGENT_LIST_ERROR: "AGENT_LIST_ERROR",
+  AGENT_NOT_FOUND: "AGENT_NOT_FOUND",
+  MISSING_CAPABILITY: "MISSING_CAPABILITY",
+  EXECUTION_FAILED: "EXECUTION_FAILED",
+  INVALID_WORKFLOW_REFERENCE: "INVALID_WORKFLOW_REFERENCE",
 } as const;
 
 // ============================================================================
@@ -128,6 +142,7 @@ export const ERROR_CODES = {
   ...HYGIENE_ERROR_CODES,
   ...CHAT_ERROR_CODES,
   ...WORKFLOW_ERROR_CODES,
+  ...AGENT_ERROR_CODES,
   ...ROUTER_ERROR_CODES,
   ...INFRASTRUCTURE_ERROR_CODES,
   ...GENERIC_ERROR_CODES,

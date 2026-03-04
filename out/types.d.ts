@@ -27,11 +27,11 @@ export interface Command<P = unknown> {
     params: P;
 }
 export type CommandName = GitCommandName | HygieneCommandName | ChatCommandName | WorkflowCommandName | AgentCommandName;
-export type GitCommandName = "git.status" | "git.pull" | "git.commit" | "git.smartCommit" | "git.analyzeInbound" | "git.showAnalytics" | "git.exportJson" | "git.exportCsv";
-export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics";
+export type GitCommandName = "git.status" | "git.pull" | "git.commit" | "git.smartCommit" | "git.analyzeInbound" | "git.showAnalytics" | "git.exportJson" | "git.exportCsv" | "git.generatePR" | "git.reviewPR" | "git.commentPR" | "git.resolveConflicts" | "git.sessionBriefing";
+export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics" | "hygiene.impactAnalysis";
 export type ChatCommandName = "chat.context" | "chat.delegate";
 export type WorkflowCommandName = "workflow.list" | "workflow.run";
-export type AgentCommandName = "agent.list";
+export type AgentCommandName = "agent.list" | "agent.execute";
 export type Handler<P = unknown, R = unknown> = (ctx: CommandContext, params: P) => Promise<Result<R>>;
 export interface HandlerRegistry {
     [name: string]: Handler<any, any>;
@@ -68,6 +68,8 @@ export interface GitProvider {
     getCurrentBranch(): Promise<Result<string>>;
     diff(revision: string, options?: string[]): Promise<Result<string>>;
     getRecentCommits(count: number): Promise<Result<RecentCommit[]>>;
+    getCommitRange(from: string, to?: string): Promise<Result<RecentCommit[]>>;
+    getMergeBase(branch: string, base?: string): Promise<Result<string>>;
 }
 export interface WorkspaceProvider {
     findFiles(pattern: string): Promise<Result<string[]>>;

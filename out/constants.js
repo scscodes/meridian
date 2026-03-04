@@ -6,7 +6,7 @@
  * Organized by domain for clarity.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.ANALYTICS_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = void 0;
+exports.UI_SETTINGS = exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.ANALYTICS_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = void 0;
 // ============================================================================
 // Cache Configuration
 // ============================================================================
@@ -191,12 +191,6 @@ exports.ANALYTICS_SETTINGS = {
     TREND_CONFIDENCE: 0.75,
     /** Minimum slope magnitude to classify a trend as "up" or "down" vs "stable" */
     TREND_SLOPE_THRESHOLD: 0.5,
-    /**
-     * Divisor used to normalize each trend half-period to a per-week rate.
-     * NOTE: Currently a fixed estimate. See docs/TODO.md for the known limitation
-     * (does not account for actual period length — tracked for future fix).
-     */
-    TREND_NORMALIZE_WEEKS: 4,
 };
 // ============================================================================
 // Dead Code Diagnostics
@@ -211,4 +205,11 @@ exports.ANALYTICS_SETTINGS = {
  * 6205 — 'X' is read but never used
  */
 exports.DEAD_CODE_DIAGNOSTIC_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205]);
+// ============================================================================
+// UI Settings
+// ============================================================================
+exports.UI_SETTINGS = {
+    /** Debounce delay for file watcher → tree refresh (ms) */
+    WATCHER_DEBOUNCE_MS: 500,
+};
 //# sourceMappingURL=constants.js.map

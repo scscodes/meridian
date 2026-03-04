@@ -75,6 +75,14 @@ export interface ApprovalItem {
  *   - null           → user cancelled the entire flow (Escape)
  */
 export type ApprovalUI = (groups: ChangeGroup[]) => Promise<ApprovalItem[] | null>;
+export interface PRGenerationParams {
+    targetBranch?: string;
+}
+export interface GeneratedPR {
+    title: string;
+    body: string;
+    branch: string;
+}
 /**
  * Conflict file with status and severity
  */
@@ -110,5 +118,60 @@ export interface InboundChanges {
     conflicts: ConflictFile[];
     summary: ChangesSummary;
     diffLink: string;
+}
+export interface PRContext {
+    branch: string;
+    targetBranch: string;
+    commits: Array<{
+        shortHash: string;
+        message: string;
+        author: string;
+        insertions: number;
+        deletions: number;
+    }>;
+    changes: Array<{
+        path: string;
+        status: "A" | "M" | "D" | "R";
+        additions: number;
+        deletions: number;
+    }>;
+    diff: string;
+}
+export interface PRReviewParams {
+    targetBranch?: string;
+}
+export interface PRReviewComment {
+    file: string;
+    severity: "critical" | "suggestion" | "nit";
+    comment: string;
+}
+export interface GeneratedPRReview {
+    branch: string;
+    summary: string;
+    comments: PRReviewComment[];
+    verdict: "approve" | "request-changes" | "comment";
+}
+export interface PRCommentParams {
+    targetBranch?: string;
+    paths?: string[];
+}
+export interface InlineComment {
+    file: string;
+    line?: number;
+    comment: string;
+}
+export interface GeneratedPRComments {
+    branch: string;
+    comments: InlineComment[];
+}
+export interface ConflictResolutionProse {
+    overview: string;
+    perFile: ConflictResolution[];
+}
+export interface ConflictResolution {
+    path: string;
+    strategy: "keep-ours" | "keep-theirs" | "manual-merge" | "review-needed";
+    rationale: string;
+    suggestedSteps: string[];
 }
 //# sourceMappingURL=types.d.ts.map

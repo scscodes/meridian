@@ -4,7 +4,7 @@
  * Every error code must be explicitly defined here
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_RETRY_CONFIG = exports.TIMEOUTS = exports.TELEMETRY_EVENTS = exports.TelemetryEvent = exports.ERROR_CODES = exports.GENERIC_ERROR_CODES = exports.INFRASTRUCTURE_ERROR_CODES = exports.ROUTER_ERROR_CODES = exports.WORKFLOW_ERROR_CODES = exports.CHAT_ERROR_CODES = exports.HYGIENE_ERROR_CODES = exports.GIT_ERROR_CODES = void 0;
+exports.DEFAULT_RETRY_CONFIG = exports.TIMEOUTS = exports.TELEMETRY_EVENTS = exports.TelemetryEvent = exports.ERROR_CODES = exports.GENERIC_ERROR_CODES = exports.INFRASTRUCTURE_ERROR_CODES = exports.ROUTER_ERROR_CODES = exports.AGENT_ERROR_CODES = exports.WORKFLOW_ERROR_CODES = exports.CHAT_ERROR_CODES = exports.HYGIENE_ERROR_CODES = exports.GIT_ERROR_CODES = void 0;
 exports.getRetryConfig = getRetryConfig;
 // ============================================================================
 // Git Domain Error Codes
@@ -37,6 +37,10 @@ exports.GIT_ERROR_CODES = {
     NO_CHANGES: "NO_CHANGES",
     NO_GROUPS_APPROVED: "NO_GROUPS_APPROVED",
     COMMIT_CANCELLED: "COMMIT_CANCELLED",
+    PR_GENERATION_ERROR: "PR_GENERATION_ERROR",
+    PR_REVIEW_ERROR: "PR_REVIEW_ERROR",
+    PR_COMMENT_ERROR: "PR_COMMENT_ERROR",
+    CONFLICT_RESOLUTION_ERROR: "CONFLICT_RESOLUTION_ERROR",
 };
 // ============================================================================
 // Hygiene Domain Error Codes
@@ -47,6 +51,7 @@ exports.HYGIENE_ERROR_CODES = {
     HYGIENE_CLEANUP_ERROR: "HYGIENE_CLEANUP_ERROR",
     FILE_READ_ERROR: "FILE_READ_ERROR",
     FILE_DELETE_ERROR: "FILE_DELETE_ERROR",
+    IMPACT_ANALYSIS_ERROR: "IMPACT_ANALYSIS_ERROR",
 };
 // ============================================================================
 // Chat Domain Error Codes
@@ -66,6 +71,17 @@ exports.WORKFLOW_ERROR_CODES = {
     STEP_TIMEOUT: "STEP_TIMEOUT",
     INTERPOLATION_ERROR: "INTERPOLATION_ERROR",
     INVALID_WORKFLOW: "INVALID_WORKFLOW",
+};
+// ============================================================================
+// Agent Domain Error Codes
+// ============================================================================
+exports.AGENT_ERROR_CODES = {
+    AGENT_INIT_ERROR: "AGENT_INIT_ERROR",
+    AGENT_LIST_ERROR: "AGENT_LIST_ERROR",
+    AGENT_NOT_FOUND: "AGENT_NOT_FOUND",
+    MISSING_CAPABILITY: "MISSING_CAPABILITY",
+    EXECUTION_FAILED: "EXECUTION_FAILED",
+    INVALID_WORKFLOW_REFERENCE: "INVALID_WORKFLOW_REFERENCE",
 };
 // ============================================================================
 // Router Error Codes
@@ -89,6 +105,7 @@ exports.INFRASTRUCTURE_ERROR_CODES = {
     WORKSPACE_WRITE_ERROR: "WORKSPACE_WRITE_ERROR",
     WEBVIEW_ERROR: "WEBVIEW_ERROR",
     LOGGER_ERROR: "LOGGER_ERROR",
+    MODEL_UNAVAILABLE: "MODEL_UNAVAILABLE",
 };
 // ============================================================================
 // Generic Error Codes
@@ -107,6 +124,7 @@ exports.ERROR_CODES = {
     ...exports.HYGIENE_ERROR_CODES,
     ...exports.CHAT_ERROR_CODES,
     ...exports.WORKFLOW_ERROR_CODES,
+    ...exports.AGENT_ERROR_CODES,
     ...exports.ROUTER_ERROR_CODES,
     ...exports.INFRASTRUCTURE_ERROR_CODES,
     ...exports.GENERIC_ERROR_CODES,

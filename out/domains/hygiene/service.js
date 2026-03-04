@@ -6,10 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HygieneDomainService = exports.HYGIENE_COMMANDS = void 0;
 exports.createHygieneDomain = createHygieneDomain;
 const types_1 = require("../../types");
-const handlers_1 = require("./handlers");
+const scan_handler_1 = require("./scan-handler");
+const cleanup_handler_1 = require("./cleanup-handler");
 const analytics_service_1 = require("./analytics-service");
 const dead_code_analyzer_1 = require("./dead-code-analyzer");
 const analytics_handler_1 = require("./analytics-handler");
+const impact_analysis_handler_1 = require("./impact-analysis-handler");
 /**
  * Hygiene domain commands.
  */
@@ -17,6 +19,7 @@ exports.HYGIENE_COMMANDS = [
     "hygiene.scan",
     "hygiene.cleanup",
     "hygiene.showAnalytics",
+    "hygiene.impactAnalysis",
 ];
 class HygieneDomainService {
     constructor(workspaceProvider, logger) {
@@ -28,9 +31,10 @@ class HygieneDomainService {
         this.deadCodeAnalyzer = new dead_code_analyzer_1.DeadCodeAnalyzer(logger);
         // Initialize handlers
         this.handlers = {
-            "hygiene.scan": (0, handlers_1.createScanHandler)(workspaceProvider, logger, this.deadCodeAnalyzer),
-            "hygiene.cleanup": (0, handlers_1.createCleanupHandler)(workspaceProvider, logger),
+            "hygiene.scan": (0, scan_handler_1.createScanHandler)(workspaceProvider, logger, this.deadCodeAnalyzer),
+            "hygiene.cleanup": (0, cleanup_handler_1.createCleanupHandler)(workspaceProvider, logger),
             "hygiene.showAnalytics": (0, analytics_handler_1.createShowHygieneAnalyticsHandler)(this.analyzer, this.deadCodeAnalyzer, logger),
+            "hygiene.impactAnalysis": (0, impact_analysis_handler_1.createImpactAnalysisHandler)(logger),
         };
     }
     /**

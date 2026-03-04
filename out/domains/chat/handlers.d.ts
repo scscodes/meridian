@@ -9,19 +9,28 @@ import { Handler, CommandContext, Command, Result, ChatContext, Logger, GitProvi
 export declare function createContextHandler(gitProvider: GitProvider, logger: Logger): Handler<Record<string, never>, ChatContext>;
 export interface DelegateParams {
     task: string;
-    workflow?: string;
 }
 export interface DelegateResult {
     dispatched: boolean;
-    workflow?: string;
-    message: string;
+    commandName: string;
+    result: unknown;
 }
 /** Minimal dispatcher interface; satisfied by CommandRouter.dispatch */
 export type CommandDispatcher = (command: Command, ctx: CommandContext) => Promise<Result<unknown>>;
 /**
- * chat.delegate — Backend command dispatcher.
- * If params.workflow is provided, dispatches "workflow.run" via the injected dispatcher.
- * No LLM calls, no chat UI — pure backend routing.
+ * Minimal prose generation interface — compatible with generateProse from infrastructure
+ * without introducing a cross-domain import.
  */
-export declare function createDelegateHandler(dispatcher: CommandDispatcher, logger: Logger): Handler<DelegateParams, DelegateResult>;
+export type GenerateProseFn = (req: {
+    domain: "hygiene" | "git" | "chat";
+    systemPrompt: string;
+    data: Record<string, unknown>;
+}) => Promise<Result<string>>;
+/**
+ * chat.delegate — Programmatic task router.
+ * Uses the LLM to classify a free-form task description into a command, then
+ * dispatches it. Intended for workflows, LM tools, and future agents — not the
+ * chat UX (which routes directly via SLASH_MAP/KEYWORD_MAP/classifier).
+ */
+export declare function createDelegateHandler(dispatcher: CommandDispatcher, logger: Logger, generateProseFn?: GenerateProseFn): Handler<DelegateParams, DelegateResult>;
 //# sourceMappingURL=handlers.d.ts.map

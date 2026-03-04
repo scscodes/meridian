@@ -68,7 +68,7 @@ export class GitAnalyzer {
     const authors = this.aggregateAuthors(commits);
 
     // Calculate trends
-    const trends = this.calculateTrends(commits);
+    const trends = this.calculateTrends(commits, since);
 
     // Build summary
     const summary = this.buildSummary(commits, files, authors, since, until);
@@ -147,6 +147,15 @@ export class GitAnalyzer {
           if (currentCommit && currentCommit.hash) {
             const filesLines = commitLines.get(currentCommit.hash) || [];
             this.aggregateCommitFiles(currentCommit as CommitMetric, filesLines);
+            if (opts.pathPattern !== undefined) {
+              const matched = (currentCommit as CommitMetric).files.filter(f =>
+                micromatch.isMatch(f.path, opts.pathPattern!)
+              );
+              (currentCommit as CommitMetric).files = matched;
+              (currentCommit as CommitMetric).filesChanged = matched.length;
+              (currentCommit as CommitMetric).insertions = matched.reduce((s, f) => s + f.insertions, 0);
+              (currentCommit as CommitMetric).deletions  = matched.reduce((s, f) => s + f.deletions, 0);
+            }
             if (opts.pathPattern === undefined || this.matchesPathPattern(currentCommit as CommitMetric, opts.pathPattern)) {
               commits.push(currentCommit as CommitMetric);
             }
@@ -178,6 +187,15 @@ export class GitAnalyzer {
       if (currentCommit && currentCommit.hash) {
         const filesLines = commitLines.get(currentCommit.hash) || [];
         this.aggregateCommitFiles(currentCommit as CommitMetric, filesLines);
+        if (opts.pathPattern !== undefined) {
+          const matched = (currentCommit as CommitMetric).files.filter(f =>
+            micromatch.isMatch(f.path, opts.pathPattern!)
+          );
+          (currentCommit as CommitMetric).files = matched;
+          (currentCommit as CommitMetric).filesChanged = matched.length;
+          (currentCommit as CommitMetric).insertions = matched.reduce((s, f) => s + f.insertions, 0);
+          (currentCommit as CommitMetric).deletions  = matched.reduce((s, f) => s + f.deletions, 0);
+        }
         if (opts.pathPattern === undefined || this.matchesPathPattern(currentCommit as CommitMetric, opts.pathPattern)) {
           commits.push(currentCommit as CommitMetric);
         }
@@ -328,35 +346,37 @@ export class GitAnalyzer {
   }
 
   /**
-   * Calculate trend metrics
+   * Calculate trend metrics, normalized by actual period length.
    */
-  private calculateTrends(commits: CommitMetric[]): TrendData {
-    // Simple slope calculation: compare first half vs second half
+  private calculateTrends(commits: CommitMetric[], _since: Date): TrendData {
+    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
     const mid = Math.floor(commits.length / 2);
-    const firstHalf = commits.slice(0, mid);
-    const secondHalf = commits.slice(mid);
+    const firstHalf  = commits.slice(0, mid);  // recent (git log: newest first)
+    const secondHalf = commits.slice(mid);      // older
 
-    const firstAvg = firstHalf.length > 0 ? firstHalf.length / ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS : 0;
-    const secondAvg = secondHalf.length > 0 ? secondHalf.length / ANALYTICS_SETTINGS.TREND_NORMALIZE_WEEKS : 0;
+    // Normalize each half by its own actual time span so density is comparable
+    const spanWeeks = (half: CommitMetric[]): number => {
+      if (half.length < 2) return 1;
+      const ms = Math.abs(half[0].date.getTime() - half[half.length - 1].date.getTime());
+      return Math.max(1, ms / WEEK_MS);
+    };
 
-    const commitSlope = secondAvg - firstAvg;
-    const commitDirection = this.getDirection(commitSlope);
+    const firstAvg  = firstHalf.length  / spanWeeks(firstHalf);
+    const secondAvg = secondHalf.length / spanWeeks(secondHalf);
 
-    // Volatility trend
-    const firstVolatility = this.getAverageVolatility(firstHalf);
-    const secondVolatility = this.getAverageVolatility(secondHalf);
-    const volatilitySlope = secondVolatility - firstVolatility;
-    const volatilityDirection = this.getDirection(volatilitySlope);
+    // recent − older: positive = increasing activity = "up"
+    const commitSlope     = firstAvg - secondAvg;
+    const volatilitySlope = this.getAverageVolatility(firstHalf) - this.getAverageVolatility(secondHalf);
 
     return {
       commitTrend: {
         slope: commitSlope,
-        direction: commitDirection,
+        direction: this.getDirection(commitSlope),
         confidence: ANALYTICS_SETTINGS.TREND_CONFIDENCE,
       },
       volatilityTrend: {
         slope: volatilitySlope,
-        direction: volatilityDirection,
+        direction: this.getDirection(volatilitySlope),
       },
     };
   }
@@ -435,12 +455,16 @@ export class GitAnalyzer {
   }
 
   /**
-   * Get week key for grouping (YYYY-W##)
+   * Get ISO 8601 week key for grouping (YYYY-W##).
+   * Avoids week-of-month fragmentation at month boundaries.
    */
   private getWeekKey(date: Date): string {
-    const d = new Date(date);
-    const week = Math.ceil(d.getDate() / 7);
-    return `${d.getFullYear()}-W${week.toString().padStart(2, "0")}`;
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return `${d.getUTCFullYear()}-W${week.toString().padStart(2, "0")}`;
   }
 
   /**

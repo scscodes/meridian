@@ -196,4 +196,94 @@ describe('GitAnalyzer', () => {
     expect(report.commits).toHaveLength(0);
     expect(report.summary.totalCommits).toBe(0);
   });
+
+  // Bug 1 fix: file aggregation respects path filter (no bleed-through from non-matching files)
+  it('should exclude non-matching files from commit metrics when pathPattern is set', async () => {
+    const gitLog = [
+      'aaa111|Alice|2026-02-20T10:00:00Z|feat: mixed commit',
+      '50\t10\tsrc/api/handler.ts',
+      '20\t5\tdocs/README.md',
+    ].join('\n');
+
+    mockedExecSync.mockReturnValue(gitLog);
+
+    const report = await analyzer.analyze({ period: '3mo', pathPattern: 'src/api/**' });
+
+    expect(report.commits).toHaveLength(1);
+    expect(report.commits[0].files).toHaveLength(1);
+    expect(report.commits[0].files[0].path).toBe('src/api/handler.ts');
+    // Only matched file stats — docs/README.md (20+5) must not bleed through
+    expect(report.commits[0].insertions).toBe(50);
+    expect(report.commits[0].deletions).toBe(10);
+    expect(report.files.every(f => f.path !== 'docs/README.md')).toBe(true);
+  });
+
+  // Bug 2 fix: trend direction reflects actual commit density, not raw count
+  it('should report "up" for recent burst and "down" for old burst', async () => {
+    // Setup A: 3 recent commits all on same day, 3 old spread over ~60 days → recent is denser
+    const recentBurstLog = [
+      'r001|Alice|2026-03-03T10:00:00Z|feat: A', '5\t2\tsrc/a.ts',
+      '',
+      'r002|Alice|2026-03-03T09:00:00Z|feat: B', '5\t2\tsrc/a.ts',
+      '',
+      'r003|Alice|2026-03-03T08:00:00Z|feat: C', '5\t2\tsrc/a.ts',
+      '',
+      'o001|Alice|2025-09-01T10:00:00Z|feat: D', '5\t2\tsrc/a.ts',
+      '',
+      'o002|Alice|2025-08-01T10:00:00Z|feat: E', '5\t2\tsrc/a.ts',
+      '',
+      'o003|Alice|2025-07-01T10:00:00Z|feat: F', '5\t2\tsrc/a.ts',
+    ].join('\n');
+
+    mockedExecSync.mockReturnValue(recentBurstLog);
+    const upReport = await analyzer.analyze({ period: '3mo' });
+    expect(upReport.trends.commitTrend.direction).toBe('up');
+
+    analyzer.clearCache();
+
+    // Setup B: 3 recent spread over ~76 days, 3 old all on same day → old is denser
+    const oldBurstLog = [
+      'r001|Alice|2026-03-01T10:00:00Z|feat: A', '5\t2\tsrc/a.ts',
+      '',
+      'r002|Alice|2026-01-15T10:00:00Z|feat: B', '5\t2\tsrc/a.ts',
+      '',
+      'r003|Alice|2025-12-15T10:00:00Z|feat: C', '5\t2\tsrc/a.ts',
+      '',
+      'o001|Alice|2025-12-01T10:00:00Z|feat: D', '5\t2\tsrc/a.ts',
+      '',
+      'o002|Alice|2025-12-01T10:00:00Z|feat: E', '5\t2\tsrc/a.ts',
+      '',
+      'o003|Alice|2025-12-01T10:00:00Z|feat: F', '5\t2\tsrc/a.ts',
+    ].join('\n');
+
+    mockedExecSync.mockReturnValue(oldBurstLog);
+    const downReport = await analyzer.analyze({ period: '3mo' });
+    expect(downReport.trends.commitTrend.direction).toBe('down');
+
+    analyzer.clearCache();
+
+    // Setup C: empty log → no commits → stable
+    mockedExecSync.mockReturnValue('');
+    const emptyReport = await analyzer.analyze({ period: '3mo' });
+    expect(emptyReport.trends.commitTrend.direction).toBe('stable');
+  });
+
+  // Bug 3 fix: getWeekKey uses UTC date components — no timezone misalignment
+  it('should bucket commits into correct ISO weeks using UTC dates', async () => {
+    // Jan 4, 2026 (Sunday) → ISO W01; Jan 5, 2026 (Monday) → ISO W02
+    // Without fix: in a negative-offset TZ, Jan 5 00:30 UTC reads as Jan 4 locally → W01 (wrong)
+    // With fix: UTC date components are used → W02 (correct)
+    const gitLog = [
+      'w001|Alice|2026-01-04T23:30:00Z|feat: last day of W01', '5\t2\tsrc/a.ts',
+      '',
+      'w002|Alice|2026-01-05T00:30:00Z|feat: first day of W02', '5\t2\tsrc/a.ts',
+    ].join('\n');
+
+    mockedExecSync.mockReturnValue(gitLog);
+    const report = await analyzer.analyze({ period: '3mo' });
+
+    expect(report.commitFrequency.labels).toHaveLength(2);
+    expect(report.commitFrequency.labels).toContain('2026-W01');
+    expect(report.commitFrequency.labels).toContain('2026-W02');
+  });
 });

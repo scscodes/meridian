@@ -25,6 +25,13 @@ const TOOL_DEFS: readonly ToolDef[] = [
   { name: "meridian_workflow_run",        commandName: "workflow.run"       },
   { name: "meridian_git_show_analytics",  commandName: "git.showAnalytics"  },
   { name: "meridian_chat_delegate",       commandName: "chat.delegate"      },
+  { name: "meridian_git_generate_pr",     commandName: "git.generatePR"       },
+  { name: "meridian_git_review_pr",       commandName: "git.reviewPR"         },
+  { name: "meridian_git_comment_pr",      commandName: "git.commentPR"        },
+  { name: "meridian_git_resolve_conflicts", commandName: "git.resolveConflicts" },
+  { name: "meridian_git_session_briefing", commandName: "git.sessionBriefing"  },
+  { name: "meridian_hygiene_impact",      commandName: "hygiene.impactAnalysis" },
+  { name: "meridian_agent_execute",       commandName: "agent.execute"         },
 ] as const;
 
 export function registerMeridianTools(

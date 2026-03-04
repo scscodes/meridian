@@ -187,6 +187,93 @@
             }
           }
         }
+      },
+      {
+        "name": "meridian_git_generate_pr",
+        "displayName": "Meridian: Generate PR",
+        "modelDescription": "Generate a pull request description from the current branch changes, including title, summary, and change breakdown.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_git_review_pr",
+        "displayName": "Meridian: Review PR",
+        "modelDescription": "Review current branch changes and return a verdict (approve/request-changes) with per-file comments and severity ratings.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_git_comment_pr",
+        "displayName": "Meridian: Comment PR",
+        "modelDescription": "Generate inline code review comments for changed files in the current branch.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_git_resolve_conflicts",
+        "displayName": "Meridian: Resolve Conflicts",
+        "modelDescription": "Detect git merge conflicts and suggest resolution strategies per file, including rationale for each recommendation.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_git_session_briefing",
+        "displayName": "Meridian: Session Briefing",
+        "modelDescription": "Generate a session briefing covering branch state, recent commits, uncommitted work, and suggested next steps.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_hygiene_impact",
+        "displayName": "Meridian: Impact Analysis",
+        "modelDescription": "Trace the blast radius of a file or function change using TypeScript Compiler API. Returns importers, call sites, test coverage, and a prose summary.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute or relative path to the TypeScript file to analyze"
+            },
+            "functionName": {
+              "type": "string",
+              "description": "Optional function or symbol name to trace call sites for"
+            }
+          },
+          "required": ["filePath"]
+        }
+      },
+      {
+        "name": "meridian_agent_execute",
+        "displayName": "Meridian: Execute Agent",
+        "modelDescription": "Execute a registered agent with a target command or workflow. Use meridian_agent_list first to discover available agents and their capabilities.",
+        "inputSchema": {
+          "type": "object",
+          "required": ["agentId"],
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "description": "The ID of the agent to execute"
+            },
+            "targetCommand": {
+              "type": "string",
+              "description": "The command to execute (must be in agent's capabilities list)"
+            },
+            "targetWorkflow": {
+              "type": "string",
+              "description": "The workflow to execute (alternative to targetCommand)"
+            }
+          }
+        }
       }
     ],
     "commands": [

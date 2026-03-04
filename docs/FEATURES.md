@@ -107,10 +107,10 @@ Gather workspace context for Copilot: active file path, current Git branch, Git 
 Spawn a sub-agent to execute a Meridian command asynchronously and return the result. Decouples long-running operations (analytics, scans) from the chat thread, allowing Copilot to continue interacting while work proceeds in the background.
 
 ### **@meridian chat participant**
-Use `@meridian` in Copilot Chat to interact with Meridian. Natural language is the primary interface — describe what you want and Meridian routes it via LLM intent classification (e.g., "show uncommitted changes", "what's the blast radius of createStatusHandler?", "run the morning sync workflow"). Slash commands (`/pr`, `/review`, `/briefing`, `/scan`, `/status`, `/workflows`, `/agents`, `/analytics`, `/conflicts`, `/context`) are accelerator shortcuts for common operations.
+Use `@meridian` in Copilot Chat to interact with Meridian. Natural language is the primary interface — describe what you want and Meridian routes it via LLM intent classification (e.g., "show uncommitted changes", "what's the blast radius of createStatusHandler?", "run the morning sync workflow"). Slash commands (`/pr`, `/review`, `/briefing`, `/scan`, `/status`, `/workflows`, `/agents`, `/analytics`, `/conflicts`, `/context`, `/impact`) are accelerator shortcuts for common operations.
 
 ### **Meridian LM Tools**
-Git, Hygiene, Workflow, and Agent commands are exposed as LM tools, allowing Copilot to autonomously discover and invoke Meridian features during agentic workflows.
+All major commands across Git, Hygiene, Workflow, and Agent domains are exposed as LM tools, allowing Copilot to autonomously discover and invoke Meridian features during agentic workflows — including export commands (`git.exportJson`, `git.exportCsv`).
 
 ---
 

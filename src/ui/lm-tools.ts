@@ -32,6 +32,8 @@ const TOOL_DEFS: readonly ToolDef[] = [
   { name: "meridian_git_session_briefing", commandName: "git.sessionBriefing"  },
   { name: "meridian_hygiene_impact",      commandName: "hygiene.impactAnalysis" },
   { name: "meridian_agent_execute",       commandName: "agent.execute"         },
+  { name: "meridian_git_export_json",     commandName: "git.exportJson"        },
+  { name: "meridian_git_export_csv",      commandName: "git.exportCsv"         },
 ] as const;
 
 export function registerMeridianTools(

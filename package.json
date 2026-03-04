@@ -274,6 +274,52 @@
             }
           }
         }
+      },
+      {
+        "name": "meridian_git_export_json",
+        "displayName": "Meridian: Export Git Analytics (JSON)",
+        "modelDescription": "Export the git analytics report data as a JSON file.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "string",
+              "enum": ["3mo", "6mo", "12mo"],
+              "description": "Time period for the analytics report. Defaults to 3mo."
+            },
+            "author": {
+              "type": "string",
+              "description": "Optional: filter analytics by author name."
+            },
+            "pathPattern": {
+              "type": "string",
+              "description": "Optional: filter analytics by file path glob pattern."
+            }
+          }
+        }
+      },
+      {
+        "name": "meridian_git_export_csv",
+        "displayName": "Meridian: Export Git Analytics (CSV)",
+        "modelDescription": "Export the git analytics report data as a CSV file.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "string",
+              "enum": ["3mo", "6mo", "12mo"],
+              "description": "Time period for the analytics report. Defaults to 3mo."
+            },
+            "author": {
+              "type": "string",
+              "description": "Optional: filter analytics by author name."
+            },
+            "pathPattern": {
+              "type": "string",
+              "description": "Optional: filter analytics by file path glob pattern."
+            }
+          }
+        }
       }
     ],
     "commands": [

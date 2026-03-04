@@ -100,6 +100,8 @@ git.reviewPR          – review branch changes (verdict + comments)
 git.commentPR         – generate inline review comments
 git.resolveConflicts  – suggest conflict resolution strategies
 git.sessionBriefing   – generate a morning session briefing
+git.exportJson        – export git analytics data as JSON
+git.exportCsv         – export git analytics data as CSV
 hygiene.scan          – scan workspace for dead files, large files, logs
 hygiene.showAnalytics – show hygiene analytics
 hygiene.cleanup       – delete flagged files from a hygiene scan (dry-run safe)
@@ -113,7 +115,8 @@ Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow
 
 const KNOWN_COMMANDS = new Set([
   "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
-  "git.showAnalytics", "git.generatePR", "git.reviewPR", "git.commentPR",
+  "git.showAnalytics", "git.exportJson", "git.exportCsv",
+  "git.generatePR", "git.reviewPR", "git.commentPR",
   "git.resolveConflicts", "git.sessionBriefing",
   "hygiene.scan", "hygiene.showAnalytics", "hygiene.cleanup", "hygiene.impactAnalysis",
   "workflow.list", "workflow.run", "agent.list", "agent.execute",

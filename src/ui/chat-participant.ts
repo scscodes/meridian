@@ -15,6 +15,8 @@ import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
+import { ListWorkflowsResult } from "../domains/workflow/types";
+import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
 const SLASH_MAP: Record<string, CommandName> = {
@@ -175,6 +177,41 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
   "hygiene.impactAnalysis": (value, stream) => {
     stream.markdown((value as ImpactAnalysisResult).summary);
   },
+  "workflow.list": (value, stream) => {
+    const r = value as ListWorkflowsResult;
+    if (r.count === 0) {
+      stream.markdown("No workflows found. Add `.vscode/workflows/*.json` to your workspace.");
+      return;
+    }
+    stream.markdown(`**${r.count} workflow${r.count === 1 ? "" : "s"} available:**\n\n`);
+    for (const w of r.workflows) {
+      const steps = `${w.stepCount} step${w.stepCount === 1 ? "" : "s"}`;
+      stream.markdown(`- **${w.name}** (${steps})${w.description ? ` — ${w.description}` : ""}\n`);
+    }
+  },
+  "agent.list": (value, stream) => {
+    const r = value as ListAgentsResult;
+    if (r.count === 0) {
+      stream.markdown("No agents found. Add `.vscode/agents/*.json` to your workspace.");
+      return;
+    }
+    stream.markdown(`**${r.count} agent${r.count === 1 ? "" : "s"} available:**\n\n`);
+    for (const a of r.agents) {
+      stream.markdown(`- **${a.id}**${a.description ? ` — ${a.description}` : ""} (${a.capabilities.length} capabilities)\n`);
+    }
+  },
+  "agent.execute": (value, stream) => {
+    const r = value as AgentExecutionResult;
+    const what = r.executedCommand ?? r.executedWorkflow ?? "unknown";
+    const status = r.success ? "succeeded" : "failed";
+    stream.markdown(`**Agent \`${r.agentId}\`** ran \`${what}\` — ${status} in ${r.durationMs}ms\n\n`);
+    if (r.error) {
+      stream.markdown(`**Error:** ${r.error}\n\n`);
+    }
+    if (r.output && Object.keys(r.output).length > 0) {
+      stream.markdown("**Output:**\n```json\n" + JSON.stringify(r.output, null, 2) + "\n```\n");
+    }
+  },
 };
 
 function formatCommandResult(
@@ -187,11 +224,8 @@ function formatCommandResult(
     formatter(value, stream);
     return;
   }
-  // Default: generic message + optional JSON for list commands
+  // Default: generic message from result-handler
   const msg = formatResultMessage(commandName, { kind: "ok", value });
   stream.markdown(msg.message);
-  if (commandName === "workflow.list" || commandName === "agent.list") {
-    stream.markdown("\n\n```json\n" + JSON.stringify(value, null, 2) + "\n```");
-  }
 }
 

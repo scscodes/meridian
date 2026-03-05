@@ -93,20 +93,32 @@ describe("formatResultMessage", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 6. workflow.run failure (success=false, failedAt set) → error level
+  // 6. workflow.run failure → error code maps to friendly message
+  //    (failures return Result<err>, not success({ success: false }))
   // -----------------------------------------------------------------------
-  it("formats workflow.run failure with failed step info", () => {
-    const result = success({
-      workflowName: "deploy",
-      success: false,
-      failedAt: "step2",
+  it("maps WORKFLOW_EXECUTION_FAILED to friendly error message", () => {
+    const result: Result<unknown> = failure({
+      code: "WORKFLOW_EXECUTION_FAILED",
+      message: "Step 'build' timed out",
     });
     const msg = formatResultMessage("workflow.run", result);
 
     expect(msg.level).toBe("error");
-    expect(msg.message).toContain("deploy");
-    expect(msg.message).toContain("step2");
-    expect(msg.message).toContain("failed");
+    expect(msg.message).toContain("Workflow execution failed");
+  });
+
+  // -----------------------------------------------------------------------
+  // 6b. WORKFLOW_NOT_FOUND → friendly error
+  // -----------------------------------------------------------------------
+  it("maps WORKFLOW_NOT_FOUND to friendly error message", () => {
+    const result: Result<unknown> = failure({
+      code: "WORKFLOW_NOT_FOUND",
+      message: "Workflow not found: deploy",
+    });
+    const msg = formatResultMessage("workflow.run", result);
+
+    expect(msg.level).toBe("error");
+    expect(msg.message).toContain("Workflow not found");
   });
 
   // -----------------------------------------------------------------------
@@ -121,6 +133,62 @@ describe("formatResultMessage", () => {
     expect(msg.level).toBe("info");
     expect(msg.message).toContain("Delegated");
     expect(msg.message).toContain("git.status");
+  });
+
+  // -----------------------------------------------------------------------
+  // 7b. agent.execute success → agentId + command + timing
+  // -----------------------------------------------------------------------
+  it("formats agent.execute success with agent id and command", () => {
+    const result = success({
+      agentId: "my-agent",
+      success: true,
+      durationMs: 1200,
+      logs: [],
+      executedCommand: "git.status",
+      agentCapabilities: ["git.status"],
+    });
+    const msg = formatResultMessage("agent.execute", result);
+
+    expect(msg.level).toBe("info");
+    expect(msg.message).toContain("my-agent");
+    expect(msg.message).toContain("git.status");
+    expect(msg.message).toContain("1200ms");
+  });
+
+  // -----------------------------------------------------------------------
+  // 7c. agent.execute internal failure → error level with message
+  //     (agent always wraps failures in success({ success: false }))
+  // -----------------------------------------------------------------------
+  it("formats agent.execute internal failure as error with reason", () => {
+    const result = success({
+      agentId: "my-agent",
+      success: false,
+      durationMs: 50,
+      logs: [],
+      error: "Command 'git.status' returned an error",
+      executedCommand: "git.status",
+      agentCapabilities: ["git.status"],
+    });
+    const msg = formatResultMessage("agent.execute", result);
+
+    expect(msg.level).toBe("error");
+    expect(msg.message).toContain("my-agent");
+    expect(msg.message).toContain("failed");
+    expect(msg.message).toContain("Command 'git.status' returned an error");
+  });
+
+  // -----------------------------------------------------------------------
+  // 7d. AGENT_NOT_FOUND → friendly error
+  // -----------------------------------------------------------------------
+  it("maps AGENT_NOT_FOUND to friendly error message", () => {
+    const result: Result<unknown> = failure({
+      code: "AGENT_NOT_FOUND",
+      message: "Agent 'foo' not found",
+    });
+    const msg = formatResultMessage("agent.execute", result);
+
+    expect(msg.level).toBe("error");
+    expect(msg.message).toContain("Agent not found");
   });
 
   // -----------------------------------------------------------------------

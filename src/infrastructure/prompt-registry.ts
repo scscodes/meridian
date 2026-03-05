@@ -3,7 +3,12 @@
  *
  * Every prompt used across the codebase is defined here with a typed ID.
  * Handlers import by ID rather than inlining prompt strings.
+ *
+ * The DELEGATE_CLASSIFIER command list is generated from COMMAND_CATALOG
+ * (src/infrastructure/command-catalog.ts) — do not edit it inline here.
  */
+
+import { buildClassifierLines } from "./command-catalog";
 
 export type PromptId =
   | "PR_GENERATION"
@@ -123,26 +128,7 @@ Guidelines:
   DELEGATE_CLASSIFIER: `You are a command router for the Meridian VS Code extension.
 Given a task description, respond with EXACTLY ONE command ID that best handles it.
 
-git.status            – check branch state
-git.smartCommit       – group and commit staged changes
-git.pull              – pull remote changes
-git.analyzeInbound    – analyze incoming remote changes for conflicts
-git.showAnalytics     – show git analytics report
-git.generatePR        – generate a PR description
-git.reviewPR          – review branch changes (verdict + comments)
-git.commentPR         – generate inline review comments
-git.resolveConflicts  – suggest conflict resolution strategies
-git.sessionBriefing   – generate a morning session briefing
-git.exportJson        – export git analytics data as JSON
-git.exportCsv         – export git analytics data as CSV
-hygiene.scan          – scan workspace for dead files, large files, logs
-hygiene.showAnalytics – show hygiene analytics
-hygiene.cleanup       – delete flagged files from a hygiene scan (dry-run safe)
-hygiene.impactAnalysis – trace blast radius of a file or function
-workflow.list         – list available workflows
-workflow.run:<name>   – run a named workflow (replace <name>)
-agent.list            – list available agents
-agent.execute         – run a named agent with a target command or workflow
+${buildClassifierLines()}
 
 Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`,
 

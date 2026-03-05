@@ -17,6 +17,7 @@ vi.mock("vscode", () => ({
 }));
 
 import { registerMeridianTools } from "../src/ui/lm-tools";
+import { LM_TOOL_DEFS } from "../src/infrastructure/command-catalog";
 import * as vscode from "vscode";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -42,14 +43,14 @@ describe("registerMeridianTools", () => {
     logger = new MockLogger();
   });
 
-  it("registers all tools via vscode.lm.registerTool", () => {
+  it("registers all catalog tools via vscode.lm.registerTool", () => {
     registerMeridianTools(router as any, BASE_CTX, logger);
-    expect(vscode.lm.registerTool).toHaveBeenCalledTimes(16);
+    expect(vscode.lm.registerTool).toHaveBeenCalledTimes(LM_TOOL_DEFS.length);
   });
 
   it("returns one disposable per tool", () => {
     const disposables = registerMeridianTools(router as any, BASE_CTX, logger);
-    expect(disposables).toHaveLength(16);
+    expect(disposables).toHaveLength(LM_TOOL_DEFS.length);
     expect(disposables[0]).toHaveProperty("dispose");
   });
 
@@ -73,6 +74,22 @@ describe("registerMeridianTools", () => {
     registerMeridianTools(router as any, BASE_CTX, logger);
     expect(vscode.lm.registerTool).toHaveBeenCalledWith(
       "meridian_git_analyze_inbound",
+      expect.objectContaining({ invoke: expect.any(Function) })
+    );
+  });
+
+  it("registers meridian_workflow_list tool", () => {
+    registerMeridianTools(router as any, BASE_CTX, logger);
+    expect(vscode.lm.registerTool).toHaveBeenCalledWith(
+      "meridian_workflow_list",
+      expect.objectContaining({ invoke: expect.any(Function) })
+    );
+  });
+
+  it("registers meridian_agent_list tool", () => {
+    registerMeridianTools(router as any, BASE_CTX, logger);
+    expect(vscode.lm.registerTool).toHaveBeenCalledWith(
+      "meridian_agent_list",
       expect.objectContaining({ invoke: expect.any(Function) })
     );
   });

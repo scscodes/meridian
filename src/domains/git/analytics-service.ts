@@ -9,7 +9,6 @@ import {
   AnalyticsOptions,
   AnalyticsSummary,
   AuthorMetric,
-  CachedAnalytics,
   CommitMetric,
   CommitFileChange,
   FileMetric,
@@ -17,6 +16,7 @@ import {
   TrendData,
 } from "./analytics-types";
 import { ANALYTICS_SETTINGS, CACHE_SETTINGS } from "../../constants";
+import { TtlCache } from "../../infrastructure/cache";
 
 /** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
 const ANALYTICS_EXCLUDE = [
@@ -31,8 +31,7 @@ const ANALYTICS_EXCLUDE = [
 ];
 
 export class GitAnalyzer {
-  private cacheMap: Map<string, CachedAnalytics> = new Map();
-  private readonly cacheTTLMs = CACHE_SETTINGS.ANALYTICS_TTL_MS;
+  private cacheMap = new TtlCache<string, GitAnalyticsReport>(CACHE_SETTINGS.ANALYTICS_TTL_MS);
 
   constructor(private readonly workspaceRoot: string = process.cwd()) {}
 
@@ -52,8 +51,8 @@ export class GitAnalyzer {
 
     // Check cache
     const cached = this.cacheMap.get(cacheKey);
-    if (cached && Date.now() - cached.cachedAt.getTime() < this.cacheTTLMs) {
-      return cached.report;
+    if (cached) {
+      return cached;
     }
 
     // Calculate date range
@@ -98,11 +97,7 @@ export class GitAnalyzer {
     };
 
     // Cache result
-    this.cacheMap.set(cacheKey, {
-      report,
-      cachedAt: new Date(),
-      key: cacheKey,
-    });
+    this.cacheMap.set(cacheKey, report);
 
     return report;
   }

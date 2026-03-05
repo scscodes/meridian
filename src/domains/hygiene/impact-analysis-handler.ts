@@ -11,6 +11,7 @@
 
 import * as path from "path";
 import * as ts from "typescript";
+import { ImpactAnalysisVisitor } from "./impact-visitor";
 import {
   Handler,
   CommandContext,
@@ -21,6 +22,8 @@ import {
 } from "../../types";
 import { generateProse, ProseRequest } from "../../infrastructure/prose-generator";
 import { CACHE_SETTINGS } from "../../constants";
+import { TtlCache } from "../../infrastructure/cache";
+import { HYGIENE_ERROR_CODES, GENERIC_ERROR_CODES, INFRASTRUCTURE_ERROR_CODES } from "../../infrastructure/error-codes";
 
 export interface ImpactAnalysisParams {
   filePath?: string; // Absolute or relative path to a .ts file
@@ -48,106 +51,8 @@ interface ImpactContext {
   analysisType: "file" | "function";
 }
 
-class ImpactAnalysisVisitor {
-  private importers: Set<string> = new Set();
-  private callSites: string[] = [];
-  private testFiles: Set<string> = new Set();
-
-  constructor(
-    private program: ts.Program,
-    private targetFile: string,
-    private targetFunction?: string
-  ) {}
-
-  analyze(): { importers: string[]; callSites: string[]; testFiles: string[] } {
-    const sourceFiles = this.program.getSourceFiles();
-
-    for (const sourceFile of sourceFiles) {
-      // Skip declarations and tests for now (analyze later)
-      if (sourceFile.fileName.includes(".d.ts")) continue;
-
-      // Track test files
-      if (this.isTestFile(sourceFile.fileName)) {
-        this.testFiles.add(sourceFile.fileName);
-      }
-
-      // Visitor for this file
-      ts.forEachChild(sourceFile, (node: ts.Node) => {
-        this.visitNode(node, sourceFile.fileName);
-      });
-    }
-
-    return {
-      importers: Array.from(this.importers),
-      callSites: this.callSites,
-      testFiles: Array.from(this.testFiles),
-    };
-  }
-
-  private visitNode(node: ts.Node | undefined, fileName: string): void {
-    if (!node) return;
-    // Check for import statements
-    if (ts.isImportDeclaration(node) || ts.isImportEqualsDeclaration(node)) {
-      const importPath = this.extractImportPath(node);
-      if (importPath && this.pathsResolveToTarget(importPath)) {
-        this.importers.add(fileName);
-      }
-    }
-
-    // Check for function calls if analyzing a specific function
-    if (this.targetFunction && ts.isCallExpression(node)) {
-      const funcName = this.extractCallName(node);
-      if (funcName === this.targetFunction) {
-        this.callSites.push(`${fileName}:${node.getStart()}`);
-      }
-    }
-
-    // Recurse
-    ts.forEachChild(node, (child: ts.Node) => {
-      this.visitNode(child, fileName);
-    });
-  }
-
-  private extractImportPath(node: ts.Node): string | null {
-    if (ts.isImportDeclaration(node)) {
-      const moduleSpecifier = node.moduleSpecifier;
-      if (ts.isStringLiteral(moduleSpecifier)) {
-        return moduleSpecifier.text;
-      }
-    } else if (ts.isImportEqualsDeclaration(node)) {
-      const moduleReference = node.moduleReference;
-      if (ts.isExternalModuleReference(moduleReference) && ts.isStringLiteral(moduleReference.expression)) {
-        return moduleReference.expression.text;
-      }
-    }
-    return null;
-  }
-
-  // Simple heuristic: check if path contains target filename stem.
-  private pathsResolveToTarget(importPath: string): boolean {
-    const targetStem = path.parse(this.targetFile).name;
-    // Match ".../name" or "./name" or "../name"
-    return importPath.endsWith(`/${targetStem}`) || importPath.endsWith(`\/${targetStem}`);
-  }
-
-  private extractCallName(node: ts.CallExpression): string | null {
-    const expression = node.expression;
-    if (ts.isIdentifier(expression)) {
-      return expression.text;
-    }
-    if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.name)) {
-      return expression.name.text;
-    }
-    return null;
-  }
-
-  private isTestFile(fileName: string): boolean {
-    return /\.test\.(ts|js)$/.test(fileName) || /\.spec\.(ts|js)$/.test(fileName);
-  }
-}
-
 class ImpactAnalyzer {
-  private cache = new Map<string, ImpactContext>();
+  private cache = new TtlCache<string, ImpactContext>(CACHE_SETTINGS.ANALYTICS_TTL_MS);
 
   constructor(private logger: Logger) {}
 
@@ -158,7 +63,7 @@ class ImpactAnalyzer {
   ): ImpactContext | null {
     const cacheKey = `${workspaceRoot}|${filePath || functionName}`;
     const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() - (cached as any).cachedAt < CACHE_SETTINGS.ANALYTICS_TTL_MS) {
+    if (cached) {
       return cached;
     }
 
@@ -207,14 +112,12 @@ class ImpactAnalyzer {
         analysisType: filePath ? "file" : "function",
       };
 
-      // Cache (with timestamp)
-      (context as any).cachedAt = Date.now();
       this.cache.set(cacheKey, context);
 
       return context;
     } catch (err) {
       this.logger.warn("Impact analysis failed", "ImpactAnalyzer", {
-        code: "IMPACT_ANALYSIS_ERROR",
+        code: HYGIENE_ERROR_CODES.IMPACT_ANALYSIS_ERROR,
         message: String(err),
       });
       return null;
@@ -234,7 +137,7 @@ export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnaly
       // Validate input
       if (!params.filePath && !params.functionName) {
         return failure({
-          code: "INVALID_PARAMS",
+          code: GENERIC_ERROR_CODES.INVALID_PARAMS,
           message: "Impact analysis requires either filePath or functionName",
           context: "hygiene.impactAnalysis",
         });
@@ -248,7 +151,7 @@ export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnaly
       const workspaceRoot = _ctx.workspaceFolders?.[0];
       if (!workspaceRoot) {
         return failure({
-          code: "WORKSPACE_NOT_FOUND",
+          code: INFRASTRUCTURE_ERROR_CODES.WORKSPACE_NOT_FOUND,
           message: "No workspace folder found",
           context: "hygiene.impactAnalysis",
         });
@@ -258,7 +161,7 @@ export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnaly
       const context = analyzer.analyze(workspaceRoot, params.filePath, params.functionName);
       if (!context) {
         return failure({
-          code: "IMPACT_ANALYSIS_ERROR",
+          code: HYGIENE_ERROR_CODES.IMPACT_ANALYSIS_ERROR,
           message: "Failed to analyze impact; check TypeScript config and file paths",
           context: "hygiene.impactAnalysis",
         });
@@ -299,7 +202,7 @@ Be brief and actionable.`,
       });
     } catch (err) {
       return failure({
-        code: "IMPACT_ANALYSIS_ERROR",
+        code: HYGIENE_ERROR_CODES.IMPACT_ANALYSIS_ERROR,
         message: `Impact analysis failed: ${err instanceof Error ? err.message : String(err)}`,
         details: err,
         context: "hygiene.impactAnalysis",

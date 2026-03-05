@@ -10,22 +10,20 @@ exports.GitAnalyzer = void 0;
 const child_process_1 = require("child_process");
 const micromatch_1 = __importDefault(require("micromatch"));
 const constants_1 = require("../../constants");
+const cache_1 = require("../../infrastructure/cache");
 /** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
 const ANALYTICS_EXCLUDE = [
-    "**/node_modules/**",
-    "**/.git/**",
+    ...constants_1.WORKSPACE_EXCLUDE_BASE,
     "**/out/**",
     "**/dist/**",
     "**/build/**",
-    "**/.vscode/**",
     "**/*.lock",
     "**/package-lock.json",
 ];
 class GitAnalyzer {
     constructor(workspaceRoot = process.cwd()) {
         this.workspaceRoot = workspaceRoot;
-        this.cacheMap = new Map();
-        this.cacheTTLMs = constants_1.CACHE_SETTINGS.ANALYTICS_TTL_MS;
+        this.cacheMap = new cache_1.TtlCache(constants_1.CACHE_SETTINGS.ANALYTICS_TTL_MS);
     }
     /**
      * Generate cache key from options
@@ -41,8 +39,8 @@ class GitAnalyzer {
         const cacheKey = this.getCacheKey(opts);
         // Check cache
         const cached = this.cacheMap.get(cacheKey);
-        if (cached && Date.now() - cached.cachedAt.getTime() < this.cacheTTLMs) {
-            return cached.report;
+        if (cached) {
+            return cached;
         }
         // Calculate date range
         const since = this.getPeriodStartDate(opts.period);
@@ -77,11 +75,7 @@ class GitAnalyzer {
             topAuthors,
         };
         // Cache result
-        this.cacheMap.set(cacheKey, {
-            report,
-            cachedAt: new Date(),
-            key: cacheKey,
-        });
+        this.cacheMap.set(cacheKey, report);
         return report;
     }
     /**

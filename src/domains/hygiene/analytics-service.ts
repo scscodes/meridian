@@ -17,7 +17,7 @@ import {
   PRUNE_DEFAULTS,
 } from "./analytics-types";
 import { DeadCodeScan } from "../../types";
-import { HYGIENE_ANALYTICS_EXCLUDE_PATTERNS } from "../../constants";
+import { CACHE_SETTINGS, HYGIENE_ANALYTICS_EXCLUDE_PATTERNS } from "../../constants";
 import { TtlCache } from "../../infrastructure/cache";
 import {
   categorize,
@@ -110,7 +110,7 @@ function buildDeadCodeRelPathMap(
 // ============================================================================
 
 export class HygieneAnalyzer {
-  private cache = new TtlCache<string, { report: HygieneAnalyticsReport; configKey: string }>(10 * 60 * 1000);
+  private cache = new TtlCache<string, { report: HygieneAnalyticsReport; configKey: string }>(CACHE_SETTINGS.ANALYTICS_TTL_MS);
 
   /**
    * Analyze workspace files and return a full report.

@@ -7,13 +7,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WorkflowDomainService = exports.WORKFLOW_COMMANDS = void 0;
-exports.validateWorkflowDefinition = validateWorkflowDefinition;
 exports.createWorkflowDomain = createWorkflowDomain;
 const node_path_1 = __importDefault(require("node:path"));
 const types_1 = require("../../types");
 const handlers_1 = require("./handlers");
 const workspace_1 = require("../../infrastructure/workspace");
 const workflow_engine_1 = require("../../infrastructure/workflow-engine");
+const validation_1 = require("./validation");
 /**
  * Workflow domain commands.
  */
@@ -77,7 +77,7 @@ class WorkflowDomainService {
                 const files = (0, workspace_1.listJsonFiles)(bundledDir);
                 for (const filePath of files) {
                     const data = (0, workspace_1.readJsonFile)(filePath);
-                    if (data && validateWorkflowDefinition(data)) {
+                    if (data && (0, validation_1.validateWorkflowDefinition)(data)) {
                         this.workflowCache.set(data.name, data);
                     }
                 }
@@ -92,7 +92,7 @@ class WorkflowDomainService {
         const files = (0, workspace_1.listJsonFiles)(workflowsDir);
         for (const filePath of files) {
             const data = (0, workspace_1.readJsonFile)(filePath);
-            if (data && validateWorkflowDefinition(data)) {
+            if (data && (0, validation_1.validateWorkflowDefinition)(data)) {
                 this.workflowCache.set(data.name, data);
             }
         }
@@ -132,39 +132,6 @@ class WorkflowDomainService {
     }
 }
 exports.WorkflowDomainService = WorkflowDomainService;
-/**
- * Validate workflow definition schema.
- */
-function validateWorkflowDefinition(data) {
-    if (typeof data !== "object" || data === null) {
-        return false;
-    }
-    const obj = data;
-    // Required fields
-    if (typeof obj.name !== "string" || !obj.name) {
-        return false;
-    }
-    if (!Array.isArray(obj.steps) || obj.steps.length === 0) {
-        return false;
-    }
-    // Validate each step
-    for (const step of obj.steps) {
-        if (typeof step !== "object" || step === null) {
-            return false;
-        }
-        const stepObj = step;
-        if (typeof stepObj.id !== "string" || !stepObj.id) {
-            return false;
-        }
-        if (typeof stepObj.command !== "string" || !stepObj.command) {
-            return false;
-        }
-        if (typeof stepObj.params !== "object") {
-            return false;
-        }
-    }
-    return true;
-}
 /**
  * Factory function — creates and returns workflow domain service.
  */

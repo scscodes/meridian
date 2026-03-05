@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createListWorkflowsHandler = createListWorkflowsHandler;
 exports.createRunWorkflowHandler = createRunWorkflowHandler;
 const types_1 = require("../../types");
+const error_codes_1 = require("../../infrastructure/error-codes");
 /**
  * workflow.list — Show all available workflows.
  */
@@ -27,7 +28,7 @@ function createListWorkflowsHandler(logger, discoverWorkflows) {
         }
         catch (err) {
             return (0, types_1.failure)({
-                code: "WORKFLOW_LIST_ERROR",
+                code: error_codes_1.WORKFLOW_ERROR_CODES.WORKFLOW_LIST_ERROR,
                 message: "Failed to list workflows",
                 details: err,
                 context: "workflow.list",
@@ -43,7 +44,7 @@ function createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow) {
         // Validate params
         if (!params.name || params.name.trim().length === 0) {
             return (0, types_1.failure)({
-                code: "INVALID_PARAMS",
+                code: error_codes_1.GENERIC_ERROR_CODES.INVALID_PARAMS,
                 message: "Workflow name is required",
                 context: "workflow.run",
             });
@@ -54,7 +55,7 @@ function createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow) {
             const workflow = loadWorkflow(params.name);
             if (!workflow) {
                 return (0, types_1.failure)({
-                    code: "WORKFLOW_NOT_FOUND",
+                    code: error_codes_1.WORKFLOW_ERROR_CODES.WORKFLOW_NOT_FOUND,
                     message: `Workflow not found: ${params.name}`,
                     context: "workflow.run",
                 });
@@ -77,7 +78,7 @@ function createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow) {
             else {
                 const failedStepId = executionResult.error.details?.currentStep;
                 return (0, types_1.failure)({
-                    code: "WORKFLOW_EXECUTION_FAILED",
+                    code: error_codes_1.WORKFLOW_ERROR_CODES.WORKFLOW_EXECUTION_FAILED,
                     message: `Workflow failed: ${executionResult.error.message}`,
                     details: {
                         duration,
@@ -90,7 +91,7 @@ function createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow) {
         }
         catch (err) {
             return (0, types_1.failure)({
-                code: "WORKFLOW_RUN_ERROR",
+                code: error_codes_1.WORKFLOW_ERROR_CODES.WORKFLOW_RUN_ERROR,
                 message: `Failed to run workflow: ${params.name}`,
                 details: err,
                 context: "workflow.run",

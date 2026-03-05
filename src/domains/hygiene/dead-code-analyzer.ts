@@ -11,14 +11,10 @@ import * as path from "path";
 import { DeadCodeItem, DeadCodeScan, Logger } from "../../types";
 import { CACHE_SETTINGS, DEAD_CODE_DIAGNOSTIC_CODES, HYGIENE_SETTINGS } from "../../constants";
 import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
-
-interface CachedScan {
-  scan: DeadCodeScan;
-  cachedAt: number;
-}
+import { TtlCache } from "../../infrastructure/cache";
 
 export class DeadCodeAnalyzer {
-  private cache = new Map<string, CachedScan>();
+  private cache = new TtlCache<string, DeadCodeScan>(CACHE_SETTINGS.DEAD_CODE_TTL_MS);
 
   constructor(private readonly logger: Logger) {}
 
@@ -28,14 +24,14 @@ export class DeadCodeAnalyzer {
    */
   analyze(workspaceRoot: string): DeadCodeScan {
     const cached = this.cache.get(workspaceRoot);
-    if (cached && Date.now() - cached.cachedAt < CACHE_SETTINGS.DEAD_CODE_TTL_MS) {
+    if (cached) {
       this.logger.debug("Dead code analyzer: cache hit", "DeadCodeAnalyzer");
-      return cached.scan;
+      return cached;
     }
 
     try {
       const scan = this.runScan(workspaceRoot);
-      this.cache.set(workspaceRoot, { scan, cachedAt: Date.now() });
+      this.cache.set(workspaceRoot, scan);
       this.logger.info(
         `Dead code scan complete: ${scan.items.length} issues in ${scan.fileCount} files (${scan.durationMs}ms)`,
         "DeadCodeAnalyzer"

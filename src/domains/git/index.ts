@@ -62,7 +62,7 @@ export {
   AnalyticsOptions,
   AnalyticsSummary,
   AuthorMetric,
-  CachedAnalytics,
+
   CommitMetric,
   CommitTrend,
   FileMetric,

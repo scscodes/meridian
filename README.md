@@ -30,7 +30,7 @@ Meridian brings smart commit grouping, PR generation and review, workspace hygie
 
 - **`@meridian` Chat Participant** -- use natural language in Copilot Chat to invoke any Meridian feature. An LLM classifier routes your request to the right command automatically.
 - **11 Slash Commands** -- accelerator shortcuts for common operations: `/status`, `/scan`, `/analytics`, `/pr`, `/review`, `/briefing`, `/conflicts`, `/impact`, `/workflows`, `/agents`, `/context`.
-- **14 LM Tools** -- all major commands are exposed as Language Model tools, enabling Copilot to autonomously discover and orchestrate Meridian features in agent mode.
+- **16 LM Tools** -- all major commands are exposed as Language Model tools, enabling Copilot to autonomously discover and orchestrate Meridian features in agent mode.
 
 ---
 

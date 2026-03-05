@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createListAgentsHandler = createListAgentsHandler;
 const types_1 = require("../../types");
+const error_codes_1 = require("../../infrastructure/error-codes");
 /**
  * agent.list — Show all available agent definitions.
  */
@@ -27,7 +28,7 @@ function createListAgentsHandler(logger, discoverAgents) {
         }
         catch (err) {
             return (0, types_1.failure)({
-                code: "AGENT_LIST_ERROR",
+                code: error_codes_1.AGENT_ERROR_CODES.AGENT_LIST_ERROR,
                 message: "Failed to list agents",
                 details: err,
                 context: "agent.list",

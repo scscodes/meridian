@@ -13,11 +13,11 @@ The chat participant originally ran its own inline LLM classifier alongside the 
 
 ## Decision
 
-All natural language input routes through `router.dispatch("chat.delegate", { task })`. The `chat.delegate` handler owns classification — the prompt (`DELEGATE_CLASSIFIER_PROMPT`) and the valid command set (`KNOWN_COMMANDS`). The chat participant does zero classification; it dispatches and formats.
+All natural language input routes through `router.dispatch("chat.delegate", { task })`. The `chat.delegate` handler owns classification — the prompt (registry ID: `DELEGATE_CLASSIFIER`) and the valid command set (`KNOWN_COMMANDS`). The chat participant does zero classification; it dispatches and formats.
 
 **Adding a new command means updating exactly two places:**
 1. `KNOWN_COMMANDS` in `src/domains/chat/handlers.ts`
-2. One line in `DELEGATE_CLASSIFIER_PROMPT` describing when to select it
+2. One line in the `DELEGATE_CLASSIFIER` prompt (in `src/infrastructure/prompt-registry.ts`) describing when to select it
 
 Nowhere else. Not in `chat-participant.ts`. Not in a keyword map. Not in a switch statement.
 
@@ -42,4 +42,5 @@ Do NOT add keyword maps, shortcut maps, or inline classifiers to `chat-participa
 ## Reference
 
 - `src/ui/chat-participant.ts` — dispatch-only routing
-- `src/domains/chat/handlers.ts` — `KNOWN_COMMANDS`, `DELEGATE_CLASSIFIER_PROMPT`
+- `src/domains/chat/handlers.ts` — `KNOWN_COMMANDS`
+- `src/infrastructure/prompt-registry.ts` — `DELEGATE_CLASSIFIER` prompt

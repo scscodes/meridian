@@ -1,7 +1,10 @@
 "use strict";
 /**
- * Analytics Webview Provider — opens a full-width editor panel (Welcome Screen style)
- * displaying git analytics with Chart.js visualizations.
+ * Webview Providers — base class + Git/Hygiene analytics subclasses.
+ *
+ * BaseWebviewProvider<T> centralizes: panel lifecycle, buildHtml(), CSP nonce
+ * injection, and asset URI rewriting. Subclasses provide view metadata and
+ * message handling.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -37,54 +40,65 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HygieneAnalyticsWebviewProvider = exports.AnalyticsWebviewProvider = void 0;
+exports.HygieneAnalyticsWebviewProvider = exports.AnalyticsWebviewProvider = exports.BaseWebviewProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const crypto = __importStar(require("crypto"));
-class AnalyticsWebviewProvider {
-    constructor(extensionUri, workspaceRoot, onFilter) {
+// ============================================================================
+// Base Class
+// ============================================================================
+class BaseWebviewProvider {
+    constructor(extensionUri) {
         this.extensionUri = extensionUri;
-        this.workspaceRoot = workspaceRoot;
-        this.onFilter = onFilter;
         this.panel = null;
     }
     async openPanel(report) {
+        const uiDirUri = vscode.Uri.joinPath(this.extensionUri, ...this.getUiDirSegments());
         if (this.panel) {
             this.panel.reveal(vscode.ViewColumn.One);
         }
         else {
-            this.panel = vscode.window.createWebviewPanel("meridian.analytics", "Git Analytics — Meridian", vscode.ViewColumn.One, {
+            this.panel = vscode.window.createWebviewPanel(this.getViewId(), this.getViewTitle(), vscode.ViewColumn.One, {
                 enableScripts: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(this.extensionUri, "out", "domains", "git", "analytics-ui"),
-                ],
+                localResourceRoots: [uiDirUri],
                 retainContextWhenHidden: true,
             });
             this.panel.onDidDispose(() => {
                 this.panel = null;
             });
             this.panel.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
-            this.panel.webview.html = this.buildHtml(this.panel.webview);
+            this.panel.webview.html = this.buildHtml(this.panel.webview, uiDirUri);
         }
         this.panel.webview.postMessage({ type: "init", payload: report });
     }
-    buildHtml(webview) {
-        const uiDir = vscode.Uri.joinPath(this.extensionUri, "out", "domains", "git", "analytics-ui");
-        const htmlPath = path.join(uiDir.fsPath, "index.html");
+    buildHtml(webview, uiDirUri) {
+        const htmlPath = path.join(uiDirUri.fsPath, "index.html");
         let html = fs.readFileSync(htmlPath, "utf-8");
         const nonce = crypto.randomBytes(16).toString("base64");
         const cspSource = webview.cspSource;
-        const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDir, "styles.css"));
-        const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDir, "script.js"));
-        // Inject CSP nonce and source
+        const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDirUri, "styles.css"));
+        const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDirUri, "script.js"));
         html = html.replace(/\{\{NONCE\}\}/g, nonce);
         html = html.replace(/\{\{WEBVIEW_CSP_SOURCE\}\}/g, cspSource);
-        // Rewrite local asset references to webview URIs
         html = html.replace(/href="styles\.css"/g, `href="${cssUri}"`);
         html = html.replace(/src="script\.js"/g, `src="${jsUri}"`);
         return html;
     }
+}
+exports.BaseWebviewProvider = BaseWebviewProvider;
+// ============================================================================
+// Git Analytics Webview
+// ============================================================================
+class AnalyticsWebviewProvider extends BaseWebviewProvider {
+    constructor(extensionUri, workspaceRoot, onFilter) {
+        super(extensionUri);
+        this.workspaceRoot = workspaceRoot;
+        this.onFilter = onFilter;
+    }
+    getViewId() { return "meridian.analytics"; }
+    getViewTitle() { return "Git Analytics — Meridian"; }
+    getUiDirSegments() { return ["out", "domains", "git", "analytics-ui"]; }
     async handleMessage(msg) {
         if (msg.type === "filter") {
             try {
@@ -113,49 +127,20 @@ class AnalyticsWebviewProvider {
 }
 exports.AnalyticsWebviewProvider = AnalyticsWebviewProvider;
 // ============================================================================
-// Hygiene Analytics Webview Provider
+// Hygiene Analytics Webview
 // ============================================================================
-class HygieneAnalyticsWebviewProvider {
+class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider {
     constructor(extensionUri, onRefresh) {
-        this.extensionUri = extensionUri;
-        this.onRefresh = onRefresh;
-        this.panel = null;
+        super(extensionUri);
         this.workspaceRoot = "";
+        this.onRefresh = onRefresh;
     }
+    getViewId() { return "meridian.hygiene.analytics"; }
+    getViewTitle() { return "Hygiene Analytics — Meridian"; }
+    getUiDirSegments() { return ["out", "domains", "hygiene", "analytics-ui"]; }
     async openPanel(report) {
         this.workspaceRoot = report.workspaceRoot;
-        if (this.panel) {
-            this.panel.reveal(vscode.ViewColumn.One);
-        }
-        else {
-            this.panel = vscode.window.createWebviewPanel("meridian.hygiene.analytics", "Hygiene Analytics — Meridian", vscode.ViewColumn.One, {
-                enableScripts: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(this.extensionUri, "out", "domains", "hygiene", "analytics-ui"),
-                ],
-                retainContextWhenHidden: true,
-            });
-            this.panel.onDidDispose(() => {
-                this.panel = null;
-            });
-            this.panel.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
-            this.panel.webview.html = this.buildHtml(this.panel.webview);
-        }
-        this.panel.webview.postMessage({ type: "init", payload: report });
-    }
-    buildHtml(webview) {
-        const uiDir = vscode.Uri.joinPath(this.extensionUri, "out", "domains", "hygiene", "analytics-ui");
-        const htmlPath = path.join(uiDir.fsPath, "index.html");
-        let html = fs.readFileSync(htmlPath, "utf-8");
-        const nonce = crypto.randomBytes(16).toString("base64");
-        const cspSource = webview.cspSource;
-        const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDir, "styles.css"));
-        const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDir, "script.js"));
-        html = html.replace(/\{\{NONCE\}\}/g, nonce);
-        html = html.replace(/\{\{WEBVIEW_CSP_SOURCE\}\}/g, cspSource);
-        html = html.replace(/href="styles\.css"/g, `href="${cssUri}"`);
-        html = html.replace(/src="script\.js"/g, `src="${jsUri}"`);
-        return html;
+        return super.openPanel(report);
     }
     async handleMessage(msg) {
         if (msg.type === "refresh") {

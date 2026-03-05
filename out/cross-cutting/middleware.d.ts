@@ -3,10 +3,12 @@
  * Declaratively applied to all commands.
  */
 import { Middleware, Logger } from "../types";
+import { TelemetryTracker } from "../infrastructure/telemetry";
 /**
- * Logging middleware — tracks command execution time and outcomes.
+ * Observability middleware — unified logging + telemetry in a single timing pass.
+ * Replaces the former createLoggingMiddleware + createTelemetryMiddleware pair.
  */
-export declare function createLoggingMiddleware(logger: Logger): Middleware;
+export declare function createObservabilityMiddleware(logger: Logger, telemetry: TelemetryTracker): Middleware;
 /**
  * Permission middleware — checks command-level access control.
  */

@@ -32,6 +32,7 @@ export declare const GIT_DEFAULTS: {
     /** Git operation timeout in milliseconds */
     readonly OPERATION_TIMEOUT_MS: number;
 };
+export declare const WORKSPACE_EXCLUDE_BASE: readonly ["**/node_modules/**", "**/.git/**", "**/.vscode/**", "**/.idea/**"];
 export declare const HYGIENE_SETTINGS: {
     /** Whether hygiene checks are enabled */
     readonly ENABLED: true;
@@ -40,7 +41,7 @@ export declare const HYGIENE_SETTINGS: {
     /** Maximum file size to check in bytes (10 MB) */
     readonly MAX_FILE_SIZE_BYTES: number;
     /** File patterns to exclude from hygiene checks */
-    readonly EXCLUDE_PATTERNS: readonly ["**/node_modules/**", "**/.git/**", "**/.vscode/**", "**/.idea/**", "**/dist/**", "**/build/**", "**/out/**", "**/bundled/**", "**/.venv/**", "**/venv/**", "**/__pycache__/**", "**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/.tox/**", "**/.eggs/**", "**/*.egg-info/**", "**/coverage/**", "**/.nyc_output/**", "**/.cache/**"];
+    readonly EXCLUDE_PATTERNS: readonly string[];
     /** Log file patterns to detect */
     readonly LOG_FILE_PATTERNS: readonly ["*.log", "debug.log", "*-error.log"];
     /** Temporary file patterns */

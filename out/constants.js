@@ -6,7 +6,7 @@
  * Organized by domain for clarity.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UI_SETTINGS = exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.ANALYTICS_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = void 0;
+exports.UI_SETTINGS = exports.DEAD_CODE_DIAGNOSTIC_CODES = exports.ANALYTICS_SETTINGS = exports.TELEMETRY_EVENT_KINDS = exports.LOG_SETTINGS = exports.CHAT_SETTINGS = exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = exports.HYGIENE_SETTINGS = exports.WORKSPACE_EXCLUDE_BASE = exports.GIT_DEFAULTS = exports.CACHE_SETTINGS = void 0;
 // ============================================================================
 // Cache Configuration
 // ============================================================================
@@ -42,6 +42,16 @@ exports.GIT_DEFAULTS = {
     OPERATION_TIMEOUT_MS: 30 * 1000,
 };
 // ============================================================================
+// Workspace Exclusion Base — shared across git and hygiene analytics.
+// Domain-specific lists extend via spread.
+// ============================================================================
+exports.WORKSPACE_EXCLUDE_BASE = [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.vscode/**",
+    "**/.idea/**",
+];
+// ============================================================================
 // Hygiene Configuration
 // ============================================================================
 exports.HYGIENE_SETTINGS = {
@@ -53,11 +63,7 @@ exports.HYGIENE_SETTINGS = {
     MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024,
     /** File patterns to exclude from hygiene checks */
     EXCLUDE_PATTERNS: [
-        // VCS + editor
-        "**/node_modules/**",
-        "**/.git/**",
-        "**/.vscode/**",
-        "**/.idea/**",
+        ...exports.WORKSPACE_EXCLUDE_BASE,
         // Build / output
         "**/dist/**",
         "**/build/**",
@@ -91,10 +97,8 @@ exports.HYGIENE_SETTINGS = {
 // so they still show in the report without scanning contents.
 // ============================================================================
 exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
-    "**/node_modules/**",
-    "**/.git/**",
-    "**/.vscode/**",
-    "**/.idea/**",
+    ...exports.WORKSPACE_EXCLUDE_BASE,
+    // Python runtime & tooling
     "**/.venv/**",
     "**/venv/**",
     "**/__pycache__/**",
@@ -104,6 +108,7 @@ exports.HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
     "**/.tox/**",
     "**/.eggs/**",
     "**/*.egg-info/**",
+    // Package managers & build tool caches
     "**/.yarn/**",
     "**/.pnpm-store/**",
     "**/vendor/**",

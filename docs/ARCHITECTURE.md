@@ -59,7 +59,7 @@ Notable: `dead-code-analyzer.ts` uses TypeScript Compiler API for unused export 
 #### Chat (`chat/`)
 Commands: `chat.context`, `chat.delegate`
 
-`chat.delegate` is the programmatic router: LLM classifies a free-form task string into a command via `DELEGATE_CLASSIFIER_PROMPT`, then dispatches. The chat UI (`ui/chat-participant.ts`) routes independently via `SLASH_MAP` → LLM classifier → fallback.
+`chat.delegate` is the programmatic router: LLM classifies a free-form task string into a command via the prompt registry (`DELEGATE_CLASSIFIER`), then dispatches. The chat UI (`ui/chat-participant.ts`) routes independently via `SLASH_MAP` → LLM classifier → fallback.
 
 #### Workflow (`workflow/`)
 Commands: `workflow.list`, `workflow.run`
@@ -195,12 +195,12 @@ Middleware is executed in registration order before the handler:
 
 1. **LoggingMiddleware** -- Tracks command execution time, logs start/end
 2. **AuditMiddleware** -- Logs mutations (git, cleanup, delegation)
-3. **TelemetryMiddleware** -- Records command usage and timing metrics
+3. **ObservabilityMiddleware** -- Unified logging + telemetry in a single timing pass
 4. (Custom: PermissionMiddleware, RateLimitMiddleware)
 5. **Handler** -- Business logic
 
 ```typescript
-router.use(createLoggingMiddleware(logger));
+router.use(createObservabilityMiddleware(logger, telemetry));
 router.use(createAuditMiddleware(logger));
 // Executed in order before handler dispatch
 ```

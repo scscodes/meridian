@@ -12,6 +12,7 @@ import {
   success,
   failure,
 } from "../../types";
+import { HYGIENE_SETTINGS } from "../../constants";
 import { createScanHandler } from "./scan-handler";
 import { createCleanupHandler } from "./cleanup-handler";
 import { HygieneAnalyzer } from "./analytics-service";
@@ -36,7 +37,7 @@ export class HygieneDomainService implements DomainService {
   public analyzer: HygieneAnalyzer;
   public deadCodeAnalyzer: DeadCodeAnalyzer;
   private logger: Logger;
-  private scanIntervalMs: number = 60 * 60 * 1000; // 1 hour default
+  private scanIntervalMs: number = HYGIENE_SETTINGS.SCAN_INTERVAL_MINUTES * 60 * 1000;
 
   constructor(workspaceProvider: WorkspaceProvider, logger: Logger) {
     this.logger = logger;

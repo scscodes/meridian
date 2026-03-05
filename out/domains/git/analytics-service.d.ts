@@ -5,7 +5,6 @@ import { AnalyticsOptions, GitAnalyticsReport } from "./analytics-types";
 export declare class GitAnalyzer {
     private readonly workspaceRoot;
     private cacheMap;
-    private readonly cacheTTLMs;
     constructor(workspaceRoot?: string);
     /**
      * Generate cache key from options

@@ -4,30 +4,35 @@
  * Declaratively applied to all commands.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createLoggingMiddleware = createLoggingMiddleware;
+exports.createObservabilityMiddleware = createObservabilityMiddleware;
 exports.createPermissionMiddleware = createPermissionMiddleware;
 exports.createRateLimitMiddleware = createRateLimitMiddleware;
 exports.createAuditMiddleware = createAuditMiddleware;
 /**
- * Logging middleware — tracks command execution time and outcomes.
+ * Observability middleware — unified logging + telemetry in a single timing pass.
+ * Replaces the former createLoggingMiddleware + createTelemetryMiddleware pair.
  */
-function createLoggingMiddleware(logger) {
+function createObservabilityMiddleware(logger, telemetry) {
     return async (ctx, next) => {
-        logger.debug(`[${ctx.commandName}] Starting execution`, "LoggingMiddleware", { commandName: ctx.commandName });
+        logger.debug(`[${ctx.commandName}] Starting execution`, "ObservabilityMiddleware", { commandName: ctx.commandName });
         const start = Date.now();
+        telemetry.trackCommandStarted(ctx.commandName);
         try {
             await next();
             const duration = Date.now() - start;
-            logger.info(`[${ctx.commandName}] Completed in ${duration}ms`, "LoggingMiddleware", { commandName: ctx.commandName, duration });
+            logger.info(`[${ctx.commandName}] Completed in ${duration}ms`, "ObservabilityMiddleware", { commandName: ctx.commandName, duration });
+            telemetry.trackCommandCompleted(ctx.commandName, duration, "success");
         }
         catch (err) {
             const duration = Date.now() - start;
-            logger.error(`[${ctx.commandName}] Failed after ${duration}ms`, "LoggingMiddleware", {
+            const appErr = {
                 code: "MIDDLEWARE_ERROR",
-                message: `Command execution failed`,
+                message: err instanceof Error ? err.message : String(err),
                 details: err,
                 context: ctx.commandName,
-            });
+            };
+            logger.error(`[${ctx.commandName}] Failed after ${duration}ms`, "ObservabilityMiddleware", appErr);
+            telemetry.trackCommandFailed(ctx.commandName, duration, appErr);
             throw err;
         }
     };

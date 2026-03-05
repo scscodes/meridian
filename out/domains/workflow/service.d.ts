@@ -1,7 +1,7 @@
 /**
  * Workflow Domain Service — discover, manage, and execute workflows.
  */
-import { DomainService, WorkflowCommandName, Handler, Logger, Result, WorkflowDefinition } from "../../types";
+import { DomainService, WorkflowCommandName, Handler, Logger, Result } from "../../types";
 import { StepRunner } from "../../infrastructure/workflow-engine";
 /**
  * Workflow domain commands.
@@ -43,10 +43,6 @@ export declare class WorkflowDomainService implements DomainService {
      */
     private createDefaultStepRunner;
 }
-/**
- * Validate workflow definition schema.
- */
-export declare function validateWorkflowDefinition(data: unknown): data is WorkflowDefinition;
 /**
  * Factory function — creates and returns workflow domain service.
  */

@@ -1,4 +1,4 @@
-# Architecture — Meridian
+# Meridian Architecture
 
 **Design Pattern**: Domain-Driven Design (DDD) with Aiogram-style Command Router
 **Philosophy**: Structure over features, explicit types, no magic, Result monad for error handling
@@ -15,6 +15,17 @@ Meridian implements a layered VS Code extension architecture:
 4. **Workflow Engine** (`workflow-engine.ts`) — linear step executor with conditional branching and output passing
 5. **Agent Registry** (`agent-registry.ts`) — local agent definition discovery and validation
 6. **Result Monad** — `{kind: "ok"|"err"}` throughout; no exceptions in normal flow
+
+### Design Principles
+
+1. **No Magic** -- All strings are typed constants, explicit configuration
+2. **Result Monad** -- Errors surfaced explicitly, no exceptions in normal flow
+3. **Dependency Injection** -- Services receive dependencies, fully testable
+4. **Middleware Chain** -- Cross-cutting concerns applied declaratively
+5. **Handler Registration** -- Commands validated at startup, not at call time
+6. **Tool Export** -- Domains expose tools for external orchestration
+7. **Subagent Delegation** -- Background tasks spawn agents, capture results
+8. **Clear Boundaries** -- Each domain owns its schema, no type leaks
 
 ---
 
@@ -140,6 +151,118 @@ src/
 └── cross-cutting/
     └── middleware.ts
 ```
+
+---
+
+## Type Safety
+
+TypeScript strict mode is enforced project-wide:
+
+```json
+{
+  "strict": true,
+  "noImplicitAny": true,
+  "strictNullChecks": true,
+  "noUnusedLocals": true,
+  "noImplicitReturns": true
+}
+```
+
+All handler signatures are explicitly typed:
+
+```typescript
+export type Handler<P = unknown, R = unknown> = (
+  ctx: CommandContext,
+  params: P
+) => Promise<Result<R>>;
+```
+
+Command names use a discriminated union:
+
+```typescript
+export type CommandName =
+  | "git.status" | "git.pull" | "git.commit"
+  | "hygiene.scan" | "hygiene.cleanup"
+  | "chat.context" | "chat.delegate"
+  // ... additional commands per domain
+```
+
+---
+
+## Middleware Stack
+
+Middleware is executed in registration order before the handler:
+
+1. **LoggingMiddleware** -- Tracks command execution time, logs start/end
+2. **AuditMiddleware** -- Logs mutations (git, cleanup, delegation)
+3. **TelemetryMiddleware** -- Records command usage and timing metrics
+4. (Custom: PermissionMiddleware, RateLimitMiddleware)
+5. **Handler** -- Business logic
+
+```typescript
+router.use(createLoggingMiddleware(logger));
+router.use(createAuditMiddleware(logger));
+// Executed in order before handler dispatch
+```
+
+---
+
+## Command Dispatch
+
+### Registration (Validated at Startup)
+
+```typescript
+const router = new CommandRouter(logger);
+const gitDomain = createGitDomain(gitProvider, logger);
+router.registerDomain(gitDomain);
+await router.validateDomains(); // All handlers initialized
+```
+
+### Dispatch (with Middleware Chain)
+
+```typescript
+const result = await router.dispatch(
+  { name: "git.status", params: { branch: "main" } },
+  context
+);
+
+if (result.kind === "ok") {
+  console.log(result.value); // GitStatus
+} else {
+  console.error(result.error); // AppError
+}
+```
+
+---
+
+## Testing
+
+### Unit Tests (Handlers)
+
+```typescript
+const mockGit = { status: vi.fn().mockResolvedValue(...) };
+const handler = createStatusHandler(mockGit, logger);
+const result = await handler(ctx, {});
+expect(result.kind).toBe("ok");
+```
+
+### Integration Tests (Router + Domains)
+
+```typescript
+const router = new CommandRouter(logger);
+router.registerDomain(createGitDomain(mockGit, logger));
+const result = await router.dispatch({ name: "git.status", params: {} }, ctx);
+```
+
+Test framework: Vitest. Tests live in `tests/` and mock at boundaries (providers, VS Code API).
+
+---
+
+## Dependencies
+
+**Runtime**: `micromatch` (glob matching for ignore patterns)
+
+**Development**: `typescript`, `vitest`, `@types/vscode`, `@types/node`
 
 ---
 

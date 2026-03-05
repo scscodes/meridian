@@ -10,6 +10,7 @@ import * as ts from "typescript";
 import * as path from "path";
 import { DeadCodeItem, DeadCodeScan, Logger } from "../../types";
 import { CACHE_SETTINGS, DEAD_CODE_DIAGNOSTIC_CODES, HYGIENE_SETTINGS } from "../../constants";
+import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
 
 interface CachedScan {
   scan: DeadCodeScan;
@@ -42,7 +43,7 @@ export class DeadCodeAnalyzer {
       return scan;
     } catch (err) {
       this.logger.warn("Dead code scan failed", "DeadCodeAnalyzer", {
-        code: "DEAD_CODE_SCAN_ERROR",
+        code: HYGIENE_ERROR_CODES.DEAD_CODE_SCAN_ERROR,
         message: String(err),
       });
       return { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 };

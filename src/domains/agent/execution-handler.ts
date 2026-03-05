@@ -20,6 +20,7 @@ import {
   Command,
   AgentDefinition,
 } from "../../types";
+import { AGENT_ERROR_CODES, GENERIC_ERROR_CODES } from "../../infrastructure/error-codes";
 import { ExecuteAgentParams, AgentExecutionResult, ExecutionLog } from "./types";
 import { loadAgents } from "../../infrastructure/agent-registry";
 
@@ -65,7 +66,7 @@ class AgentExecutor {
 
       if (!agent) {
         return failure({
-          code: "AGENT_NOT_FOUND",
+          code: AGENT_ERROR_CODES.AGENT_NOT_FOUND,
           message: `Agent '${agentId}' not found in registry`,
           context: "AgentExecutor.execute",
         });
@@ -76,7 +77,7 @@ class AgentExecutor {
       // Validate agent has requested capability (if command-based execution)
       if (targetCommand && !agent.capabilities.includes(targetCommand as any)) {
         return failure({
-          code: "MISSING_CAPABILITY",
+          code: AGENT_ERROR_CODES.MISSING_CAPABILITY,
           message: `Agent '${agentId}' does not have capability '${targetCommand}'`,
           context: "AgentExecutor.execute",
         });
@@ -142,7 +143,7 @@ class AgentExecutor {
         return success(this.buildResult(state, agent));
       } else {
         return failure({
-          code: "INVALID_PARAMS",
+          code: GENERIC_ERROR_CODES.INVALID_PARAMS,
           message: "Agent execution requires either targetCommand or targetWorkflow",
           context: "AgentExecutor.execute",
         });
@@ -153,7 +154,7 @@ class AgentExecutor {
       this.log(state, `Execution error: ${state.error}`);
 
       return failure({
-        code: "EXECUTION_FAILED",
+        code: AGENT_ERROR_CODES.EXECUTION_FAILED,
         message: `Agent '${agentId}' execution failed: ${state.error}`,
         details: err,
         context: "AgentExecutor.execute",
@@ -215,7 +216,7 @@ export function createExecuteAgentHandler(
       // Validate required params
       if (!params.agentId) {
         return failure({
-          code: "INVALID_PARAMS",
+          code: GENERIC_ERROR_CODES.INVALID_PARAMS,
           message: "Agent execution requires agentId",
           context: "agent.execute",
         });
@@ -223,7 +224,7 @@ export function createExecuteAgentHandler(
 
       if (!params.targetCommand && !params.targetWorkflow) {
         return failure({
-          code: "INVALID_PARAMS",
+          code: GENERIC_ERROR_CODES.INVALID_PARAMS,
           message: "Agent execution requires either targetCommand or targetWorkflow",
           context: "agent.execute",
         });
@@ -245,7 +246,7 @@ export function createExecuteAgentHandler(
       );
     } catch (err) {
       return failure({
-        code: "EXECUTION_FAILED",
+        code: AGENT_ERROR_CODES.EXECUTION_FAILED,
         message: `Failed to execute agent: ${err instanceof Error ? err.message : String(err)}`,
         details: err,
         context: "agent.execute",

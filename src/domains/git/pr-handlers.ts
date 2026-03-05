@@ -11,6 +11,7 @@ import {
   Logger,
   GitProvider,
 } from "../../types";
+import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
 import {
   PRGenerationParams,
   GeneratedPR,
@@ -64,7 +65,7 @@ export async function gatherPRContext(
 
   if (changes.length === 0) {
     return failure({
-      code: "NO_CHANGES",
+      code: GIT_ERROR_CODES.NO_CHANGES,
       message: `No changes between ${targetBranch} and HEAD`,
       context: "gatherPRContext",
     });
@@ -86,7 +87,7 @@ export async function gatherPRContext(
  * Parse `git diff --numstat` output into PRContext-compatible change entries.
  * Each line: `additions\tdeletions\tpath`
  */
-function parseNumstatOutput(
+export function parseNumstatOutput(
   raw: string
 ): Array<{ path: string; status: "A" | "M" | "D" | "R"; additions: number; deletions: number }> {
   const results: Array<{ path: string; status: "A" | "M" | "D" | "R"; additions: number; deletions: number }> = [];
@@ -149,7 +150,7 @@ export function createGeneratePRHandler(
 
     if (prContext.changes.length === 0) {
       return failure({
-        code: "NO_CHANGES",
+        code: GIT_ERROR_CODES.NO_CHANGES,
         message: "No changes to generate PR for",
         context: "git.generatePR",
       });
@@ -213,7 +214,7 @@ export function createReviewPRHandler(
     const ctx = contextResult.value;
 
     if (ctx.changes.length === 0) {
-      return failure({ code: "NO_CHANGES", message: "No changes to review", context: "git.reviewPR" });
+      return failure({ code: GIT_ERROR_CODES.NO_CHANGES, message: "No changes to review", context: "git.reviewPR" });
     }
 
     const proseResult = await generateProseFn({
@@ -270,7 +271,7 @@ export function createCommentPRHandler(
     const ctx = contextResult.value;
 
     if (ctx.changes.length === 0) {
-      return failure({ code: "NO_CHANGES", message: "No changes to comment on", context: "git.commentPR" });
+      return failure({ code: GIT_ERROR_CODES.NO_CHANGES, message: "No changes to comment on", context: "git.commentPR" });
     }
 
     // Optional path filter
@@ -334,7 +335,7 @@ export function createResolveConflictsHandler(
     const analysis = analysisResult.value;
 
     if (analysis.conflicts.length === 0) {
-      return failure({ code: "NO_CHANGES", message: "No conflicts to resolve", context: "git.resolveConflicts" });
+      return failure({ code: GIT_ERROR_CODES.NO_CHANGES, message: "No conflicts to resolve", context: "git.resolveConflicts" });
     }
 
     // Gather per-conflict diffs for richer context

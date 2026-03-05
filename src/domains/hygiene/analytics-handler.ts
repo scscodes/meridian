@@ -3,6 +3,7 @@
  */
 
 import { Handler, CommandContext, success, failure, Logger } from "../../types";
+import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
 import { HygieneAnalyticsReport, PruneConfig, PRUNE_DEFAULTS } from "./analytics-types";
 import { HygieneAnalyzer } from "./analytics-service";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
@@ -37,7 +38,7 @@ export function createShowHygieneAnalyticsHandler(
       return success(report);
     } catch (err) {
       return failure({
-        code: "HYGIENE_ANALYTICS_ERROR",
+        code: HYGIENE_ERROR_CODES.HYGIENE_ANALYTICS_ERROR,
         message: "Hygiene analytics failed",
         details: err,
         context: "hygiene.showAnalytics",

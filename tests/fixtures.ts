@@ -153,7 +153,7 @@ export class MockGitProvider implements GitProvider {
     return success(this.currentBranch);
   }
 
-  async diff(revision: string): Promise<Result<string>> {
+  async diff(revision: string, options?: string[]): Promise<Result<string>> {
     return success(`diff ${revision}\n${this.diffOutput}`);
   }
 

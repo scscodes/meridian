@@ -11,6 +11,7 @@ import {
   success,
   failure,
 } from "../../types";
+import { WORKFLOW_ERROR_CODES, GENERIC_ERROR_CODES } from "../../infrastructure/error-codes";
 import { ListWorkflowsResult, RunWorkflowResult } from "./types";
 import { WorkflowEngine } from "../../infrastructure/workflow-engine";
 
@@ -39,7 +40,7 @@ export function createListWorkflowsHandler(
       });
     } catch (err) {
       return failure({
-        code: "WORKFLOW_LIST_ERROR",
+        code: WORKFLOW_ERROR_CODES.WORKFLOW_LIST_ERROR,
         message: "Failed to list workflows",
         details: err,
         context: "workflow.list",
@@ -66,7 +67,7 @@ export function createRunWorkflowHandler(
     // Validate params
     if (!params.name || params.name.trim().length === 0) {
       return failure({
-        code: "INVALID_PARAMS",
+        code: GENERIC_ERROR_CODES.INVALID_PARAMS,
         message: "Workflow name is required",
         context: "workflow.run",
       });
@@ -79,7 +80,7 @@ export function createRunWorkflowHandler(
       const workflow = loadWorkflow(params.name);
       if (!workflow) {
         return failure({
-          code: "WORKFLOW_NOT_FOUND",
+          code: WORKFLOW_ERROR_CODES.WORKFLOW_NOT_FOUND,
           message: `Workflow not found: ${params.name}`,
           context: "workflow.run",
         });
@@ -113,7 +114,7 @@ export function createRunWorkflowHandler(
       } else {
         const failedStepId = (executionResult.error.details as any)?.currentStep;
         return failure({
-          code: "WORKFLOW_EXECUTION_FAILED",
+          code: WORKFLOW_ERROR_CODES.WORKFLOW_EXECUTION_FAILED,
           message: `Workflow failed: ${executionResult.error.message}`,
           details: {
             duration,
@@ -125,7 +126,7 @@ export function createRunWorkflowHandler(
       }
     } catch (err) {
       return failure({
-        code: "WORKFLOW_RUN_ERROR",
+        code: WORKFLOW_ERROR_CODES.WORKFLOW_RUN_ERROR,
         message: `Failed to run workflow: ${params.name}`,
         details: err,
         context: "workflow.run",

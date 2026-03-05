@@ -1,10 +1,13 @@
 {
   "name": "meridian",
   "displayName": "Meridian",
-  "description": "DDD-based command registry architecture for VS Code extensions with workflow engine and local agent discovery",
+  "description": "AI-powered git analytics, code hygiene, workflow engine, and chat assistant for VS Code",
   "version": "0.0.1",
   "publisher": "scscodes",
   "license": "MIT",
+  "private": true,
+  "categories": ["Programming Languages", "SCM Providers", "Machine Learning"],
+  "keywords": ["git", "hygiene", "code-review", "ai", "workflow", "copilot"],
   "engines": {
     "node": ">=22.22.0",
     "vscode": "^1.90.0"
@@ -828,7 +831,7 @@
     "compile": "tsc -p ./ && cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
-    "test": "vitest",
+    "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",

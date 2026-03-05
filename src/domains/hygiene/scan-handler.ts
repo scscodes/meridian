@@ -18,6 +18,7 @@ import {
   Logger,
 } from "../../types";
 import { HYGIENE_SETTINGS } from "../../constants";
+import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 
 /**
@@ -175,7 +176,7 @@ export function createScanHandler(
       return success(scan);
     } catch (err) {
       return failure({
-        code: "HYGIENE_SCAN_ERROR",
+        code: HYGIENE_ERROR_CODES.HYGIENE_SCAN_ERROR,
         message: "Workspace scan failed",
         details: err,
         context: "hygiene.scan",

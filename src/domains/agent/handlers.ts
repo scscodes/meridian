@@ -11,6 +11,7 @@ import {
   success,
   failure,
 } from "../../types";
+import { AGENT_ERROR_CODES } from "../../infrastructure/error-codes";
 import { ListAgentsResult } from "./types";
 
 /**
@@ -39,7 +40,7 @@ export function createListAgentsHandler(
       });
     } catch (err) {
       return failure({
-        code: "AGENT_LIST_ERROR",
+        code: AGENT_ERROR_CODES.AGENT_LIST_ERROR,
         message: "Failed to list agents",
         details: err,
         context: "agent.list",

@@ -11,6 +11,7 @@ import {
   GitProvider,
   GitFileChange,
 } from "../../types";
+import { GIT_ERROR_CODES, GENERIC_ERROR_CODES } from "../../infrastructure/error-codes";
 import {
   FileChange,
   ChangeGroup,
@@ -49,7 +50,7 @@ export function createSmartCommitHandler(
         typeof params.autoApprove !== "boolean"
       ) {
         return failure({
-          code: "INVALID_PARAMS",
+          code: GENERIC_ERROR_CODES.INVALID_PARAMS,
           message: "autoApprove must be a boolean when provided",
           context: "git.smartCommit",
         });
@@ -57,7 +58,7 @@ export function createSmartCommitHandler(
 
       if (params.branch !== undefined && typeof params.branch !== "string") {
         return failure({
-          code: "INVALID_PARAMS",
+          code: GENERIC_ERROR_CODES.INVALID_PARAMS,
           message: "Branch must be a string when provided",
           context: "git.smartCommit",
         });
@@ -72,7 +73,7 @@ export function createSmartCommitHandler(
       const changesResult = await gitProvider.getAllChanges();
       if (changesResult.kind === "err") {
         return failure({
-          code: "GET_CHANGES_FAILED",
+          code: GIT_ERROR_CODES.GET_CHANGES_FAILED,
           message: "Failed to get git changes",
           details: changesResult.error,
           context: "git.smartCommit",
@@ -81,7 +82,7 @@ export function createSmartCommitHandler(
 
       if (changesResult.value.length === 0) {
         return failure({
-          code: "NO_CHANGES",
+          code: GIT_ERROR_CODES.NO_CHANGES,
           message: "No changes to commit",
           context: "git.smartCommit",
         });
@@ -134,7 +135,7 @@ export function createSmartCommitHandler(
         // null = user cancelled (Escape)
         if (approvalResult === null) {
           return failure({
-            code: "COMMIT_CANCELLED",
+            code: GIT_ERROR_CODES.COMMIT_CANCELLED,
             message: "Smart commit cancelled by user",
             context: "git.smartCommit",
           });
@@ -152,7 +153,7 @@ export function createSmartCommitHandler(
 
       if (approvedGroups.length === 0) {
         return failure({
-          code: "NO_GROUPS_APPROVED",
+          code: GIT_ERROR_CODES.NO_GROUPS_APPROVED,
           message: "No groups approved for commit",
           context: "git.smartCommit",
         });
@@ -183,14 +184,14 @@ export function createSmartCommitHandler(
         "Smart commit error",
         "GitSmartCommitHandler",
         {
-          code: "SMART_COMMIT_ERROR",
+          code: GIT_ERROR_CODES.SMART_COMMIT_ERROR,
           message: "Unexpected error during smart commit",
           details: err,
         }
       );
 
       return failure({
-        code: "SMART_COMMIT_ERROR",
+        code: GIT_ERROR_CODES.SMART_COMMIT_ERROR,
         message: "Failed to execute smart commit",
         details: err,
         context: "git.smartCommit",

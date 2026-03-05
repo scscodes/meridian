@@ -9,6 +9,7 @@ import {
   failure,
   Logger,
 } from "../../types";
+import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
 import { InboundChanges } from "./types";
 import { InboundAnalyzer } from "./inbound-analyzer";
 
@@ -47,14 +48,14 @@ export function createAnalyzeInboundHandler(
         "Unexpected error during inbound analysis",
         "GitAnalyzeInboundHandler",
         {
-          code: "INBOUND_ANALYSIS_ERROR",
+          code: GIT_ERROR_CODES.INBOUND_ANALYSIS_ERROR,
           message: "Failed to analyze inbound changes",
           details: err,
         }
       );
 
       return failure({
-        code: "INBOUND_ANALYSIS_ERROR",
+        code: GIT_ERROR_CODES.INBOUND_ANALYSIS_ERROR,
         message: "Failed to analyze inbound changes",
         details: err,
         context: "git.analyzeInbound",

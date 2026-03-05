@@ -1,345 +1,182 @@
-# Meridian POC
+# Meridian
 
-**Domain-Driven Design (DDD) architecture for VS Code extensions.**
+**AI-powered git, code hygiene, and workflow tools for VS Code.**
 
-A production-ready scaffold demonstrating:
-- **Command Router** (Aiogram-style pattern)
-- **Explicit types, no magic** (TypeScript strict mode)
-- **Result monad error handling** (Either<Error, Success>)
-- **Domain isolation** (Git, Hygiene, Chat/Copilot)
-- **Cross-cutting middleware** (logging, auth, audit)
+Meridian brings smart commit grouping, PR generation and review, workspace hygiene scanning, JSON-defined workflows, autonomous agents, and deep Copilot Chat integration into a single extension.
 
 ---
 
-## Directory Structure
+## Feature Highlights
 
-```
-meridian/
-├── src/
-│   ├── main.ts                  # Extension entry point (activate/deactivate)
-│   ├── types.ts                 # Core interfaces & Result monad
-│   ├── router.ts                # CommandRouter with middleware chain
-│   ├── domains/
-│   │   ├── git/
-│   │   │   ├── handlers.ts      # git.status, git.pull, git.commit
-│   │   │   └── service.ts       # GitDomainService
-│   │   ├── hygiene/
-│   │   │   ├── handlers.ts      # hygiene.scan, hygiene.cleanup
-│   │   │   └── service.ts       # HygieneDomainService
-│   │   └── chat/
-│   │       ├── handlers.ts      # chat.context, chat.delegate
-│   │       └── service.ts       # ChatDomainService (integration)
-│   ├── infrastructure/
-│   │   ├── logger.ts            # Structured logging (no console.log)
-│   │   ├── config.ts            # Typed config schema
-│   │   └── git-provider.ts      # (Stub) Git CLI wrapper
-│   └── cross-cutting/
-│       ├── middleware.ts        # Logging, auth, audit, rate-limiting
-│       └── permissions.ts       # (Stub) RBAC checks
-├── ARCHITECTURE.md              # Design patterns & extension points
-├── VENDOR_REFERENCE.md          # Official VS Code API docs (stored)
-├── package.json                 # Minimal, strict dependencies
-├── tsconfig.json                # TypeScript strict mode
-└── README.md                    # This file
-```
+### Git AI
 
----
+- **Smart Commit** -- groups staged changes by semantic type, suggests messages via LLM, and commits in batch with an interactive approval UI.
+- **PR Generation & Review** -- generate PR descriptions, run AI code reviews with per-file verdicts, and get inline comment suggestions, all from your current branch diff.
+- **Session Briefing & Conflict Resolution** -- start your day with an AI-generated briefing of branch state, recent commits, and uncommitted work. Detect merge conflicts and get per-file resolution strategies.
+- **Analytics Dashboard** -- visualize code churn, file volatility, authorship, and commit trends in a full-screen dashboard with JSON/CSV export.
 
-## Quick Start
+### Code Hygiene
 
-### Install Dependencies
-```bash
-npm install
-```
-
-### Compile TypeScript
-```bash
-npm run compile
-```
-
-### Run in Extension Development Host
-1. Open in VS Code: `code .`
-2. Press `F5` to launch Extension Development Host
-3. In the dev window, run command palette: `Git: Show Status`
-
-### Watch Mode (for development)
-```bash
-npm run watch
-```
-
----
-
-## Architecture Overview
-
-### Layers
-
-1. **Application Layer** (`main.ts`, `router.ts`)
-   - Extension activation/deactivation
-   - Domain registration
-   - Command dispatch
-
-2. **Domain Layer** (`domains/`)
-   - Isolated business logic (git, hygiene, chat)
-   - Command handlers
-   - Domain services
-
-3. **Infrastructure Layer** (`infrastructure/`)
-   - Logger, Config, GitProvider, WorkspaceProvider
-   - Typed wrappers for external systems
-
-4. **Cross-Cutting** (`cross-cutting/`)
-   - Middleware (logging, auth, audit, rate-limiting)
-   - Permissions and access control
-
-### Core Patterns
-
-#### Command Registration (Validated at Startup)
-```typescript
-const router = new CommandRouter(logger);
-const gitDomain = createGitDomain(gitProvider, logger);
-router.registerDomain(gitDomain);
-await router.validateDomains(); // All handlers initialized
-```
-
-#### Command Dispatch (with Middleware Chain)
-```typescript
-const result = await router.dispatch(
-  { name: "git.status", params: { branch: "main" } },
-  context
-);
-
-if (result.kind === "ok") {
-  console.log(result.value); // GitStatus
-} else {
-  console.error(result.error); // AppError
-}
-```
-
-#### Error Handling (Result Monad)
-```typescript
-async function statusHandler(ctx, params) {
-  const result = await gitProvider.status(params.branch);
-  if (result.kind === "ok") {
-    return success(result.value);
-  }
-  return result; // Forward error
-}
-```
-
-#### Middleware (Declaratively Applied)
-```typescript
-router.use(createLoggingMiddleware(logger));
-router.use(createAuditMiddleware(logger));
-// Executed in order before handler dispatch
-```
----
-
-## Features
-
-### Git & Repository Analytics
-- **Git status & flows**: View branch health (clean/dirty, staged/unstaged/untracked), pull from remote, and create validated commits, including an interactive **smart commit** flow that groups changes and suggests messages.
-- **Inbound change analysis**: Analyze inbound remote changes before pulling to understand conflict risk and impacted files.
-- **Analytics dashboards & exports**: Generate Git analytics (churn, volatility, authorship, trends) and view them in a full-screen dashboard with charts, tables, and JSON/CSV export.
-
-### Workspace Hygiene
-- **Hygiene scans**: Scan the workspace for dead files, large/log/markdown files, and dead TypeScript code while respecting `.gitignore` and `.meridianignore`.
-- **Safe cleanup**: Perform targeted cleanup of candidates (with optional dry-run) and manage them from a dedicated Hygiene view (delete or ignore).
-- **Hygiene analytics**: Open a hygiene analytics dashboard showing prune candidates, disk impact, and file-type breakdowns over time.
-- **AI doc review**: Request LLM-powered reviews of markdown files surfaced by hygiene scans.
+- **Automated Scanning** -- detect dead files, unused exports, oversized logs, and stale documentation across your workspace. Respects `.gitignore` and `.meridianignore`.
+- **Impact Analysis** -- trace the blast radius of a file or function change using the TypeScript Compiler API. See importers, call sites, test coverage, and an LLM-generated prose summary.
+- **Cleanup & Analytics** -- batch-delete candidates with dry-run support, and view hygiene trends over time in a dedicated analytics dashboard.
 
 ### Workflows & Agents
-- **JSON-defined workflows**: Discover and run workflows from `.vscode/workflows/*.json` (and bundled assets), including conditional branches and shared variables between steps.
-- **Automation agents**: Discover agents from `.vscode/agents/*.json` that wrap capabilities (git, hygiene, workflows) into reusable automation profiles.
-- **VS Code views**: Browse and run workflows and inspect agents from dedicated sidebar views.
 
-### Chat / Copilot Integration
-- **`@meridian` chat participant**: Use Meridian from Copilot Chat with slash and keyword commands (`/status`, `/scan`, `/workflows`, `/agents`, `/analytics`, `/context`, `run <workflow>`).
-- **LLM intent routing**: Let an LLM classify free-form chat requests into concrete commands (`git.*`, `hygiene.*`, `workflow.*`, `agent.*`, `chat.*`).
-- **Tooling for autonomy**: Expose Git, hygiene, workflow, and analytics commands as LM tools so copilots can orchestrate them programmatically.
+- **JSON-Defined Workflows** -- drop a `.json` file in `.vscode/workflows/` to define multi-step automation (e.g., status, pull, smart commit, generate PR) with conditional branching and variable passing.
+- **Autonomous Agents** -- define reusable automation profiles in `.vscode/agents/` that wrap Meridian capabilities with capability validation and structured execution reports.
 
-### Configuration & Observability
-- **Typed configuration**: Configure Git auto-fetch, hygiene enablement/thresholds, log level, and model selection via strongly-typed settings.
-- **Middleware & telemetry**: All commands run through logging/audit/rate-limit middleware and are observable via a central command bus.
+### Chat & Copilot
 
-### Git Domain
-- **git.status** — Read-only; returns branch, dirty state, staged/unstaged counts
-- **git.pull** — Mutation; pulls from branch with error handling
-- **git.commit** — Mutation with validation; requires message param
-
-### Hygiene Domain
-- **hygiene.scan** — Analyzes workspace for dead files, large logs
-- **hygiene.cleanup** — Removes files with optional dry-run mode
-
-### Chat/Copilot Domain
-- **chat.context** — Gathers active file + git state for copilot context window
-- **chat.delegate** — Spawns subagent for complex work
+- **`@meridian` Chat Participant** -- use natural language in Copilot Chat to invoke any Meridian feature. An LLM classifier routes your request to the right command automatically.
+- **11 Slash Commands** -- accelerator shortcuts for common operations: `/status`, `/scan`, `/analytics`, `/pr`, `/review`, `/briefing`, `/conflicts`, `/impact`, `/workflows`, `/agents`, `/context`.
+- **14 LM Tools** -- all major commands are exposed as Language Model tools, enabling Copilot to autonomously discover and orchestrate Meridian features in agent mode.
 
 ---
 
-## Design Principles
+## Screenshots
 
-1. **No Magic** — All strings are typed constants, explicit configuration
-2. **Result Monad** — Errors surfaced explicitly, no exceptions in normal flow
-3. **Dependency Injection** — Services receive dependencies, fully testable
-4. **Middleware Chain** — Cross-cutting concerns applied declaratively
-5. **Handler Registration** — Commands validated at startup, not at call time
-6. **Tool Export** — Domains expose tools for external orchestration
-7. **Subagent Delegation** — Background tasks spawn agents, capture results
-8. **Clear Boundaries** — Each domain owns its schema, no type leaks
+### Git Analytics Dashboard
+
+![Git Analytics](media/git_analytics.png)
+
+### Hygiene Analytics Dashboard
+
+![Hygiene Analytics](media/hygiene_analytics.png)
 
 ---
 
-## Type Safety
+## Commands
 
-**TypeScript Strict Mode**
-```json
-{
-  "strict": true,
-  "noImplicitAny": true,
-  "strictNullChecks": true,
-  "noUnusedLocals": true,
-  "noImplicitReturns": true
-}
-```
+### Git
 
-All handler signatures explicitly typed:
-```typescript
-export type Handler<P = unknown, R = unknown> = (
-  ctx: CommandContext,
-  params: P
-) => Promise<Result<R>>;
-```
+| Command | Title | Keybinding |
+|---------|-------|------------|
+| `meridian.git.status` | Git: Show Status | |
+| `meridian.git.pull` | Git: Pull | |
+| `meridian.git.commit` | Git: Commit | |
+| `meridian.git.smartCommit` | Git: Smart Commit (Interactive) | `Ctrl+M Ctrl+C` |
+| `meridian.git.showAnalytics` | Git: Show Analytics | `Ctrl+M Ctrl+A` |
+| `meridian.git.exportJson` | Git: Export Analytics JSON | |
+| `meridian.git.exportCsv` | Git: Export Analytics CSV | |
+| `meridian.git.generatePR` | Git: Generate PR Description | `Ctrl+M Ctrl+P` |
+| `meridian.git.reviewPR` | Git: Review PR (AI) | `Ctrl+M Ctrl+V` |
+| `meridian.git.commentPR` | Git: Generate PR Comments | `Ctrl+M Ctrl+I` |
+| `meridian.git.resolveConflicts` | Git: Resolve Conflicts (AI) | `Ctrl+M Ctrl+X` |
+| `meridian.git.sessionBriefing` | Git: Session Briefing (AI) | `Ctrl+M Ctrl+B` |
+| `meridian.git.refresh` | Git: Refresh View | |
 
-Command names discriminated union:
-```typescript
-export type CommandName =
-  | "git.status" | "git.pull" | "git.commit"
-  | "hygiene.scan" | "hygiene.cleanup"
-  | "chat.context" | "chat.delegate";
-```
+### Hygiene
+
+| Command | Title | Keybinding |
+|---------|-------|------------|
+| `meridian.hygiene.scan` | Hygiene: Scan Workspace | `Ctrl+M Ctrl+S` |
+| `meridian.hygiene.cleanup` | Hygiene: Cleanup | |
+| `meridian.hygiene.deleteFile` | Hygiene: Delete File | |
+| `meridian.hygiene.ignoreFile` | Hygiene: Ignore File | |
+| `meridian.hygiene.reviewFile` | Hygiene: Review with AI | |
+| `meridian.hygiene.showAnalytics` | Hygiene: Show Analytics | |
+| `meridian.hygiene.impactAnalysis` | Hygiene: Impact Analysis | `Ctrl+M Ctrl+T` |
+| `meridian.hygiene.refresh` | Hygiene: Refresh View | |
+
+### Workflow
+
+| Command | Title | Keybinding |
+|---------|-------|------------|
+| `meridian.workflow.list` | Workflow: List All | |
+| `meridian.workflow.run` | Workflow: Run | |
+| `meridian.workflow.refresh` | Workflow: Refresh View | |
+
+### Agent
+
+| Command | Title | Keybinding |
+|---------|-------|------------|
+| `meridian.agent.list` | Agent: List All | |
+| `meridian.agent.refresh` | Agent: Refresh View | |
+
+### General
+
+| Command | Title | Keybinding |
+|---------|-------|------------|
+| `meridian.chat.context` | Chat: Get Context | |
+| `meridian.statusBar.clicked` | Meridian: Quick Actions | |
+| `meridian.refreshAll` | Meridian: Refresh All Views | `Ctrl+M Ctrl+R` |
+
+> On macOS, replace `Ctrl` with `Cmd` in all keybindings.
+
+---
+
+## Chat & Copilot Integration
+
+Type `@meridian` in Copilot Chat to interact using natural language or slash commands.
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/status` | Show current git branch and file change counts |
+| `/scan` | Scan workspace for hygiene issues |
+| `/analytics` | Open the Git Analytics report |
+| `/pr` | Generate a pull request description |
+| `/review` | Review current branch changes with AI verdict |
+| `/briefing` | Generate a session briefing |
+| `/conflicts` | Suggest resolution strategies for git conflicts |
+| `/impact` | Trace the blast radius of a file or function change |
+| `/workflows` | List all available workflows |
+| `/agents` | List all available agents |
+| `/context` | Show workspace context (branch, active file, commands) |
+
+### LM Tools (Agent Mode)
+
+All major commands are registered as Language Model tools, allowing Copilot to autonomously invoke Meridian features during agentic workflows. Tools include git status, smart commit, inbound change analysis, hygiene scan, impact analysis, PR generation/review/comments, conflict resolution, session briefing, workflow execution, agent execution, task delegation, analytics, and data export.
 
 ---
 
 ## Configuration
 
-Typed schema in `infrastructure/config.ts`:
+All settings live under the `meridian.*` namespace.
 
-```typescript
-export const CONFIG_KEYS = {
-  GIT_AUTOFETCH: "git.autofetch",
-  HYGIENE_ENABLED: "hygiene.enabled",
-  CHAT_MODEL: "chat.model",
-  LOG_LEVEL: "log.level",
-} as const;
-
-const config = new Config();
-const autofetch = config.get(CONFIG_KEYS.GIT_AUTOFETCH, false);
-```
-
-Declared in `package.json`:
-```json
-{
-  "configuration": {
-    "properties": {
-      "meridian.git.autofetch": { "type": "boolean", "default": false }
-    }
-  }
-}
-```
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `meridian.model.default` | Default language model family for all AI features (e.g. `gpt-4o`, `claude-3-5-sonnet`) | `gpt-4o` |
+| `meridian.model.hygiene` | Language model for hygiene domain. Empty inherits default. | `""` |
+| `meridian.model.git` | Language model for git domain. Empty inherits default. | `""` |
+| `meridian.model.chat` | Language model for `@meridian` chat. Empty inherits default. | `""` |
+| `meridian.hygiene.prune.minAgeDays` | Minimum file age (days) to flag as prune candidate | `30` |
+| `meridian.hygiene.prune.maxSizeMB` | File size threshold (MB) for prune candidates | `1` |
+| `meridian.hygiene.prune.minLineCount` | Line count threshold for prune candidates (0 = disabled) | `0` |
+| `meridian.hygiene.prune.categories` | File categories to auto-flag as prune candidates | `["backup", "temp", "log", "artifact"]` |
 
 ---
 
-## Middleware Stack
+## Requirements
 
-Middleware executed in registration order:
-
-1. **LoggingMiddleware** — Tracks command execution time, logs start/end
-2. **AuditMiddleware** — Logs mutations (git, cleanup, delegation)
-3. (Custom: PermissionMiddleware, RateLimitMiddleware)
-4. **Handler** — Business logic
-
-Middleware can throw to fail fast (auth denied, rate limit exceeded).
+- **VS Code** 1.90 or later
+- **Node.js** 22 or later
 
 ---
 
-## Extending the Architecture
+## Sidebar Views
 
-### Add a New Domain
-1. Create `src/domains/<name>/{handlers.ts,service.ts}`
-2. Add commands to `CommandName` union in `types.ts`
-3. Register in `main.ts`: `router.registerDomain(newDomain)`
+Meridian adds a dedicated activity bar icon with four sidebar views:
 
-### Add Middleware
-1. Create factory in `cross-cutting/middleware.ts`
-2. Register in `main.ts`: `router.use(createMyMiddleware(...))`
+- **Git** -- branch state, dirty indicator, recent commits. Inline actions for smart commit, pull, and analytics.
+- **Hygiene** -- scan results grouped by category. Right-click to delete, ignore, or AI-review files.
+- **Workflows** -- browse and run JSON-defined workflows with status indicators.
+- **Agents** -- browse available agents with capabilities and execute them directly.
 
-### Add Configuration
-1. Add key to `CONFIG_KEYS` in `config.ts`
-2. Add default and schema entry
-3. Declare in `package.json` contribution points
-
-### Expose External Tool
-1. Register in domain service: `this.tools.set("my-tool", {...})`
-2. Implement handler that calls domain handler
-3. Export via `exportTools()` method
+A **status bar item** shows real-time git status (branch, dirty state, change counts) and opens a Quick Pick with top actions.
 
 ---
 
-## Testing
+## Documentation
 
-### Unit Tests (Handlers)
-```typescript
-const mockGit = { status: jest.fn().mockResolvedValue(...) };
-const handler = createStatusHandler(mockGit, logger);
-const result = await handler(ctx, {});
-expect(result.kind).toBe("ok");
-```
-
-### Integration Tests (Router + Domains)
-```typescript
-const router = new CommandRouter(logger);
-router.registerDomain(createGitDomain(mockGit, logger));
-const result = await router.dispatch({ name: "git.status", params: {} }, ctx);
-```
-
----
-
-## Dependencies
-
-**Runtime**: None (except `@vscode/api` when integrated with VS Code)
-
-**Development**:
-- `typescript@^5.2.0`
-- `@types/node@^20.0.0`
-- `@types/vscode@^1.80.0`
-
----
-
-## Known Limitations
-
-- Mock providers used (git, workspace) — replace with real VS Code API wrappers
-- `sessions_spawn()` stubbed — reserved for future orchestration integration
-- No background task scheduling — needed for hygiene scans
-- No pre-commit hooks — git domain extension point
-- No full test suite — scaffold only, not production-ready tests
-
----
-
-## References
-
-- **ARCHITECTURE.md** — Design patterns, extension points, examples
-- **VENDOR_REFERENCE.md** — Official VS Code API docs (curated)
-- **VS Code Extension API**: https://code.visualstudio.com/api
-- **Commands Guide**: https://code.visualstudio.com/api/extension-guides/command
-- **Contribution Points**: https://code.visualstudio.com/api/references/contribution-points
+- [Architecture](docs/ARCHITECTURE.md) -- design patterns, layers, extension points
+- [Feature Reference](docs/FEATURES.md) -- full command inventory with detailed descriptions
+- [Roadmap](docs/ROADMAP.md) -- planned work and current phase
 
 ---
 
 ## License
 
 MIT
-
----
-
-**Version**: 0.0.1-rc1  
-**Last Updated**: Feb 2026

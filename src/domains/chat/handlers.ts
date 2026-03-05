@@ -13,6 +13,7 @@ import {
   Logger,
   GitProvider,
 } from "../../types";
+import { CHAT_ERROR_CODES } from "../../infrastructure/error-codes";
 
 // ============================================================================
 // Context Handler
@@ -48,7 +49,7 @@ export function createContextHandler(
       return success(chatCtx);
     } catch (err) {
       return failure({
-        code: "CHAT_CONTEXT_ERROR",
+        code: CHAT_ERROR_CODES.CHAT_CONTEXT_ERROR,
         message: "Failed to gather chat context",
         details: err,
         context: "chat.context",
@@ -139,7 +140,7 @@ export function createDelegateHandler(
 
       if (!generateProseFn) {
         return failure({
-          code: "CHAT_DELEGATE_NO_GENERATE_FN",
+          code: CHAT_ERROR_CODES.CHAT_DELEGATE_NO_GENERATE_FN,
           message: "chat.delegate requires a prose generation function (is Copilot enabled?)",
           context: "chat.delegate",
         });
@@ -191,7 +192,7 @@ export function createDelegateHandler(
       });
     } catch (err) {
       return failure({
-        code: "CHAT_DELEGATE_ERROR",
+        code: CHAT_ERROR_CODES.CHAT_DELEGATE_ERROR,
         message: "Failed to delegate task",
         details: err,
         context: "chat.delegate",

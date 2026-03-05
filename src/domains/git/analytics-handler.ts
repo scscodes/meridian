@@ -9,6 +9,7 @@ import {
   failure,
   Logger,
 } from "../../types";
+import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
 import { AnalyticsOptions, GitAnalyticsReport } from "./analytics-types";
 import { GitAnalyzer } from "./analytics-service";
 
@@ -28,7 +29,7 @@ export function createShowAnalyticsHandler(
       const period = params.period || "3mo";
       if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
         return failure({
-          code: "INVALID_PERIOD",
+          code: GIT_ERROR_CODES.INVALID_PERIOD,
           message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
           context: "ShowAnalyticsHandler",
         });
@@ -55,7 +56,7 @@ export function createShowAnalyticsHandler(
       return success(report);
     } catch (err) {
       const error = {
-        code: "ANALYTICS_ERROR" as const,
+        code: GIT_ERROR_CODES.ANALYTICS_ERROR,
         message: `Failed to generate analytics: ${err instanceof Error ? err.message : String(err)}`,
         context: "ShowAnalyticsHandler",
         details: err,
@@ -85,7 +86,7 @@ export function createExportJsonHandler(
       const period = params.period || "3mo";
       if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
         return failure({
-          code: "INVALID_PERIOD",
+          code: GIT_ERROR_CODES.INVALID_PERIOD,
           message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
           context: "ExportJsonHandler",
         });
@@ -102,7 +103,7 @@ export function createExportJsonHandler(
       return success(json);
     } catch (err) {
       return failure({
-        code: "EXPORT_ERROR",
+        code: GIT_ERROR_CODES.EXPORT_ERROR,
         message: `Failed to export JSON: ${err instanceof Error ? err.message : String(err)}`,
         context: "ExportJsonHandler",
         details: err,
@@ -126,7 +127,7 @@ export function createExportCsvHandler(
       const period = params.period || "3mo";
       if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
         return failure({
-          code: "INVALID_PERIOD",
+          code: GIT_ERROR_CODES.INVALID_PERIOD,
           message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
           context: "ExportCsvHandler",
         });
@@ -143,7 +144,7 @@ export function createExportCsvHandler(
       return success(csv);
     } catch (err) {
       return failure({
-        code: "EXPORT_ERROR",
+        code: GIT_ERROR_CODES.EXPORT_ERROR,
         message: `Failed to export CSV: ${err instanceof Error ? err.message : String(err)}`,
         context: "ExportCsvHandler",
         details: err,

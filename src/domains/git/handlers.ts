@@ -11,6 +11,7 @@ import {
   Logger,
   GitProvider,
 } from "../../types";
+import { GIT_ERROR_CODES, GENERIC_ERROR_CODES } from "../../infrastructure/error-codes";
 
 /**
  * Example: git.status — Read-only operation.
@@ -24,7 +25,7 @@ export function createStatusHandler(
     // Validate branch parameter shape when provided
     if (params.branch !== undefined && typeof params.branch !== "string") {
       return failure({
-        code: "INVALID_PARAMS",
+        code: GENERIC_ERROR_CODES.INVALID_PARAMS,
         message: "Branch must be a string when provided",
         context: "git.status",
       });
@@ -43,7 +44,7 @@ export function createStatusHandler(
       return result;
     } catch (err) {
       return failure({
-        code: "GIT_STATUS_ERROR",
+        code: GIT_ERROR_CODES.GIT_STATUS_ERROR,
         message: "Failed to fetch git status",
         details: err,
         context: "git.status",
@@ -64,7 +65,7 @@ export function createPullHandler(
     // Validate branch parameter shape when provided
     if (params.branch !== undefined && typeof params.branch !== "string") {
       return failure({
-        code: "INVALID_PARAMS",
+        code: GENERIC_ERROR_CODES.INVALID_PARAMS,
         message: "Branch must be a string when provided",
         context: "git.pull",
       });
@@ -87,7 +88,7 @@ export function createPullHandler(
       return result;
     } catch (err) {
       return failure({
-        code: "GIT_PULL_ERROR",
+        code: GIT_ERROR_CODES.GIT_PULL_ERROR,
         message: "Failed to pull from git",
         details: err,
         context: "git.pull",
@@ -108,7 +109,7 @@ export function createCommitHandler(
     // Validate branch parameter shape when provided
     if (params.branch !== undefined && typeof params.branch !== "string") {
       return failure({
-        code: "INVALID_PARAMS",
+        code: GENERIC_ERROR_CODES.INVALID_PARAMS,
         message: "Branch must be a string when provided",
         context: "git.commit",
       });
@@ -117,7 +118,7 @@ export function createCommitHandler(
     // Validate required params
     if (!params.message || params.message.trim().length === 0) {
       return failure({
-        code: "INVALID_PARAMS",
+        code: GENERIC_ERROR_CODES.INVALID_PARAMS,
         message: "Commit message is required and cannot be empty",
         context: "git.commit",
       });
@@ -137,7 +138,7 @@ export function createCommitHandler(
       return result;
     } catch (err) {
       return failure({
-        code: "GIT_COMMIT_ERROR",
+        code: GIT_ERROR_CODES.GIT_COMMIT_ERROR,
         message: "Failed to commit to git",
         details: err,
         context: "git.commit",

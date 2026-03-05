@@ -1,0 +1,12 @@
+src/**
+tests/**
+tasks/**
+docs/**
+node_modules/**
+.vscode/**
+.claude/**
+.git/**
+vitest.config.ts
+tsconfig.json
+*.map
+**/*.test.ts

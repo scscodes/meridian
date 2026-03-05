@@ -10,6 +10,7 @@ import {
   WorkspaceProvider,
   Logger,
 } from "../../types";
+import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
 
 export interface CleanupParams {
   dryRun?: boolean;
@@ -38,7 +39,7 @@ export function createCleanupHandler(
 
       if (!files || files.length === 0) {
         return failure({
-          code: "HYGIENE_CLEANUP_NO_FILES",
+          code: HYGIENE_ERROR_CODES.HYGIENE_CLEANUP_NO_FILES,
           message: "Cleanup requires an explicit file list; none provided",
           context: "hygiene.cleanup",
         });
@@ -89,7 +90,7 @@ export function createCleanupHandler(
       return success({ dryRun: false, files, deleted, failed });
     } catch (err) {
       return failure({
-        code: "HYGIENE_CLEANUP_ERROR",
+        code: HYGIENE_ERROR_CODES.HYGIENE_CLEANUP_ERROR,
         message: "Cleanup operation failed",
         details: err,
         context: "hygiene.cleanup",

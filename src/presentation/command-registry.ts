@@ -16,6 +16,7 @@ export const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.pull",                "git.pull"],
   ["meridian.git.commit",              "git.commit"],
   ["meridian.git.smartCommit",         "git.smartCommit"],
+  ["meridian.git.analyzeInbound",      "git.analyzeInbound"],
   ["meridian.hygiene.scan",            "hygiene.scan"],
   ["meridian.hygiene.cleanup",         "hygiene.cleanup"],
   // hygiene.impactAnalysis — dedicated registration (active-file fallback + function name prompt)

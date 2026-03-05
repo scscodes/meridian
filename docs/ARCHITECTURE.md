@@ -61,6 +61,36 @@ Commands: `chat.context`, `chat.delegate`
 
 `chat.delegate` is the programmatic router: LLM classifies a free-form task string into a command via the prompt registry (`DELEGATE_CLASSIFIER`), then dispatches. The chat UI (`ui/chat-participant.ts`) routes independently via `SLASH_MAP` → LLM classifier → fallback.
 
+### NL Orchestration Layer
+
+#### Chat Participant Routing (`ui/chat-participant.ts`)
+
+The `@meridian` chat participant implements four-tier routing, checked in strict priority order:
+
+1. **`request.command`** — VS Code routes `/status`, `/scan`, `/impact`, etc. directly here (no leading slash). Matched against `SLASH_MAP` for immediate dispatch with no LLM call.
+2. **`SLASH_MAP` keyword match** — explicit `/keyword` in the raw prompt text (legacy fallback for clients that don't surface `request.command`).
+3. **`"run <name>"` shorthand** — dispatches `workflow.run` with the extracted workflow name; zero LLM calls.
+4. **`chat.delegate`** — falls through to the single classification authority: `chat.delegate` calls the LLM with the `DELEGATE_CLASSIFIER` prompt, gets back a `CommandName` (or `workflow.run:<name>`), then dispatches. This is the only tier that invokes the LLM.
+
+Empty prompts fall back to a help message listing all available slash commands. The `/impact` command auto-populates `filePath` from the active editor; if no file is open it surfaces a user-friendly message rather than dispatching.
+
+See ADR 003 (`docs/adr/003-single-classifier.md`) for the rationale behind keeping classification in a single authority (`chat.delegate`) rather than distributing it across tiers.
+
+#### LM Tools (`ui/lm-tools.ts`)
+
+`registerMeridianTools()` wraps every entry in `TOOL_DEFS` as a `vscode.lm.registerTool()` call. Each tool:
+1. Receives `options.input` as params (typed `Record<string, unknown>`).
+2. Calls `router.dispatch({ name: commandName, params }, ctx)`.
+3. Returns a `LanguageModelToolResult` with the formatted message from `formatResultMessage()`.
+
+Tools share the same `CommandRouter` instance as VS Code commands and the chat participant — ensuring consistent middleware (observability, audit) and a single handler registry. Adding a new tool only requires an entry in `TOOL_DEFS` and `contributes.languageModelTools` in `package.json`.
+
+#### Workflow and Agent Composition
+
+Workflows (`.vscode/workflows/*.json`) compose commands linearly via the same `router.dispatch()` path as all other callers. The `StepRunner` passed to the workflow engine is a closure over the router, so workflows can chain any registered command including `chat.delegate` (enabling LLM-driven steps within a workflow).
+
+Agents (`.vscode/agents/*.json`) declare capability lists (`capabilities: CommandName[]`) validated at load time. `AgentExecutor` dispatches each capability command through the router, then synthesises a structured result. Agents can also reference workflows by name, composing multi-step plans without additional orchestration code.
+
 #### Workflow (`workflow/`)
 Commands: `workflow.list`, `workflow.run`
 

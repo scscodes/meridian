@@ -1,0 +1,199 @@
+/**
+ * Chat Participant Routing Tests — covers the 4-tier routing precedence
+ * documented in ui/chat-participant.ts.
+ */
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { CommandContext } from "../src/types";
+import { success, failure } from "../src/types";
+import { MockLogger } from "./fixtures";
+
+// ── Mock vscode before importing the module under test ────────────────────────
+vi.mock("vscode", () => ({
+  chat: {
+    createChatParticipant: vi.fn(),
+  },
+  Uri: {
+    joinPath: vi.fn().mockReturnValue({ fsPath: "/ext/media/icon.svg" }),
+    file: vi.fn().mockReturnValue({ fsPath: "/ext" }),
+  },
+}));
+
+import { createChatParticipant } from "../src/ui/chat-participant";
+import * as vscode from "vscode";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function makeRouter(dispatchResult = success({ branch: "main", isDirty: false, staged: 0, unstaged: 0, untracked: 0 })) {
+  return { dispatch: vi.fn().mockResolvedValue(dispatchResult) };
+}
+
+function makeStream() {
+  return { markdown: vi.fn(), progress: vi.fn() };
+}
+
+const BASE_CTX: CommandContext = {
+  extensionPath: "/ext",
+  workspaceFolders: ["/ws"],
+  activeFilePath: "/ws/src/main.ts",
+};
+
+// ── Test Suite ────────────────────────────────────────────────────────────────
+
+describe("ChatParticipant routing", () => {
+  let router: ReturnType<typeof makeRouter>;
+  let logger: MockLogger;
+  let chatHandler: (req: Record<string, unknown>, chatCtx: unknown, stream: ReturnType<typeof makeStream>, token: unknown) => Promise<void>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    router = makeRouter();
+    logger = new MockLogger();
+
+    vi.mocked(vscode.chat.createChatParticipant).mockImplementation((_id: string, handler: unknown) => {
+      chatHandler = handler as typeof chatHandler;
+      return { dispose: vi.fn(), iconPath: undefined } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>;
+    });
+
+    createChatParticipant(router as any, BASE_CTX, logger);
+  });
+
+  // ── Tier 1: request.command ──────────────────────────────────────────────────
+
+  it("tier 1: routes /status via request.command", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: "status", prompt: "" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "git.status" }),
+      BASE_CTX
+    );
+  });
+
+  it("tier 1: routes /scan via request.command", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: "scan", prompt: "" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "hygiene.scan" }),
+      BASE_CTX
+    );
+  });
+
+  it("tier 1: routes /impact via request.command with active file", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: "impact", prompt: "" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "hygiene.impactAnalysis", params: expect.objectContaining({ filePath: "/ws/src/main.ts" }) }),
+      BASE_CTX
+    );
+  });
+
+  it("tier 1: /impact with no active file shows message instead of dispatching", async () => {
+    const ctxNoFile: CommandContext = { extensionPath: "/ext", workspaceFolders: ["/ws"] };
+    vi.clearAllMocks();
+    vi.mocked(vscode.chat.createChatParticipant).mockImplementation((_id: string, handler: unknown) => {
+      chatHandler = handler as typeof chatHandler;
+      return { dispose: vi.fn(), iconPath: undefined } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>;
+    });
+    createChatParticipant(router as any, ctxNoFile, logger);
+
+    const stream = makeStream();
+    await chatHandler({ command: "impact", prompt: "" }, {}, stream, {});
+    expect(router.dispatch).not.toHaveBeenCalled();
+    expect(stream.markdown).toHaveBeenCalledWith(expect.stringContaining("TypeScript file"));
+  });
+
+  it("tier 1: unknown slash command with non-empty prompt falls through to classifier", async () => {
+    const delegateResult = success({ dispatched: true, commandName: "git.status", result: {} });
+    router.dispatch.mockResolvedValue(delegateResult);
+    const stream = makeStream();
+    // request.command is set but not in SLASH_MAP, prompt has text → falls to tier 4
+    await chatHandler({ command: "unknownCommand", prompt: "show git status" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "chat.delegate" }),
+      BASE_CTX
+    );
+  });
+
+  // ── Tier 2: SLASH_MAP keyword in prompt ──────────────────────────────────────
+
+  it("tier 2: routes /status keyword in prompt text", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "/status" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "git.status" }),
+      BASE_CTX
+    );
+  });
+
+  it("tier 2: routes /pr keyword in prompt text", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "/pr" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "git.generatePR" }),
+      BASE_CTX
+    );
+  });
+
+  // ── Tier 3: "run <name>" shorthand ───────────────────────────────────────────
+
+  it("tier 3: routes 'run deploy' to workflow.run with correct name", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "run deploy" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "workflow.run", params: { name: "deploy" } }),
+      BASE_CTX
+    );
+  });
+
+  it("tier 3: routes 'run my-pipeline' to workflow.run", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "run my-pipeline" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "workflow.run", params: { name: "my-pipeline" } }),
+      BASE_CTX
+    );
+  });
+
+  // ── Tier 4: chat.delegate (LLM classifier) ───────────────────────────────────
+
+  it("tier 4: delegates NL prompt to chat.delegate", async () => {
+    const delegateResult = success({ dispatched: true, commandName: "git.status", result: {} });
+    router.dispatch.mockResolvedValue(delegateResult);
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "show me my git status please" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "chat.delegate", params: { task: "show me my git status please" } }),
+      BASE_CTX
+    );
+  });
+
+  it("tier 4: falls back to chat.context when delegate fails", async () => {
+    const errResult = failure({ code: "MODEL_UNAVAILABLE", message: "No model" });
+    const contextResult = success({ activeFile: "/ws/src/main.ts", gitBranch: "main" });
+    router.dispatch
+      .mockResolvedValueOnce(errResult)   // chat.delegate fails
+      .mockResolvedValueOnce(contextResult); // chat.context fallback
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "do something" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledTimes(2);
+    expect(router.dispatch).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ name: "chat.context" }),
+      BASE_CTX
+    );
+  });
+
+  // ── Edge cases ───────────────────────────────────────────────────────────────
+
+  it("empty prompt shows help message without dispatching", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "" }, {}, stream, {});
+    expect(router.dispatch).not.toHaveBeenCalled();
+    expect(stream.markdown).toHaveBeenCalledWith(expect.stringContaining("/status"));
+  });
+
+  it("whitespace-only prompt shows help message", async () => {
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "   " }, {}, stream, {});
+    expect(router.dispatch).not.toHaveBeenCalled();
+  });
+});

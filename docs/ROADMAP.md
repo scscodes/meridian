@@ -46,6 +46,8 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
   - Add integration tests for webview adapters (analytics panels).
   - Add `/impact` + `ImpactAnalyzer` unit tests (currently untested path).
 
-- **Package & publish readiness**
-  - Audit `package.json` `contributes.languageModelTools` against `LM_TOOL_DEFS` (2 new tools need entries: `workflow.list`, `agent.list`).
-  - Review `activationEvents` and `engines.vscode` for compatibility range.
+- **Package & publish readiness** *(done)*
+  - `contributes.languageModelTools` now has 18 entries matching `LM_TOOL_DEFS` exactly (`meridian_workflow_list` and `meridian_agent_list` added).
+  - `meridian_workflow_run` `modelDescription` path corrected (`.vscode/agents/` → `.vscode/workflows/`).
+  - `engines.vscode` bumped to `^1.91.0` (minimum required for `vscode.lm.registerTool`).
+  - `activationEvents: ["onStartupFinished"]` confirmed correct.

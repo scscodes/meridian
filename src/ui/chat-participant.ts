@@ -13,6 +13,8 @@ import { CommandRouter } from "../router";
 import { Command, CommandContext, CommandName } from "../types";
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
+import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
+import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
 const SLASH_MAP: Record<string, CommandName> = {
@@ -154,24 +156,24 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     stream.markdown(value as string);
   },
   "git.generatePR": (value, stream) => {
-    stream.markdown((value as any).body);
+    stream.markdown((value as GeneratedPR).body);
   },
   "git.reviewPR": (value, stream) => {
-    const rv = value as any;
+    const rv = value as GeneratedPRReview;
     stream.markdown(`**Verdict:** ${rv.verdict}\n\n${rv.summary}\n\n`);
     for (const c of rv.comments ?? []) {
       stream.markdown(`- **[${c.severity}]** \`${c.file}\`: ${c.comment}\n`);
     }
   },
   "git.resolveConflicts": (value, stream) => {
-    const cr = value as any;
+    const cr = value as ConflictResolutionProse;
     stream.markdown(`${cr.overview}\n\n`);
     for (const f of cr.perFile ?? []) {
       stream.markdown(`**\`${f.path}\`** → \`${f.strategy}\`\n${f.rationale}\n`);
     }
   },
   "hygiene.impactAnalysis": (value, stream) => {
-    stream.markdown((value as any).summary);
+    stream.markdown((value as ImpactAnalysisResult).summary);
   },
 };
 

@@ -36,7 +36,7 @@ export const WORKFLOW_COMMANDS: WorkflowCommandName[] = [
 export class WorkflowDomainService implements DomainService {
   readonly name = "workflow";
 
-  handlers: Partial<Record<WorkflowCommandName, Handler>> = {};
+  handlers: Partial<Record<WorkflowCommandName, Handler<any, any>>> = {};
   private logger: Logger;
   private workflowCache: Map<string, WorkflowDefinition> = new Map();
   private workflowEngine: WorkflowEngine | null = null;
@@ -59,12 +59,12 @@ export class WorkflowDomainService implements DomainService {
     this.handlers = {
       "workflow.list": createListWorkflowsHandler(this.logger, () =>
         this.discoverWorkflows()
-      ) as any,
+      ),
       "workflow.run": createRunWorkflowHandler(
         this.logger,
         this.getWorkflowEngine.bind(this),
         (name) => this.loadWorkflow(name)
-      ) as any,
+      ),
     };
   }
 

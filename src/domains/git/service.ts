@@ -30,8 +30,8 @@ import {
   createReviewPRHandler,
   createCommentPRHandler,
   createResolveConflictsHandler,
-  GenerateProseFn,
 } from "./pr-handlers";
+import { GenerateProseFn } from "../../types";
 import { createSessionBriefingHandler } from "./session-handler";
 import {
   createShowAnalyticsHandler,
@@ -63,7 +63,7 @@ export const GIT_COMMANDS: GitCommandName[] = [
 export class GitDomainService implements DomainService {
   readonly name = "git";
 
-  handlers: Partial<Record<GitCommandName, Handler>> = {};
+  handlers: Partial<Record<GitCommandName, Handler<any, any>>> = {};
   private gitProvider: GitProvider;
   private logger: Logger;
 
@@ -95,9 +95,9 @@ export class GitDomainService implements DomainService {
 
     // Initialize handlers
     this.handlers = {
-      "git.status": createStatusHandler(gitProvider, logger) as any,
-      "git.pull": createPullHandler(gitProvider, logger) as any,
-      "git.commit": createCommitHandler(gitProvider, logger) as any,
+      "git.status": createStatusHandler(gitProvider, logger),
+      "git.pull": createPullHandler(gitProvider, logger),
+      "git.commit": createCommitHandler(gitProvider, logger),
       "git.smartCommit": createSmartCommitHandler(
         gitProvider,
         logger,
@@ -105,30 +105,30 @@ export class GitDomainService implements DomainService {
         this.messageSuggester,
         this.batchCommitter,
         approvalUI
-      ) as any,
+      ),
       "git.analyzeInbound": createAnalyzeInboundHandler(
         this.inboundAnalyzer,
         logger
-      ) as any,
+      ),
       "git.showAnalytics": createShowAnalyticsHandler(
         this.analyzer,
         logger
-      ) as any,
+      ),
       "git.exportJson": createExportJsonHandler(
         this.analyzer,
         logger
-      ) as any,
+      ),
       "git.exportCsv": createExportCsvHandler(
         this.analyzer,
         logger
-      ) as any,
+      ),
       ...(generateProseFn
         ? {
-            "git.generatePR": createGeneratePRHandler(gitProvider, logger, generateProseFn) as any,
-            "git.reviewPR": createReviewPRHandler(gitProvider, logger, generateProseFn) as any,
-            "git.commentPR": createCommentPRHandler(gitProvider, logger, generateProseFn) as any,
-            "git.resolveConflicts": createResolveConflictsHandler(gitProvider, logger, this.inboundAnalyzer, generateProseFn) as any,
-            "git.sessionBriefing": createSessionBriefingHandler(gitProvider, logger, generateProseFn) as any,
+            "git.generatePR": createGeneratePRHandler(gitProvider, logger, generateProseFn),
+            "git.reviewPR": createReviewPRHandler(gitProvider, logger, generateProseFn),
+            "git.commentPR": createCommentPRHandler(gitProvider, logger, generateProseFn),
+            "git.resolveConflicts": createResolveConflictsHandler(gitProvider, logger, this.inboundAnalyzer, generateProseFn),
+            "git.sessionBriefing": createSessionBriefingHandler(gitProvider, logger, generateProseFn),
           }
         : {}),
     };

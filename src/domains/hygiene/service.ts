@@ -11,8 +11,11 @@ import {
   Result,
   success,
   failure,
+  CommandContext,
+  GenerateProseFn,
 } from "../../types";
 import { HYGIENE_SETTINGS } from "../../constants";
+import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
 import { createScanHandler } from "./scan-handler";
 import { createCleanupHandler } from "./cleanup-handler";
 import { HygieneAnalyzer } from "./analytics-service";
@@ -33,29 +36,36 @@ export const HYGIENE_COMMANDS: HygieneCommandName[] = [
 export class HygieneDomainService implements DomainService {
   readonly name = "hygiene";
 
-  handlers: Partial<Record<HygieneCommandName, Handler>> = {};
+  handlers: Partial<Record<HygieneCommandName, Handler<any, any>>> = {};
   public analyzer: HygieneAnalyzer;
   public deadCodeAnalyzer: DeadCodeAnalyzer;
   private logger: Logger;
   private scanIntervalMs: number = HYGIENE_SETTINGS.SCAN_INTERVAL_MINUTES * 60 * 1000;
+  private _timer: ReturnType<typeof setInterval> | undefined;
+  private readonly workspaceRoot: string | undefined;
 
-  constructor(workspaceProvider: WorkspaceProvider, logger: Logger) {
+  constructor(
+    workspaceProvider: WorkspaceProvider,
+    logger: Logger,
+    workspaceRoot?: string,
+    generateProseFn?: GenerateProseFn
+  ) {
     this.logger = logger;
+    this.workspaceRoot = workspaceRoot;
     this.analyzer = new HygieneAnalyzer();
     this.deadCodeAnalyzer = new DeadCodeAnalyzer(logger);
 
     // Initialize handlers
     this.handlers = {
-      "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer) as any,
-      "hygiene.cleanup": createCleanupHandler(workspaceProvider, logger) as any,
-      "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, this.deadCodeAnalyzer, logger) as any,
-      "hygiene.impactAnalysis": createImpactAnalysisHandler(logger) as any,
+      "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer),
+      "hygiene.cleanup": createCleanupHandler(workspaceProvider, logger),
+      "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, this.deadCodeAnalyzer, logger),
+      "hygiene.impactAnalysis": createImpactAnalysisHandler(logger, generateProseFn),
     };
   }
 
   /**
    * Initialize domain — set up background scan scheduling.
-   * In a real extension, this would register a timer.
    */
   async initialize(): Promise<Result<void>> {
     try {
@@ -64,20 +74,35 @@ export class HygieneDomainService implements DomainService {
         "HygieneDomainService.initialize"
       );
 
-      // TODO: Schedule periodic workspace scan
-      // setInterval(async () => {
-      //   const scanResult = await this.handlers["hygiene.scan"](...)
-      // }, this.scanIntervalMs)
+      if (HYGIENE_SETTINGS.ENABLED && this.workspaceRoot) {
+        const workspaceRoot = this.workspaceRoot;
+        const scanCtx: CommandContext = {
+          extensionPath: "",
+          workspaceFolders: [workspaceRoot],
+        };
+        const handler = this.handlers["hygiene.scan"];
+        this._timer = setInterval(() => {
+          if (handler) {
+            handler(scanCtx, {}).catch((err: unknown) => {
+              this.logger.warn(
+                "Background hygiene scan failed",
+                "HygieneDomainService",
+                { code: HYGIENE_ERROR_CODES.HYGIENE_SCAN_ERROR, message: String(err) }
+              );
+            });
+          }
+        }, this.scanIntervalMs);
 
-      this.logger.info(
-        `Hygiene scan scheduled every ${this.scanIntervalMs / 1000}s`,
-        "HygieneDomainService.initialize"
-      );
+        this.logger.info(
+          `Hygiene scan scheduled every ${this.scanIntervalMs / 1000}s`,
+          "HygieneDomainService.initialize"
+        );
+      }
 
       return success(void 0);
     } catch (err) {
       return failure({
-        code: "HYGIENE_INIT_ERROR",
+        code: HYGIENE_ERROR_CODES.HYGIENE_INIT_ERROR,
         message: "Failed to initialize hygiene domain",
         details: err,
         context: "HygieneDomainService.initialize",
@@ -93,7 +118,10 @@ export class HygieneDomainService implements DomainService {
       "Tearing down hygiene domain",
       "HygieneDomainService.teardown"
     );
-    // TODO: Cancel periodic scans
+    if (this._timer !== undefined) {
+      clearInterval(this._timer);
+      this._timer = undefined;
+    }
   }
 }
 
@@ -102,7 +130,9 @@ export class HygieneDomainService implements DomainService {
  */
 export function createHygieneDomain(
   workspaceProvider: WorkspaceProvider,
-  logger: Logger
+  logger: Logger,
+  workspaceRoot?: string,
+  generateProseFn?: GenerateProseFn
 ): HygieneDomainService {
-  return new HygieneDomainService(workspaceProvider, logger);
+  return new HygieneDomainService(workspaceProvider, logger, workspaceRoot, generateProseFn);
 }

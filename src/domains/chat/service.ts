@@ -16,8 +16,8 @@ import {
   createContextHandler,
   createDelegateHandler,
   CommandDispatcher,
-  GenerateProseFn,
 } from "./handlers";
+import { GenerateProseFn } from "../../types";
 
 /**
  * Chat domain commands.
@@ -30,7 +30,7 @@ export const CHAT_COMMANDS: ChatCommandName[] = [
 export class ChatDomainService implements DomainService {
   readonly name = "chat";
 
-  handlers: Partial<Record<ChatCommandName, Handler>> = {};
+  handlers: Partial<Record<ChatCommandName, Handler<any, any>>> = {};
   private logger: Logger;
 
   constructor(
@@ -42,8 +42,8 @@ export class ChatDomainService implements DomainService {
     this.logger = logger;
 
     this.handlers = {
-      "chat.context": createContextHandler(gitProvider, logger) as Handler,
-      "chat.delegate": createDelegateHandler(dispatcher, logger, generateProseFn) as Handler,
+      "chat.context": createContextHandler(gitProvider, logger),
+      "chat.delegate": createDelegateHandler(dispatcher, logger, generateProseFn),
     };
   }
 

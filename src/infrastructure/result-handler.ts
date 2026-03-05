@@ -49,27 +49,27 @@ export function formatResultMessage(
       return { level: "info", message: `${branch} (${dirty}) — staged: ${v.staged}, unstaged: ${v.unstaged}, untracked: ${v.untracked}` };
     }
     case "git.pull":
-      return { level: "info", message: `Pulled: ${(v as any).message ?? "up to date"}` };
+      return { level: "info", message: `Pulled: ${(v as { message?: string }).message ?? "up to date"}` };
     case "git.commit":
       return { level: "info", message: `Committed: ${v}` };
     case "git.smartCommit": {
-      const sc = v as any;
+      const sc = v as { totalGroups: number; totalFiles: number };
       return { level: "info", message: `Smart commit: ${sc.totalGroups} group(s), ${sc.totalFiles} file(s)` };
     }
     case "git.generatePR": {
-      const pr = v as any;
+      const pr = v as { branch: string };
       return { level: "info", message: `PR description generated for "${pr.branch}" — copied to clipboard` };
     }
     case "git.reviewPR": {
-      const rv = v as any;
+      const rv = v as { branch: string; verdict: string; comments?: unknown[] };
       return { level: "info", message: `PR review for "${rv.branch}": ${rv.verdict} — ${rv.comments?.length ?? 0} comment(s)` };
     }
     case "git.commentPR": {
-      const cm = v as any;
+      const cm = v as { branch: string; comments?: unknown[] };
       return { level: "info", message: `${cm.comments?.length ?? 0} inline comment(s) generated for "${cm.branch}"` };
     }
     case "git.resolveConflicts": {
-      const cr = v as any;
+      const cr = v as { perFile?: unknown[] };
       return { level: "info", message: `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output` };
     }
     case "git.sessionBriefing":
@@ -97,7 +97,7 @@ export function formatResultMessage(
     case "chat.context":
       return { level: "info", message: "Chat context gathered." };
     case "chat.delegate": {
-      const dr = v as any;
+      const dr = v as { commandName?: string };
       return { level: "info", message: `Delegated → ${dr.commandName ?? "unknown"}` };
     }
     default:

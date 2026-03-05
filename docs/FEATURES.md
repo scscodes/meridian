@@ -104,7 +104,7 @@ Copilot Chat integration and context gathering.
 Gather workspace context for Copilot: active file path, current Git branch, Git status (staged/unstaged/untracked counts). Returns a structured object. Useful as a preamble before delegating complex tasks to Copilot Chat.
 
 ### **chat.delegate**
-Spawn a sub-agent to execute a Meridian command asynchronously and return the result. Decouples long-running operations (analytics, scans) from the chat thread, allowing Copilot to continue interacting while work proceeds in the background.
+Classify a free-form task description using an LLM and dispatch it to the matching Meridian command. This is the single classification authority — the `@meridian` chat participant, LM tools, and workflows all route through it rather than maintaining their own classifiers.
 
 ### **@meridian chat participant**
 Use `@meridian` in Copilot Chat to interact with Meridian. Natural language is the primary interface — describe what you want and Meridian routes it via LLM intent classification (e.g., "show uncommitted changes", "what's the blast radius of createStatusHandler?", "run the morning sync workflow"). Slash commands (`/pr`, `/review`, `/briefing`, `/scan`, `/status`, `/workflows`, `/agents`, `/analytics`, `/conflicts`, `/context`, `/impact`) are accelerator shortcuts for common operations.

@@ -8,54 +8,38 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 
 - **Chat NL-First Refactor** — `@meridian` routes all NL via LLM classifier (prompt registry: `DELEGATE_CLASSIFIER`), 16 LM tools for Copilot agent mode, `RESULT_FORMATTERS` map for extensible output, full command parity via chat.
 
+- **Stabilization & Architecture Hardening (Iterations 1–3)**
+  - Hygiene background scheduling: `setInterval`/`clearInterval` wired in `HygieneDomainService`; starts only when `hygiene.enabled`.
+  - Workspace traversal failures surfaced via injected `Logger` instead of swallowed.
+  - `BaseWebviewProvider.handleMessage` abstract signature typed (no more `any`).
+  - Handler maps use `Handler<any, any>` in service classes — eliminates all `as Handler` casts.
+  - `result-handler`, `result-presenters`, and `chat-participant` formatters use typed domain shapes (no `as any`).
+  - `GenerateProseFn` centralized in `src/types.ts`; re-exported from original locations; injected into `createImpactAnalysisHandler`.
+  - `Config.initialize()` reads all `meridian.*` VS Code settings; `Config.getPruneConfig()` replaces inline `readPruneConfig()`; wired in `main.ts`.
+  - `git.analyzeInbound` added to `COMMAND_MAP` (was missing despite being in `TOOL_DEFS`).
+  - 23 new tests: chat-participant 4-tier routing (13), LM tools registration/invocation (10).
+  - NL Orchestration section added to `ARCHITECTURE.md`; `STRUCTURAL_REFACTOR.md` retired.
+
 ---
 
 ## Deferred
 
-- Canonical config service — unify direct `vscode.workspace.getConfiguration` calls into a single provider
 - Remote telemetry sink — no destination exists yet
 - Additional analytics chart types — diminishing returns on existing webviews
-- Background task scheduling — periodic hygiene scans
+- Webview message typed generics — `BaseWebviewProvider<T, M extends WebviewMessage>` parameterization
+
+---
 
 ## Next Focus Areas
 
-- **Hygiene & background scanning**
-  - Finish wiring periodic hygiene scans in `HygieneDomainService` (real interval scheduling and teardown).
-  - Surface workspace traversal failures in `WorkspaceProvider` via injected logging instead of swallowing errors.
-  - Harden hygiene impact analysis and `/impact` UX (types, error paths, and integration with chat).
+- **Command catalog synchronization**
+  - Ensure `KNOWN_COMMANDS`, LM `TOOL_DEFS`, and the `DELEGATE_CLASSIFIER` prompt text stay synchronized (or generate from a single source of truth).
+  - Consider a build-time check that flags drift between the three.
 
-- **Architecture & DI (prose, config)**
-  - Complete DI for `GenerateProseFn` across domains (git, chat, hygiene) so no domain imports VS Code/LM directly.
-  - Converge on a canonical `ConfigProvider` for all extension configuration (hygiene scheduling, prune behavior, model selection, log level).
-
-- **Types & Result usage**
-  - Replace `any` and `as any` in handler maps, Git/hygiene params, presenters, and webview message handling with small, local types.
+- **Workflow & agent result alignment**
   - Align workflow/infra error codes with `Result` + `error-codes` (use `success`/`failure` helpers, centralize codes).
+  - Extend formatter tests to cover workflow step outputs and agent execution results.
 
-- **NL-first routing & command catalog**
-  - Keep `chat.delegate`, LM tools, and workflows aligned with ADR 003 (single classifier).
-  - Ensure `KNOWN_COMMANDS`, LM `TOOL_DEFS`, and classifier prompt text are synchronized or generated from a single catalog.
-  - Codify chat routing precedence (slash commands, `run <name>`, delegate) in tests.
-
-- **UI, LM tools, and integration tests**
-  - Add tests around `chat-participant`, LM tools registration/behavior, and webview adapters.
-  - Ensure LM tools respect the same `Result` formatting and error UX as the rest of the extension.
-
-- **Documentation cleanup**
-  - Retire or fold legacy structural-refactor docs into `ARCHITECTURE.md` / ADRs.
-  - Add a concise “NL orchestration” section describing how chat, LM tools, workflows, and agents compose.
-
-## Proposed Iterations
-
-- **Iteration 1 — Stabilization**
-  - Finish hygiene background scheduling and logging.
-  - Tighten types around hygiene/git handler maps and impact analysis.
-  - Add `/impact` + ImpactAnalyzer tests.
-
-- **Iteration 2 — Architecture hardening**
-  - Complete `GenerateProseFn` DI and wire the canonical `ConfigProvider`.
-  - Align Result/error-code usage for workflow + infra and extend formatter tests.
-
-- **Iteration 3 — NL-first & UX**
-  - Add tests for chat participant and LM tools; enforce sync between command catalog and classifier prompt.
-  - Document NL orchestration and retire remaining structural-refactor migration docs.
+- **Integration & E2E coverage**
+  - Add integration tests for webview adapters (analytics panels).
+  - Add `/impact` + `ImpactAnalyzer` unit tests (currently untested path).

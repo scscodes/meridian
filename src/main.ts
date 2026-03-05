@@ -27,7 +27,7 @@ import { createChatParticipant } from "./ui/chat-participant";
 import { createSmartCommitApprovalUI } from "./ui/smart-commit-quick-pick";
 import { registerMeridianTools } from "./ui/lm-tools";
 import { generateProse } from "./infrastructure/prose-generator";
-import { PruneConfig, PRUNE_DEFAULTS } from "./domains/hygiene/analytics-types";
+import { Config } from "./infrastructure/config";
 
 // Presentation layer
 import { registerCommands, COMMAND_MAP } from "./presentation/command-registry";
@@ -36,17 +36,6 @@ import { setupFileWatchers } from "./presentation/file-watchers";
 import { setupTreeProviders } from "./presentation/tree-setup";
 import { registerSpecializedCommands } from "./presentation/specialized-commands";
 import { createWebviewPanels } from "./presentation/webview-setup";
-
-/** Read user-configured prune settings, falling back to PRUNE_DEFAULTS */
-function readPruneConfig(): PruneConfig {
-  const cfg = vscode.workspace.getConfiguration("meridian.hygiene.prune");
-  return {
-    minAgeDays:   cfg.get<number>("minAgeDays",   PRUNE_DEFAULTS.minAgeDays),
-    maxSizeMB:    cfg.get<number>("maxSizeMB",    PRUNE_DEFAULTS.maxSizeMB),
-    minLineCount: cfg.get<number>("minLineCount",  PRUNE_DEFAULTS.minLineCount),
-    categories:   cfg.get<PruneConfig["categories"]>("categories", PRUNE_DEFAULTS.categories),
-  };
-}
 
 // ============================================================================
 // Command Context Builder
@@ -73,11 +62,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const outputChannel = vscode.window.createOutputChannel("Meridian");
   context.subscriptions.push(outputChannel);
 
+  const config = new Config();
+  const configResult = await config.initialize();
+  if (configResult.kind === "err") {
+    logger.warn("Config initialization used defaults", "activate", configResult.error);
+  }
+
   const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   const extensionPath = context.extensionUri.fsPath;
   const gitProvider = createGitProvider(workspaceRoot);
-  const workspaceProvider = createWorkspaceProvider(workspaceRoot);
+  const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);
 
   // ── Router + middleware ─────────────────────────────────────────────
   const router = new CommandRouter(logger);
@@ -95,7 +90,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // ── Domain registration ─────────────────────────────────────────────
   const smartCommitApprovalUI = createSmartCommitApprovalUI();
   router.registerDomain(createGitDomain(gitProvider, logger, workspaceRoot, smartCommitApprovalUI, generateProse));
-  router.registerDomain(createHygieneDomain(workspaceProvider, logger));
+  router.registerDomain(createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse));
   router.registerDomain(createChatDomain(gitProvider, logger, (cmd, ctx) => router.dispatch(cmd, ctx), generateProse));
   router.registerDomain(createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath));
   router.registerDomain(createAgentDomain(logger, workspaceRoot, extensionPath, (cmd, ctx) => router.dispatch(cmd, ctx)));
@@ -114,10 +109,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const trees = setupTreeProviders(context, gitProvider, logger, workspaceRoot, dispatch, cmdCtx);
 
   const { analyticsPanel, hygieneAnalyticsPanel } = createWebviewPanels(
-    context, router, workspaceRoot, ctxFn, readPruneConfig
+    context, router, workspaceRoot, ctxFn, () => config.getPruneConfig()
   );
 
-  registerCommands(context, router, outputChannel, ctxFn, readPruneConfig, {
+  registerCommands(context, router, outputChannel, ctxFn, () => config.getPruneConfig(), {
     outputChannel, analyticsPanel, hygieneAnalyticsPanel,
   });
 

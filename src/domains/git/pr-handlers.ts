@@ -10,6 +10,7 @@ import {
   failure,
   Logger,
   GitProvider,
+  GenerateProseFn,
 } from "../../types";
 import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
 import {
@@ -25,12 +26,8 @@ import {
 import { InboundAnalyzer } from "./inbound-analyzer";
 import { getPrompt } from "../../infrastructure/prompt-registry";
 
-/** Injected prose generation function — avoids transitive vscode import in tests. */
-export type GenerateProseFn = (request: {
-  domain: "hygiene" | "git" | "chat";
-  systemPrompt: string;
-  data: Record<string, unknown>;
-}) => Promise<Result<string>>;
+/** Re-exported for backward compatibility — canonical definition in src/types.ts */
+export type { GenerateProseFn } from "../../types";
 
 // ============================================================================
 // Shared PR Context Gathering

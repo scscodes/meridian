@@ -2,7 +2,9 @@
  * Configuration Provider — Typed schema, validation.
  */
 
+import * as vscode from "vscode";
 import { ConfigProvider, AppError, Result, failure, success } from "../types";
+import { PruneConfig, PRUNE_DEFAULTS } from "../domains/hygiene/analytics-types";
 
 /**
  * Typed configuration schema.
@@ -48,16 +50,23 @@ export class Config implements ConfigProvider {
 
   /**
    * Load config from VS Code workspace settings.
-   * In a real extension, this would call vscode.workspace.getConfiguration().
-   * For now, use defaults + in-memory override.
    */
   async initialize(): Promise<Result<void>> {
     try {
-      // In extension context, load from vscode.workspace.getConfiguration()
-      // For now, just use defaults
-      this.store = { ...DEFAULTS };
+      const cfg = vscode.workspace.getConfiguration("meridian");
+      this.store = {
+        [CONFIG_KEYS.GIT_AUTOFETCH]: cfg.get<boolean>("git.autofetch") ?? DEFAULTS[CONFIG_KEYS.GIT_AUTOFETCH],
+        [CONFIG_KEYS.GIT_BRANCH_CLEAN]: cfg.get<boolean>("git.branchClean") ?? DEFAULTS[CONFIG_KEYS.GIT_BRANCH_CLEAN],
+        [CONFIG_KEYS.HYGIENE_ENABLED]: cfg.get<boolean>("hygiene.enabled") ?? DEFAULTS[CONFIG_KEYS.HYGIENE_ENABLED],
+        [CONFIG_KEYS.HYGIENE_SCAN_INTERVAL]: cfg.get<number>("hygiene.scanInterval") ?? DEFAULTS[CONFIG_KEYS.HYGIENE_SCAN_INTERVAL],
+        [CONFIG_KEYS.CHAT_MODEL]: cfg.get<string>("chat.model") ?? DEFAULTS[CONFIG_KEYS.CHAT_MODEL],
+        [CONFIG_KEYS.CHAT_CONTEXT_LINES]: cfg.get<number>("chat.contextLines") ?? DEFAULTS[CONFIG_KEYS.CHAT_CONTEXT_LINES],
+        [CONFIG_KEYS.LOG_LEVEL]: cfg.get<"debug" | "info" | "warn" | "error">("log.level") ?? DEFAULTS[CONFIG_KEYS.LOG_LEVEL],
+      };
       return success(void 0);
     } catch (err) {
+      // Fall back to defaults so the extension still works
+      this.store = { ...DEFAULTS };
       const error: AppError = {
         code: "CONFIG_INIT_ERROR",
         message: "Failed to initialize configuration",
@@ -88,6 +97,19 @@ export class Config implements ConfigProvider {
       };
       return failure(error);
     }
+  }
+
+  /**
+   * Read current prune config from VS Code settings (reads fresh each call).
+   */
+  getPruneConfig(): PruneConfig {
+    const cfg = vscode.workspace.getConfiguration("meridian.hygiene.prune");
+    return {
+      minAgeDays: cfg.get<number>("minAgeDays", PRUNE_DEFAULTS.minAgeDays),
+      maxSizeMB: cfg.get<number>("maxSizeMB", PRUNE_DEFAULTS.maxSizeMB),
+      minLineCount: cfg.get<number>("minLineCount", PRUNE_DEFAULTS.minLineCount),
+      categories: cfg.get<PruneConfig["categories"]>("categories", PRUNE_DEFAULTS.categories),
+    };
   }
 
   /**

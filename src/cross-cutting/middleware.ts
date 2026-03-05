@@ -4,39 +4,48 @@
  */
 
 import { Middleware, MiddlewareContext, Logger, AppError } from "../types";
+import { TelemetryTracker } from "../infrastructure/telemetry";
 
 /**
- * Logging middleware — tracks command execution time and outcomes.
+ * Observability middleware — unified logging + telemetry in a single timing pass.
+ * Replaces the former createLoggingMiddleware + createTelemetryMiddleware pair.
  */
-export function createLoggingMiddleware(logger: Logger): Middleware {
+export function createObservabilityMiddleware(
+  logger: Logger,
+  telemetry: TelemetryTracker
+): Middleware {
   return async (ctx: MiddlewareContext, next: () => Promise<void>) => {
     logger.debug(
       `[${ctx.commandName}] Starting execution`,
-      "LoggingMiddleware",
+      "ObservabilityMiddleware",
       { commandName: ctx.commandName }
     );
 
     const start = Date.now();
+    telemetry.trackCommandStarted(ctx.commandName);
     try {
       await next();
       const duration = Date.now() - start;
       logger.info(
         `[${ctx.commandName}] Completed in ${duration}ms`,
-        "LoggingMiddleware",
+        "ObservabilityMiddleware",
         { commandName: ctx.commandName, duration }
       );
+      telemetry.trackCommandCompleted(ctx.commandName, duration, "success");
     } catch (err) {
       const duration = Date.now() - start;
+      const appErr: AppError = {
+        code: "MIDDLEWARE_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+        details: err,
+        context: ctx.commandName,
+      };
       logger.error(
         `[${ctx.commandName}] Failed after ${duration}ms`,
-        "LoggingMiddleware",
-        {
-          code: "MIDDLEWARE_ERROR",
-          message: `Command execution failed`,
-          details: err,
-          context: ctx.commandName,
-        } as AppError
+        "ObservabilityMiddleware",
+        appErr
       );
+      telemetry.trackCommandFailed(ctx.commandName, duration, appErr);
       throw err;
     }
   };

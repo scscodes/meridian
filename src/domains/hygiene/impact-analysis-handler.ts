@@ -23,6 +23,7 @@ import {
 import { generateProse, ProseRequest } from "../../infrastructure/prose-generator";
 import { CACHE_SETTINGS } from "../../constants";
 import { TtlCache } from "../../infrastructure/cache";
+import { getPrompt } from "../../infrastructure/prompt-registry";
 import { HYGIENE_ERROR_CODES, GENERIC_ERROR_CODES, INFRASTRUCTURE_ERROR_CODES } from "../../infrastructure/error-codes";
 
 export interface ImpactAnalysisParams {
@@ -170,9 +171,7 @@ export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnaly
       // Generate prose via LLM
       const proseRequest: ProseRequest = {
         domain: "hygiene",
-        systemPrompt: `Analyze the following code impact analysis and provide a concise markdown summary.
-Format: "Changing this would affect X importers and Y test files. High risk: changes to exports or core functions; low risk: internal-only changes."
-Be brief and actionable.`,
+        systemPrompt: getPrompt("IMPACT_ANALYSIS"),
         data: {
           target: context.target,
           type: context.analysisType,

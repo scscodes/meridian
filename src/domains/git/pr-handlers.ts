@@ -23,6 +23,7 @@ import {
   ConflictResolutionProse,
 } from "./types";
 import { InboundAnalyzer } from "./inbound-analyzer";
+import { getPrompt } from "../../infrastructure/prompt-registry";
 
 /** Injected prose generation function — avoids transitive vscode import in tests. */
 export type GenerateProseFn = (request: {
@@ -112,27 +113,6 @@ export function parseNumstatOutput(
 // PR Description Generation
 // ============================================================================
 
-const PR_GENERATION_PROMPT = `You are a PR description generator for a software project.
-Given the branch name, recent commits, changed files with stats, and a diff, generate a pull request description.
-
-Output format (markdown):
-# <PR title in conventional commit style, e.g. "feat(git): add PR description generator">
-
-## Summary
-<2-3 sentences explaining what this PR does and why>
-
-## Changes
-<bulleted list of key changes, grouped by area>
-
-## Test Plan
-<how to verify these changes work correctly>
-
-Guidelines:
-- Keep the title under 72 characters
-- Focus on the "why" not the "what" in the summary
-- Group changes logically, not by file
-- Be specific in the test plan`;
-
 /**
  * git.generatePR — Generate a PR description from branch context using LLM.
  */
@@ -158,7 +138,7 @@ export function createGeneratePRHandler(
 
     const proseResult = await generateProseFn({
       domain: "git",
-      systemPrompt: PR_GENERATION_PROMPT,
+      systemPrompt: getPrompt("PR_GENERATION"),
       data: {
         branch: prContext.branch,
         targetBranch: prContext.targetBranch,
@@ -185,24 +165,6 @@ export function createGeneratePRHandler(
 // PR Review
 // ============================================================================
 
-const PR_REVIEW_PROMPT = `You are a senior code reviewer. Given a branch's commits, changed files, and diff, produce a structured review.
-
-Output format (JSON):
-{
-  "summary": "<1-2 sentence overall assessment>",
-  "verdict": "approve" | "request-changes" | "comment",
-  "comments": [
-    { "file": "<path>", "severity": "critical" | "suggestion" | "nit", "comment": "<specific feedback>" }
-  ]
-}
-
-Guidelines:
-- Flag bugs, security issues, and missing error handling as critical
-- Suggest improvements for readability and maintainability as suggestion
-- Style and naming issues are nit
-- Be specific — reference exact patterns, not vague advice
-- Return valid JSON only, no markdown fences`;
-
 export function createReviewPRHandler(
   gitProvider: GitProvider,
   logger: Logger,
@@ -219,7 +181,7 @@ export function createReviewPRHandler(
 
     const proseResult = await generateProseFn({
       domain: "git",
-      systemPrompt: PR_REVIEW_PROMPT,
+      systemPrompt: getPrompt("PR_REVIEW"),
       data: { branch: ctx.branch, targetBranch: ctx.targetBranch, commits: ctx.commits, changes: ctx.changes, diff: ctx.diff },
     });
     if (proseResult.kind === "err") return proseResult;
@@ -245,21 +207,6 @@ export function createReviewPRHandler(
 // PR Comments
 // ============================================================================
 
-const PR_COMMENT_PROMPT = `You are a code reviewer generating inline comments. Given changed files and a diff, produce file-level comments.
-
-Output format (JSON):
-{
-  "comments": [
-    { "file": "<path>", "line": <number or null>, "comment": "<specific, actionable feedback>" }
-  ]
-}
-
-Guidelines:
-- Focus on logic errors, edge cases, and missing validation
-- Reference specific code patterns from the diff
-- One comment per issue, not per file
-- Return valid JSON only, no markdown fences`;
-
 export function createCommentPRHandler(
   gitProvider: GitProvider,
   logger: Logger,
@@ -282,7 +229,7 @@ export function createCommentPRHandler(
       data.filterPaths = params.paths;
     }
 
-    const proseResult = await generateProseFn({ domain: "git", systemPrompt: PR_COMMENT_PROMPT, data });
+    const proseResult = await generateProseFn({ domain: "git", systemPrompt: getPrompt("PR_COMMENT"), data });
     if (proseResult.kind === "err") return proseResult;
 
     try {
@@ -300,28 +247,6 @@ export function createCommentPRHandler(
 // ============================================================================
 // Conflict Resolution Prose
 // ============================================================================
-
-const CONFLICT_RESOLUTION_PROMPT = `You are a git conflict resolution assistant. Given inbound changes with conflicts, file diffs, and severity scores, suggest resolution strategies.
-
-Output format (JSON):
-{
-  "overview": "<1-2 sentence situation summary>",
-  "perFile": [
-    {
-      "path": "<file path>",
-      "strategy": "keep-ours" | "keep-theirs" | "manual-merge" | "review-needed",
-      "rationale": "<why this strategy>",
-      "suggestedSteps": ["<step 1>", "<step 2>"]
-    }
-  ]
-}
-
-Guidelines:
-- Choose keep-ours/keep-theirs only when one side's changes clearly subsume the other
-- Default to manual-merge for complex overlapping logic changes
-- Use review-needed when you lack sufficient context
-- Be concrete in suggested steps
-- Return valid JSON only, no markdown fences`;
 
 export function createResolveConflictsHandler(
   gitProvider: GitProvider,
@@ -349,7 +274,7 @@ export function createResolveConflictsHandler(
 
     const proseResult = await generateProseFn({
       domain: "git",
-      systemPrompt: CONFLICT_RESOLUTION_PROMPT,
+      systemPrompt: getPrompt("CONFLICT_RESOLUTION"),
       data: {
         branch: analysis.branch,
         totalInbound: analysis.totalInbound,

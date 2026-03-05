@@ -14,6 +14,7 @@ import {
   GitProvider,
 } from "../../types";
 import { CHAT_ERROR_CODES } from "../../infrastructure/error-codes";
+import { getPrompt } from "../../infrastructure/prompt-registry";
 
 // ============================================================================
 // Context Handler
@@ -88,32 +89,6 @@ export type GenerateProseFn = (req: {
   data: Record<string, unknown>;
 }) => Promise<Result<string>>;
 
-const DELEGATE_CLASSIFIER_PROMPT = `You are a command router for the Meridian VS Code extension.
-Given a task description, respond with EXACTLY ONE command ID that best handles it.
-
-git.status            – check branch state
-git.smartCommit       – group and commit staged changes
-git.pull              – pull remote changes
-git.analyzeInbound    – analyze incoming remote changes for conflicts
-git.showAnalytics     – show git analytics report
-git.generatePR        – generate a PR description
-git.reviewPR          – review branch changes (verdict + comments)
-git.commentPR         – generate inline review comments
-git.resolveConflicts  – suggest conflict resolution strategies
-git.sessionBriefing   – generate a morning session briefing
-git.exportJson        – export git analytics data as JSON
-git.exportCsv         – export git analytics data as CSV
-hygiene.scan          – scan workspace for dead files, large files, logs
-hygiene.showAnalytics – show hygiene analytics
-hygiene.cleanup       – delete flagged files from a hygiene scan (dry-run safe)
-hygiene.impactAnalysis – trace blast radius of a file or function
-workflow.list         – list available workflows
-workflow.run:<name>   – run a named workflow (replace <name>)
-agent.list            – list available agents
-agent.execute         – run a named agent with a target command or workflow
-
-Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`;
-
 const KNOWN_COMMANDS = new Set([
   "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
   "git.showAnalytics", "git.exportJson", "git.exportCsv",
@@ -150,7 +125,7 @@ export function createDelegateHandler(
 
       const classifyResult = await generateProseFn({
         domain: "chat",
-        systemPrompt: DELEGATE_CLASSIFIER_PROMPT,
+        systemPrompt: getPrompt("DELEGATE_CLASSIFIER"),
         data: { task },
       });
 

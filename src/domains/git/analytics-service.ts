@@ -15,17 +15,15 @@ import {
   GitAnalyticsReport,
   TrendData,
 } from "./analytics-types";
-import { ANALYTICS_SETTINGS, CACHE_SETTINGS } from "../../constants";
+import { ANALYTICS_SETTINGS, CACHE_SETTINGS, WORKSPACE_EXCLUDE_BASE } from "../../constants";
 import { TtlCache } from "../../infrastructure/cache";
 
 /** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
 const ANALYTICS_EXCLUDE = [
-  "**/node_modules/**",
-  "**/.git/**",
+  ...WORKSPACE_EXCLUDE_BASE,
   "**/out/**",
   "**/dist/**",
   "**/build/**",
-  "**/.vscode/**",
   "**/*.lock",
   "**/package-lock.json",
 ];

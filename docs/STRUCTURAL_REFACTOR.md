@@ -12,26 +12,26 @@
 **Gate**: tsc 0 errors, vitest 266/266 pass (35 new tests across analytics-utils + workflow-validation)
 
 ## AI-3: Prose Prompt Registry
-**Status**: pending
-**Files touched**: TBD
-**Gate**: pending
+**Status**: DONE
+**Files touched**: `src/infrastructure/prompt-registry.ts` (new), `src/domains/git/pr-handlers.ts`, `src/domains/git/session-handler.ts`, `src/domains/chat/handlers.ts`, `src/domains/hygiene/impact-analysis-handler.ts`
+**Gate**: tsc 0 errors, vitest 266/266 pass
 
 ## AI-4: Webview Provider Base Class
-**Status**: pending
-**Files touched**: TBD
-**Gate**: pending
+**Status**: DONE
+**Files touched**: `src/infrastructure/webview-provider.ts` (rewritten)
+**Gate**: tsc 0 errors, vitest 266/266 pass
 
 ## AI-5: Decompose main.ts
-**Status**: pending
-**Files touched**: TBD
-**Gate**: pending
+**Status**: DONE
+**Files touched**: `src/main.ts` (705→188 lines), `src/presentation/result-presenters.ts` (new), `src/presentation/command-registry.ts` (new), `src/presentation/status-bar.ts` (new), `src/presentation/file-watchers.ts` (new), `src/presentation/tree-setup.ts` (new), `src/presentation/specialized-commands.ts` (new), `src/presentation/webview-setup.ts` (new)
+**Gate**: tsc 0 errors, vitest 266/266 pass
 
 ## AI-6: Consolidate Telemetry + Logging Middleware
-**Status**: pending
-**Files touched**: TBD
-**Gate**: pending
+**Status**: DONE
+**Files touched**: `src/cross-cutting/middleware.ts`, `src/main.ts`
+**Gate**: tsc 0 errors, vitest 266/266 pass
 
 ## AI-7: Centralize File Exclusion Patterns
-**Status**: pending
-**Files touched**: TBD
-**Gate**: pending
+**Status**: DONE
+**Files touched**: `src/constants.ts`, `src/domains/git/analytics-service.ts`
+**Gate**: tsc 0 errors, vitest 266/266 pass

@@ -54,6 +54,18 @@ export const GIT_DEFAULTS = {
 } as const;
 
 // ============================================================================
+// Workspace Exclusion Base — shared across git and hygiene analytics.
+// Domain-specific lists extend via spread.
+// ============================================================================
+
+export const WORKSPACE_EXCLUDE_BASE = [
+  "**/node_modules/**",
+  "**/.git/**",
+  "**/.vscode/**",
+  "**/.idea/**",
+] as const;
+
+// ============================================================================
 // Hygiene Configuration
 // ============================================================================
 
@@ -69,11 +81,7 @@ export const HYGIENE_SETTINGS = {
 
   /** File patterns to exclude from hygiene checks */
   EXCLUDE_PATTERNS: [
-    // VCS + editor
-    "**/node_modules/**",
-    "**/.git/**",
-    "**/.vscode/**",
-    "**/.idea/**",
+    ...WORKSPACE_EXCLUDE_BASE,
     // Build / output
     "**/dist/**",
     "**/build/**",
@@ -93,7 +101,7 @@ export const HYGIENE_SETTINGS = {
     "**/coverage/**",
     "**/.nyc_output/**",
     "**/.cache/**",
-  ] as const,
+  ] as readonly string[],
 
   /** Log file patterns to detect */
   LOG_FILE_PATTERNS: ["*.log", "debug.log", "*-error.log"] as const,
@@ -111,10 +119,8 @@ export const HYGIENE_SETTINGS = {
 // ============================================================================
 
 export const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
-  "**/node_modules/**",
-  "**/.git/**",
-  "**/.vscode/**",
-  "**/.idea/**",
+  ...WORKSPACE_EXCLUDE_BASE,
+  // Python runtime & tooling
   "**/.venv/**",
   "**/venv/**",
   "**/__pycache__/**",
@@ -124,6 +130,7 @@ export const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
   "**/.tox/**",
   "**/.eggs/**",
   "**/*.egg-info/**",
+  // Package managers & build tool caches
   "**/.yarn/**",
   "**/.pnpm-store/**",
   "**/vendor/**",

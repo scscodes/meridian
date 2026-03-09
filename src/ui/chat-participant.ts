@@ -15,7 +15,8 @@ import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
-import { ListWorkflowsResult } from "../domains/workflow/types";
+import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
+import { WorkflowTreeProvider } from "./tree-providers/workflow-tree-provider";
 import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
@@ -36,7 +37,8 @@ const SLASH_MAP: Record<string, CommandName> = {
 export function createChatParticipant(
   router: CommandRouter,
   ctx: CommandContext,
-  logger: Logger
+  logger: Logger,
+  workflowTree?: WorkflowTreeProvider
 ): vscode.Disposable {
   const handler: vscode.ChatRequestHandler = async (request, _chatCtx, stream, _token) => {
     // Debug: log incoming request shape so issues can be diagnosed
@@ -53,7 +55,7 @@ export function createChatParticipant(
       if (commandName) {
         logger.info(`Routing via request.command: ${cmd} → ${commandName}`, "ChatParticipant");
         stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
+        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, workflowTree);
       }
     }
 
@@ -64,14 +66,14 @@ export function createChatParticipant(
     if (firstWord in SLASH_MAP) {
       const commandName = SLASH_MAP[firstWord];
       stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
+      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, workflowTree);
     }
 
     // ── 3. "run <name>" shorthand ────────────────────────────────────────────
     if (firstWord === "run" && text.length > 4) {
       const name = text.slice(4).trim();
       stream.markdown(`\`@meridian\` → \`workflow.run\`\n\n`);
-      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger);
+      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, workflowTree);
     }
 
     // ── 4. NL → chat.delegate (single classification authority) ──────────────
@@ -83,12 +85,17 @@ export function createChatParticipant(
       );
       if (delegateResult.kind === "ok") {
         const dr = delegateResult.value as { commandName: string; result: unknown };
+        // Update workflow tree if delegation resolved to a workflow run
+        if (dr.commandName === "workflow.run" && dr.result) {
+          const r = dr.result as RunWorkflowResult;
+          workflowTree?.setLastRun(r.workflowName, r.success, r.duration, r.stepResults);
+        }
         stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
         return formatCommandResult(dr.commandName as CommandName, dr.result, stream);
       } else {
         logger.warn("chat.delegate failed, falling back", "ChatParticipant", delegateResult.error);
         stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger);
+        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, workflowTree);
       }
     }
 
@@ -113,7 +120,8 @@ async function handleDirectDispatch(
   router: CommandRouter,
   ctx: CommandContext,
   stream: vscode.ChatResponseStream,
-  logger: Logger
+  logger: Logger,
+  workflowTree?: WorkflowTreeProvider
 ): Promise<void> {
   // Auto-populate filePath for impact analysis from active editor
   if (commandName === "hygiene.impactAnalysis" && !params.filePath) {
@@ -124,8 +132,25 @@ async function handleDirectDispatch(
     params = { ...params, filePath: ctx.activeFilePath };
   }
 
+  // Signal tree that workflow is starting (spinner) — chat.delegate path cannot do this
+  // because the run has already completed by the time we receive the result there
+  if (commandName === "workflow.run") {
+    workflowTree?.setRunning(params.name as string);
+  }
+
   const cmd: Command = { name: commandName, params };
   const result = await router.dispatch(cmd, ctx);
+
+  // Update tree with step results after workflow completes
+  if (commandName === "workflow.run") {
+    const r = result.kind === "ok" ? (result.value as RunWorkflowResult) : null;
+    workflowTree?.setLastRun(
+      params.name as string,
+      r?.success ?? false,
+      r?.duration ?? 0,
+      r?.stepResults ?? []
+    );
+  }
 
   if (result.kind === "ok") {
     formatCommandResult(commandName, result.value, stream);
@@ -189,6 +214,15 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
       stream.markdown(`- **${w.name}** (${steps})${w.description ? ` — ${w.description}` : ""}\n`);
     }
   },
+  "workflow.run": (value, stream) => {
+    const r = value as RunWorkflowResult;
+    const icon = r.success ? "\u2713" : "\u2717";
+    stream.markdown(`**${icon} ${r.workflowName}** \u2014 ${r.stepCount} step(s) in ${(r.duration / 1000).toFixed(1)}s\n\n`);
+    for (const step of r.stepResults ?? []) {
+      const s = step.success ? "\u2713" : "\u2717";
+      stream.markdown(`- ${s} \`${step.stepId}\`${step.error ? `: ${step.error}` : ""}\n`);
+    }
+  },
   "agent.list": (value, stream) => {
     const r = value as ListAgentsResult;
     if (r.count === 0) {
@@ -204,7 +238,7 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     const r = value as AgentExecutionResult;
     const what = r.executedCommand ?? r.executedWorkflow ?? "unknown";
     const status = r.success ? "succeeded" : "failed";
-    stream.markdown(`**Agent \`${r.agentId}\`** ran \`${what}\` — ${status} in ${r.durationMs}ms\n\n`);
+    stream.markdown(`**Agent \`${r.agentId}\`** ran \`${what}\` \u2014 ${status} in ${r.durationMs}ms\n\n`);
     if (r.error) {
       stream.markdown(`**Error:** ${r.error}\n\n`);
     }
@@ -228,4 +262,3 @@ function formatCommandResult(
   const msg = formatResultMessage(commandName, { kind: "ok", value });
   stream.markdown(msg.message);
 }
-

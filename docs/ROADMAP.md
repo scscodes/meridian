@@ -9,9 +9,18 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 - Remote telemetry sink — no destination exists yet
 - Additional analytics chart types — diminishing returns on existing webviews
 - Webview message typed generics — `BaseWebviewProvider<T, M extends WebviewMessage>` parameterization
+- **Workflow run history webview panel** — multi-run timeline with per-step history; tree expansion covers the single-run case; blocked on webview infrastructure investment
+- **`workflow.run` spinner for `chat.delegate` path** — `setRunning` requires a pre-execution hook; the delegate handler completes the run before returning the result; deferred until a broader pre-execution signaling pattern is designed
+- **`git.resolveConflicts` tree migration** — structured per-file data maps to tree expansion per ADR 006; medium priority, no immediate user impact
+
 ---
 
 ## Next Focus Areas
+
+- **Unified UI/UX rendering strategy — COMPLETE** (ADR 006 + ADR 007)
+  - Decision matrix formalized in `docs/adr/006-rendering-surface-decision-matrix.md`
+  - `workflow.run` pilot: tree step expansion, chat formatter, error path standardization, dead code removed
+  - All four surfaces now carry the correct data for `workflow.run`; new commands have a policy to follow
 
 - **Chat NL → workflow routing (medium criticality)**
   - The `chat.delegate` classifier knows the `workflow.run:<name>` dispatch format but has no knowledge of available workspace workflow names at classification time. Users saying "run my deploy pipeline" may get intent mismatches if the workflow name doesn't match.

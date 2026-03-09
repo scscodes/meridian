@@ -196,4 +196,78 @@ describe("ChatParticipant routing", () => {
     await chatHandler({ command: undefined, prompt: "   " }, {}, stream, {});
     expect(router.dispatch).not.toHaveBeenCalled();
   });
+
+  // ── workflow.run tree integration ────────────────────────────────────────────
+
+  it("tier 3: calls workflowTree.setRunning before dispatch for 'run <name>'", async () => {
+    const workflowResult = success({
+      workflowName: "deploy", success: true, duration: 1500, stepCount: 2,
+      message: "ok", stepResults: [{ stepId: "build", success: true }],
+    });
+    router.dispatch.mockResolvedValue(workflowResult);
+
+    const workflowTree = { setRunning: vi.fn(), setLastRun: vi.fn() };
+    vi.clearAllMocks();
+    vi.mocked(vscode.chat.createChatParticipant).mockImplementation((_id: string, handler: unknown) => {
+      chatHandler = handler as typeof chatHandler;
+      return { dispose: vi.fn(), iconPath: undefined } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>;
+    });
+    createChatParticipant(router as any, BASE_CTX, logger, workflowTree as any);
+
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "run deploy" }, {}, stream, {});
+
+    expect(workflowTree.setRunning).toHaveBeenCalledWith("deploy");
+  });
+
+  it("tier 3: calls workflowTree.setLastRun with step results after 'run <name>' completes", async () => {
+    const stepResults = [
+      { stepId: "build", success: true },
+      { stepId: "test", success: false, error: "timeout" },
+    ];
+    const workflowResult = success({
+      workflowName: "deploy", success: false, duration: 3200, stepCount: 2,
+      failedAt: "test", message: "failed", stepResults,
+    });
+    router.dispatch.mockResolvedValue(workflowResult);
+
+    const workflowTree = { setRunning: vi.fn(), setLastRun: vi.fn() };
+    vi.clearAllMocks();
+    vi.mocked(vscode.chat.createChatParticipant).mockImplementation((_id: string, handler: unknown) => {
+      chatHandler = handler as typeof chatHandler;
+      return { dispose: vi.fn(), iconPath: undefined } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>;
+    });
+    createChatParticipant(router as any, BASE_CTX, logger, workflowTree as any);
+
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "run deploy" }, {}, stream, {});
+
+    expect(workflowTree.setLastRun).toHaveBeenCalledWith("deploy", false, 3200, stepResults);
+  });
+
+  // ── workflow.run RESULT_FORMATTERS ───────────────────────────────────────────
+
+  it("workflow.run formatter produces step-by-step markdown", async () => {
+    const stepResults = [
+      { stepId: "build", success: true },
+      { stepId: "test", success: false, error: "timeout" },
+    ];
+    const workflowResult = success({
+      workflowName: "ci-pipeline", success: false, duration: 4100, stepCount: 2,
+      failedAt: "test", message: "failed", stepResults,
+    });
+    router.dispatch.mockResolvedValue(workflowResult);
+
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "run ci-pipeline" }, {}, stream, {});
+
+    const allMarkdown = stream.markdown.mock.calls.map((c: unknown[]) => c[0]).join("");
+    expect(allMarkdown).toContain("ci-pipeline");
+    expect(allMarkdown).toContain("build");
+    expect(allMarkdown).toContain("test");
+    expect(allMarkdown).toContain("timeout");
+    // Success step uses ✓, failure uses ✗
+    expect(allMarkdown).toMatch(/✓.*build|build.*✓/);
+    expect(allMarkdown).toMatch(/✗.*test|test.*✗/);
+  });
 });

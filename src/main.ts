@@ -133,7 +133,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   // ── Chat + LM tools ────────────────────────────────────────────────
-  context.subscriptions.push(createChatParticipant(router, cmdCtx, logger));
+  context.subscriptions.push(createChatParticipant(router, cmdCtx, logger, trees.workflowTree));
   context.subscriptions.push(...registerMeridianTools(router, cmdCtx, logger));
 
   // ── Finalize ────────────────────────────────────────────────────────

@@ -12,7 +12,6 @@ import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider } from "../infrastructure/webview-provider";
 import { GeneratedPR, GeneratedPRReview, GeneratedPRComments, ConflictResolutionProse } from "../domains/git/types";
-import { RunWorkflowResult } from "../domains/workflow/types";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -129,29 +128,6 @@ export async function presentResult(
       }
       outputChannel.appendLine("");
       vscode.window.showInformationMessage(`Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output`);
-      return true;
-    }
-
-    case "workflow.run": {
-      const wr = result.value as RunWorkflowResult;
-      outputChannel.show(true);
-      outputChannel.appendLine(`\n${HR}`);
-      outputChannel.appendLine(`[${ts()}] Workflow: ${wr.workflowName} — ${wr.stepCount} step(s) in ${(wr.duration / 1000).toFixed(2)}s`);
-      outputChannel.appendLine(HR);
-      for (const step of wr.stepResults) {
-        const icon = step.success ? "✓" : "✗";
-        outputChannel.appendLine(`  ${icon} ${step.stepId}${step.error ? `: ${step.error}` : ""}`);
-      }
-      outputChannel.appendLine("");
-      if (wr.success) {
-        vscode.window.showInformationMessage(
-          `Workflow "${wr.workflowName}" completed — ${wr.stepCount} step(s) in ${(wr.duration / 1000).toFixed(1)}s`
-        );
-      } else {
-        vscode.window.showErrorMessage(
-          `Workflow "${wr.workflowName}" failed at step "${wr.failedAt}" — see Output`
-        );
-      }
       return true;
     }
 

@@ -49,7 +49,7 @@ export function registerSpecializedCommands(
         workflowTree.setRunning(name);
         const result = await router.dispatch({ name: "workflow.run", params: { name } }, freshCtx);
         const r = result.kind === "ok" ? (result.value as RunWorkflowResult) : null;
-        workflowTree.setLastRun(name, r?.success ?? false, r?.duration ?? 0);
+        workflowTree.setLastRun(name, r?.success ?? false, r?.duration ?? 0, r?.stepResults ?? []);
 
         const HR = "─".repeat(60);
         const ts = new Date().toISOString();

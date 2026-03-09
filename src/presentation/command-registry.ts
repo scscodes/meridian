@@ -63,7 +63,9 @@ export function registerCommands(
           await presentResult(commandName, pruneResult, presenterCtx);
           if (pruneResult.kind !== "ok") {
             const { message } = formatResultMessage(commandName, pruneResult);
-            vscode.window.showErrorMessage(message);
+            outputChannel.show(true);
+            vscode.window.showErrorMessage(message, "Show Output")
+              .then(choice => { if (choice === "Show Output") outputChannel.show(true); });
           }
           return;
         }
@@ -79,7 +81,9 @@ export function registerCommands(
         if (level === "info") {
           vscode.window.showInformationMessage(message);
         } else {
-          vscode.window.showErrorMessage(message);
+          outputChannel.show(true);
+          vscode.window.showErrorMessage(message, "Show Output")
+            .then(choice => { if (choice === "Show Output") outputChannel.show(true); });
         }
       }
     );

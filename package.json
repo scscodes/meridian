@@ -2,7 +2,7 @@
   "name": "meridian",
   "displayName": "Meridian",
   "description": "AI-powered git analytics, code hygiene, workflow engine, and chat assistant for VS Code",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "publisher": "scscodes",
   "license": "MIT",
   "icon": "media/icon.png",

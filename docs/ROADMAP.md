@@ -13,6 +13,11 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 
 ## Next Focus Areas
 
+- **Chat NL → workflow routing (medium criticality)**
+  - The `chat.delegate` classifier knows the `workflow.run:<name>` dispatch format but has no knowledge of available workspace workflow names at classification time. Users saying "run my deploy pipeline" may get intent mismatches if the workflow name doesn't match.
+  - Fix: before delegating NL input, fetch available workflows via `workflow.list` and inject names+descriptions into the classifier prompt context.
+  - Primary files: `src/ui/chat-participant.ts`, `src/domains/chat/handlers.ts`, `src/infrastructure/prompt-registry.ts`.
+
 - **Integration & E2E coverage (medium criticality)**
   - Add integration tests for webview adapters (analytics panels), exercising `src/infrastructure/webview-provider.ts` and `src/presentation/webview-setup.ts` end-to-end.
 

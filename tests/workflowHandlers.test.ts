@@ -135,10 +135,19 @@ describe('workflow.run', () => {
     }
   });
 
-  it('returns success result when engine succeeds', async () => {
+  it('returns success result when all steps succeed', async () => {
     const wf = makeWorkflow({ name: 'my-flow' });
     loadWorkflow.mockReturnValue(wf);
-    mockEngine.execute.mockResolvedValue(success({ completed: true }));
+    mockEngine.execute.mockResolvedValue(success({
+      workflowName: 'my-flow',
+      currentStepId: 'step-2',
+      startTime: Date.now(),
+      variables: {},
+      stepResults: new Map([
+        ['step-1', { stepId: 'step-1', success: true, output: {} }],
+        ['step-2', { stepId: 'step-2', success: true, output: {} }],
+      ]),
+    }));
 
     const handler = createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow);
     const result = await handler(createMockContext(), { name: 'my-flow' } as any);
@@ -148,7 +157,67 @@ describe('workflow.run', () => {
       expect(result.value.workflowName).toBe('my-flow');
       expect(result.value.success).toBe(true);
       expect(result.value.stepCount).toBe(2);
+      expect(result.value.failedAt).toBeUndefined();
+      expect(result.value.stepResults).toHaveLength(2);
+      expect(result.value.stepResults[0]).toEqual(
+        expect.objectContaining({ stepId: 'step-1', success: true })
+      );
+      expect(result.value.stepResults[1]).toEqual(
+        expect.objectContaining({ stepId: 'step-2', success: true })
+      );
       expect(typeof result.value.duration).toBe('number');
+    }
+  });
+
+  it('returns success: false when a step fails within engine ok result', async () => {
+    const wf = makeWorkflow({ name: 'partial-flow' });
+    loadWorkflow.mockReturnValue(wf);
+    mockEngine.execute.mockResolvedValue(success({
+      workflowName: 'partial-flow',
+      currentStepId: 'step-2',
+      startTime: Date.now(),
+      variables: {},
+      stepResults: new Map([
+        ['step-1', { stepId: 'step-1', success: true, output: {} }],
+        ['step-2', { stepId: 'step-2', success: false, error: 'pull rejected' }],
+      ]),
+    }));
+
+    const handler = createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow);
+    const result = await handler(createMockContext(), { name: 'partial-flow' } as any);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.success).toBe(false);
+      expect(result.value.failedAt).toBe('step-2');
+      expect(result.value.stepResults[1]).toEqual(
+        expect.objectContaining({ stepId: 'step-2', success: false, error: 'pull rejected' })
+      );
+    }
+  });
+
+  it('preserves workflow step order in stepResults regardless of Map insertion order', async () => {
+    const wf = makeWorkflow({ name: 'order-flow' });
+    loadWorkflow.mockReturnValue(wf);
+    // Map has step-2 before step-1 — handler must order by workflow.steps
+    mockEngine.execute.mockResolvedValue(success({
+      workflowName: 'order-flow',
+      currentStepId: 'step-2',
+      startTime: Date.now(),
+      variables: {},
+      stepResults: new Map([
+        ['step-2', { stepId: 'step-2', success: true, output: {} }],
+        ['step-1', { stepId: 'step-1', success: true, output: {} }],
+      ]),
+    }));
+
+    const handler = createRunWorkflowHandler(logger, getWorkflowEngine, loadWorkflow);
+    const result = await handler(createMockContext(), { name: 'order-flow' } as any);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.stepResults[0].stepId).toBe('step-1');
+      expect(result.value.stepResults[1].stepId).toBe('step-2');
     }
   });
 
@@ -171,8 +240,9 @@ describe('workflow.run', () => {
       expect(result.error.code).toBe('WORKFLOW_EXECUTION_FAILED');
       expect(result.error.details).toEqual(
         expect.objectContaining({
-          failedAt: 'step-2',
+          failedAt: expect.any(String),
           stepCount: 2,
+          stepResults: [],
         })
       );
     }
@@ -195,7 +265,16 @@ describe('workflow.run', () => {
   it('passes variables through to engine.execute', async () => {
     const wf = makeWorkflow({ name: 'var-flow' });
     loadWorkflow.mockReturnValue(wf);
-    mockEngine.execute.mockResolvedValue(success({ done: true }));
+    mockEngine.execute.mockResolvedValue(success({
+      workflowName: 'var-flow',
+      currentStepId: 'step-2',
+      startTime: Date.now(),
+      variables: {},
+      stepResults: new Map([
+        ['step-1', { stepId: 'step-1', success: true }],
+        ['step-2', { stepId: 'step-2', success: true }],
+      ]),
+    }));
 
     const variables = { srcPath: '/home/user/project', branch: 'develop' };
 

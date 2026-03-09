@@ -21,13 +21,24 @@ export interface WorkflowInfo {
 }
 
 /**
+ * Per-step execution summary included in RunWorkflowResult.
+ */
+export interface StepResult {
+  stepId: string;
+  success: boolean;
+  output?: Record<string, unknown>;
+  error?: string;
+}
+
+/**
  * Result of running a workflow.
  */
 export interface RunWorkflowResult {
   workflowName: string;
-  success: boolean;
-  duration: number; // milliseconds
+  success: boolean;           // false if any step reported failure
+  duration: number;           // milliseconds
   stepCount: number;
-  failedAt?: string; // Step ID where failure occurred
+  failedAt?: string;          // Step ID of first failing step
   message: string;
+  stepResults: StepResult[];  // Ordered by workflow step sequence
 }

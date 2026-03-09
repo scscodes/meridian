@@ -82,6 +82,8 @@ List all available workflows discovered from `.vscode/workflows/*.json` (and bun
 ### **workflow.run**
 Execute a named workflow by orchestrating its steps in sequence. Steps can be conditional, share variables, and dispatch Meridian commands. Use this to automate repetitive tasks (e.g., "prepare PR" = status → pull → smartCommit → generatePR).
 
+After a run completes, the workflow item in the Workflow View becomes expandable — click to reveal per-step pass/fail results with inline error details. When triggered via `@meridian`, the chat response includes a step-by-step summary.
+
 ---
 
 ## Agent Domain
@@ -123,7 +125,7 @@ Browse current branch, dirty state, and recent commits. Right-click to pull, com
 Browse hygiene scan results (dead files, large files, logs, markdown). Inline actions to delete, ignore, or request AI review of markdown files.
 
 ### **Workflow View** (`meridian.workflow.view`)
-Browse available workflows with descriptions and step counts. Click to run, inline status indicators show last run result and execution time.
+Browse available workflows with descriptions and step counts. Click to run; inline status indicators show last run result and execution time. After a run, expand the workflow item to see per-step pass/fail with `pass`/`error` icons and inline error messages. Stale results are cleared automatically when a re-run starts.
 
 ### **Agent View** (`meridian.agent.view`)
 Browse available agents with descriptions and capabilities. Click to execute with modal parameter selection.
@@ -148,11 +150,13 @@ All features respect workspace settings under the `meridian.*` namespace:
 
 ## Output & Results
 
-Most commands surface results via:
-- **Output Channel** (`Meridian`) — logs, analytics prose, PR descriptions, reviews
-- **Notifications** — success/error toasts with action links
-- **Clipboard** — selected outputs (PR descriptions, reviews, briefings) auto-copy for pasting
+Commands surface results via the surface best matched to their output type (see `docs/adr/006-rendering-surface-decision-matrix.md`):
+- **Tree Panel** — structured step sequences (workflow results with per-step pass/fail), live state during execution
+- **Output Channel** (`Meridian`) — long-form prose (PR descriptions, reviews, briefings, streaming AI reviews)
 - **Webview Panels** — analytics dashboards (Git, Hygiene) with full-screen charts and tables
+- **Chat Stream** — NL-triggered results formatted as markdown in the Copilot Chat panel
+- **Notifications** — success/error toasts; all errors where the output channel contains diagnostic detail include a "Show Output" action button
+- **Clipboard** — selected outputs (PR descriptions, reviews, briefings, impact analysis) auto-copy for pasting
 
 ---
 

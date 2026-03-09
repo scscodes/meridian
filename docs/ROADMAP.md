@@ -12,6 +12,7 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 - **Workflow run history webview panel** — multi-run timeline with per-step history; tree expansion covers the single-run case; blocked on webview infrastructure investment
 - **`workflow.run` spinner for `chat.delegate` path** — `setRunning` requires a pre-execution hook; the delegate handler completes the run before returning the result; deferred until a broader pre-execution signaling pattern is designed
 - **`git.resolveConflicts` tree migration** — structured per-file data maps to tree expansion per ADR 006; medium priority, no immediate user impact
+- **ADR 006 compliance backlog** — `hygiene.reviewFile` (streams LLM to output channel with no richer surface; violates "last resort" rule) and `hygiene.impactAnalysis` (error path missing "Show Output" button); pre-existing, low user impact
 
 ---
 

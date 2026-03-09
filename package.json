@@ -6,6 +6,10 @@
   "publisher": "scscodes",
   "license": "MIT",
   "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scscodes/meridian"
+  },
   "categories": ["Programming Languages", "SCM Providers", "Machine Learning"],
   "keywords": ["git", "hygiene", "code-review", "ai", "workflow", "copilot"],
   "engines": {

@@ -12,6 +12,7 @@ import {
   success,
   failure,
   AppError,
+  Logger,
 } from "../types";
 
 function fsError(code: string, op: string, filePath: string, err: unknown): AppError {
@@ -30,7 +31,8 @@ function fsError(code: string, op: string, filePath: string, err: unknown): AppE
  */
 async function collectFiles(
   dir: string,
-  pattern: string
+  pattern: string,
+  logger?: Logger
 ): Promise<string[]> {
   const results: string[] = [];
 
@@ -39,8 +41,10 @@ async function collectFiles(
     try {
       entries = await fs.readdir(current, { withFileTypes: true });
     } catch {
-      // Directory unreadable — skip silently.
-      // TODO(F7): Inject Logger to surface traversal failures.
+      logger?.warn("Workspace traversal failed", "WorkspaceProvider", {
+        code: "WORKSPACE_READ_ERROR",
+        message: `Failed to read directory: ${current}`,
+      });
       return;
     }
 
@@ -74,11 +78,11 @@ function matchesPattern(name: string, pattern: string): boolean {
 }
 
 class RealWorkspaceProvider implements WorkspaceProvider {
-  constructor(private readonly workspaceRoot: string) {}
+  constructor(private readonly workspaceRoot: string, private readonly logger?: Logger) {}
 
   async findFiles(pattern: string): Promise<Result<string[]>> {
     try {
-      const files = await collectFiles(this.workspaceRoot, pattern);
+      const files = await collectFiles(this.workspaceRoot, pattern, this.logger);
       return success(files);
     } catch (err) {
       return failure(
@@ -115,6 +119,6 @@ class RealWorkspaceProvider implements WorkspaceProvider {
 /**
  * Factory: creates a real WorkspaceProvider for the given workspace root.
  */
-export function createWorkspaceProvider(workspaceRoot: string): WorkspaceProvider {
-  return new RealWorkspaceProvider(workspaceRoot);
+export function createWorkspaceProvider(workspaceRoot: string, logger?: Logger): WorkspaceProvider {
+  return new RealWorkspaceProvider(workspaceRoot, logger);
 }

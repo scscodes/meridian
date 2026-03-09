@@ -12,9 +12,11 @@ import {
   ChatContext,
   Logger,
   GitProvider,
+  GenerateProseFn,
 } from "../../types";
 import { CHAT_ERROR_CODES } from "../../infrastructure/error-codes";
 import { getPrompt } from "../../infrastructure/prompt-registry";
+import { KNOWN_COMMAND_NAMES } from "../../infrastructure/command-catalog";
 
 // ============================================================================
 // Context Handler
@@ -79,24 +81,11 @@ export type CommandDispatcher = (
   ctx: CommandContext
 ) => Promise<Result<unknown>>;
 
-/**
- * Minimal prose generation interface — compatible with generateProse from infrastructure
- * without introducing a cross-domain import.
- */
-export type GenerateProseFn = (req: {
-  domain: "hygiene" | "git" | "chat";
-  systemPrompt: string;
-  data: Record<string, unknown>;
-}) => Promise<Result<string>>;
+/** Re-exported for backward compatibility — canonical definition in src/types.ts */
+export type { GenerateProseFn } from "../../types";
 
-const KNOWN_COMMANDS = new Set([
-  "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
-  "git.showAnalytics", "git.exportJson", "git.exportCsv",
-  "git.generatePR", "git.reviewPR", "git.commentPR",
-  "git.resolveConflicts", "git.sessionBriefing",
-  "hygiene.scan", "hygiene.showAnalytics", "hygiene.cleanup", "hygiene.impactAnalysis",
-  "workflow.list", "workflow.run", "agent.list", "agent.execute",
-]);
+// Derived from COMMAND_CATALOG — do not edit here directly.
+const KNOWN_COMMANDS = KNOWN_COMMAND_NAMES;
 
 /**
  * chat.delegate — Programmatic task router.

@@ -25,7 +25,7 @@ export abstract class BaseWebviewProvider<TReport> {
   protected abstract getViewId(): string;
   protected abstract getViewTitle(): string;
   protected abstract getUiDirSegments(): string[];
-  protected abstract handleMessage(msg: any): Promise<void>;
+  protected abstract handleMessage(msg: { type: string; [key: string]: unknown }): Promise<void>;
 
   async openPanel(report: TReport): Promise<void> {
     const uiDirUri = vscode.Uri.joinPath(this.extensionUri, ...this.getUiDirSegments());

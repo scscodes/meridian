@@ -19,8 +19,8 @@ import {
   Result,
   success,
   failure,
+  GenerateProseFn,
 } from "../../types";
-import { generateProse, ProseRequest } from "../../infrastructure/prose-generator";
 import { CACHE_SETTINGS } from "../../constants";
 import { TtlCache } from "../../infrastructure/cache";
 import { getPrompt } from "../../infrastructure/prompt-registry";
@@ -130,7 +130,7 @@ class ImpactAnalyzer {
   }
 }
 
-export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnalysisParams, ImpactAnalysisResult> {
+export function createImpactAnalysisHandler(logger: Logger, generateProseFn?: GenerateProseFn): Handler<ImpactAnalysisParams, ImpactAnalysisResult> {
   const analyzer = new ImpactAnalyzer(logger);
 
   return async (_ctx: CommandContext, params: ImpactAnalysisParams): Promise<Result<ImpactAnalysisResult>> => {
@@ -169,7 +169,15 @@ export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnaly
       }
 
       // Generate prose via LLM
-      const proseRequest: ProseRequest = {
+      if (!generateProseFn) {
+        return failure({
+          code: INFRASTRUCTURE_ERROR_CODES.MODEL_UNAVAILABLE,
+          message: "Impact analysis requires a prose generation function (is Copilot enabled?)",
+          context: "hygiene.impactAnalysis",
+        });
+      }
+
+      const proseResult = await generateProseFn({
         domain: "hygiene",
         systemPrompt: getPrompt("IMPACT_ANALYSIS"),
         data: {
@@ -181,9 +189,7 @@ export function createImpactAnalysisHandler(logger: Logger): Handler<ImpactAnaly
           importers: context.importers.slice(0, 10), // Limit for token efficiency
           testFiles: context.testFiles.slice(0, 5),
         },
-      };
-
-      const proseResult = await generateProse(proseRequest);
+      });
       if (proseResult.kind === "err") {
         return proseResult; // Forward LLM error
       }

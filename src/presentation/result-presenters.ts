@@ -11,6 +11,7 @@ import { formatResultMessage } from "../infrastructure/result-handler";
 import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider } from "../infrastructure/webview-provider";
+import { GeneratedPR, GeneratedPRReview, GeneratedPRComments, ConflictResolutionProse } from "../domains/git/types";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -52,7 +53,7 @@ export async function presentResult(
     }
 
     case "git.generatePR": {
-      const pr = result.value as any;
+      const pr = result.value as GeneratedPR;
       outputChannel.show(true);
       outputChannel.appendLine(`\n${HR}`);
       outputChannel.appendLine(`[${ts()}] PR Description: ${pr.branch}`);
@@ -65,7 +66,7 @@ export async function presentResult(
     }
 
     case "git.reviewPR": {
-      const rv = result.value as any;
+      const rv = result.value as GeneratedPRReview;
       outputChannel.show(true);
       outputChannel.appendLine(`\n${HR}`);
       outputChannel.appendLine(`[${ts()}] PR Review: ${rv.branch} — ${rv.verdict}`);
@@ -75,14 +76,14 @@ export async function presentResult(
         outputChannel.appendLine(`[${c.severity}] ${c.file}: ${c.comment}`);
       }
       outputChannel.appendLine("");
-      const text = `${rv.summary}\n\n${(rv.comments ?? []).map((c: any) => `[${c.severity}] ${c.file}: ${c.comment}`).join("\n")}`;
+      const text = `${rv.summary}\n\n${(rv.comments ?? []).map((c) => `[${c.severity}] ${c.file}: ${c.comment}`).join("\n")}`;
       await vscode.env.clipboard.writeText(text);
       vscode.window.showInformationMessage(`PR review copied to clipboard (${rv.branch}: ${rv.verdict})`);
       return true;
     }
 
     case "git.commentPR": {
-      const cm = result.value as any;
+      const cm = result.value as GeneratedPRComments;
       outputChannel.show(true);
       outputChannel.appendLine(`\n${HR}`);
       outputChannel.appendLine(`[${ts()}] PR Comments: ${cm.branch} — ${cm.comments?.length ?? 0} comment(s)`);
@@ -92,7 +93,7 @@ export async function presentResult(
         outputChannel.appendLine(`${c.file}${loc}: ${c.comment}`);
       }
       outputChannel.appendLine("");
-      const cmText = (cm.comments ?? []).map((c: any) => `${c.file}${c.line ? `:${c.line}` : ""}: ${c.comment}`).join("\n");
+      const cmText = (cm.comments ?? []).map((c) => `${c.file}${c.line ? `:${c.line}` : ""}: ${c.comment}`).join("\n");
       await vscode.env.clipboard.writeText(cmText);
       vscode.window.showInformationMessage(`${cm.comments?.length ?? 0} PR comment(s) copied to clipboard`);
       return true;
@@ -112,7 +113,7 @@ export async function presentResult(
     }
 
     case "git.resolveConflicts": {
-      const cr = result.value as any;
+      const cr = result.value as ConflictResolutionProse;
       outputChannel.show(true);
       outputChannel.appendLine(`\n${HR}`);
       outputChannel.appendLine(`[${ts()}] Conflict Resolution — ${cr.perFile?.length ?? 0} file(s)`);
@@ -131,7 +132,7 @@ export async function presentResult(
     }
 
     case "chat.delegate": {
-      const dr = result.value as any;
+      const dr = result.value as { commandName: string; result: unknown };
       const { message } = formatResultMessage(dr.commandName, { kind: "ok", value: dr.result });
       outputChannel.appendLine(`[${ts()}] Delegated → ${dr.commandName}: ${message}`);
       vscode.window.showInformationMessage(`Delegated → ${dr.commandName}`);

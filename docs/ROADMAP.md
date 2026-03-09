@@ -4,15 +4,23 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 
 ---
 
-## Completed Phases
-
-- **Chat NL-First Refactor** — `@meridian` routes all NL via LLM classifier (prompt registry: `DELEGATE_CLASSIFIER`), 16 LM tools for Copilot agent mode, `RESULT_FORMATTERS` map for extensible output, full command parity via chat.
-
----
-
 ## Deferred
 
-- Canonical config service — unify direct `vscode.workspace.getConfiguration` calls into a single provider
 - Remote telemetry sink — no destination exists yet
 - Additional analytics chart types — diminishing returns on existing webviews
-- Background task scheduling — periodic hygiene scans
+- Webview message typed generics — `BaseWebviewProvider<T, M extends WebviewMessage>` parameterization
+---
+
+## Next Focus Areas
+
+- **Integration & E2E coverage (medium criticality)**
+  - Add integration tests for webview adapters (analytics panels), exercising `src/infrastructure/webview-provider.ts` and `src/presentation/webview-setup.ts` end-to-end.
+
+- **Workflow engine robustness (medium criticality)**
+  - Implement support for `WorkflowStep.conditions` and explicit retry/timeout semantics using `TIMEOUTS.WORKFLOW_STEP` and `WORKFLOW_ERROR_CODES` (e.g., `STEP_TIMEOUT`, `STEP_EXECUTION_ERROR`), rather than single-shot execution.
+  - Ensure integration tests (e.g., `tests/integration.test.ts`) assert the intended behaviour for `retries` and failure paths instead of relying on comments only.
+  - Primary files: `src/infrastructure/workflow-engine.ts`, `src/types.ts`, `src/infrastructure/error-codes.ts`, `tests/integration.test.ts`.
+
+- **Telemetry wiring (medium criticality, low immediate operational risk)**
+  - Wire `TelemetryTracker` into the structured logger and command/router boundaries so command start/completion/failure and domain-level errors emit `TelemetryEvent` records.
+  - Primary files: `src/infrastructure/telemetry.ts`, `src/infrastructure/logger.ts`, `src/router.ts`, domain services in `src/domains/*/service.ts`.

@@ -2,15 +2,19 @@
   "name": "meridian",
   "displayName": "Meridian",
   "description": "AI-powered git analytics, code hygiene, workflow engine, and chat assistant for VS Code",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "scscodes",
   "license": "MIT",
-  "private": true,
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scscodes/meridian"
+  },
   "categories": ["Programming Languages", "SCM Providers", "Machine Learning"],
   "keywords": ["git", "hygiene", "code-review", "ai", "workflow", "copilot"],
   "engines": {
     "node": ">=22.22.0",
-    "vscode": "^1.90.0"
+    "vscode": "^1.91.0"
   },
   "activationEvents": [
     "onStartupFinished"
@@ -141,7 +145,7 @@
       {
         "name": "meridian_workflow_run",
         "displayName": "Meridian: Run Workflow",
-        "modelDescription": "Execute a named workflow from the .vscode/agents/ directory. Use meridian_workflow_list first if you don't know the workflow name.",
+        "modelDescription": "Execute a named workflow from the .vscode/workflows/ directory. Use meridian_workflow_list first if you don't know the workflow name.",
         "inputSchema": {
           "type": "object",
           "required": [
@@ -276,6 +280,24 @@
               "description": "The workflow to execute (alternative to targetCommand)"
             }
           }
+        }
+      },
+      {
+        "name": "meridian_workflow_list",
+        "displayName": "Meridian: List Workflows",
+        "modelDescription": "List all available workflows defined in .vscode/workflows/. Returns names, descriptions, and step counts. Call this before meridian_workflow_run when you don't know the workflow name.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_agent_list",
+        "displayName": "Meridian: List Agents",
+        "modelDescription": "List all registered agents defined in .vscode/agents/. Returns agent IDs, descriptions, and capabilities. Call this before meridian_agent_execute when you don't know the agent ID.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
         }
       },
       {

@@ -11,8 +11,8 @@ import * as fs from "fs";
 import * as nodePath from "path";
 import { CommandRouter } from "../router";
 import { CommandContext } from "../types";
-import { formatResultMessage } from "../infrastructure/result-handler";
 import { selectModel } from "../infrastructure/model-selector";
+import { RunWorkflowResult } from "../domains/workflow/types";
 import { WorkflowTreeProvider } from "../ui/tree-providers/workflow-tree-provider";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 
@@ -48,11 +48,48 @@ export function registerSpecializedCommands(
 
         workflowTree.setRunning(name);
         const result = await router.dispatch({ name: "workflow.run", params: { name } }, freshCtx);
-        const r = result.kind === "ok" ? (result.value as any) : null;
-        workflowTree.setLastRun(name, r?.success ?? result.kind === "ok", r?.duration ?? 0);
+        const r = result.kind === "ok" ? (result.value as RunWorkflowResult) : null;
+        workflowTree.setLastRun(name, r?.success ?? false, r?.duration ?? 0);
 
-        const { message } = formatResultMessage("workflow.run", result);
-        outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
+        const HR = "─".repeat(60);
+        const ts = new Date().toISOString();
+
+        if (result.kind === "ok" && r) {
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${HR}`);
+          outputChannel.appendLine(`[${ts}] Workflow: ${r.workflowName} — ${r.stepCount} step(s) in ${(r.duration / 1000).toFixed(2)}s`);
+          outputChannel.appendLine(HR);
+          for (const step of r.stepResults) {
+            const icon = step.success ? "✓" : "✗";
+            const detail = step.error ? `: ${step.error}` : "";
+            outputChannel.appendLine(`  ${icon} ${step.stepId}${detail}`);
+          }
+          outputChannel.appendLine("");
+
+          if (r.success) {
+            vscode.window.showInformationMessage(
+              `Workflow "${r.workflowName}" completed — ${r.stepCount} step(s) in ${(r.duration / 1000).toFixed(1)}s`
+            );
+          } else {
+            vscode.window.showErrorMessage(
+              `Workflow "${r.workflowName}" failed at step "${r.failedAt}" — see Output`,
+              "Show Output"
+            ).then((choice) => { if (choice === "Show Output") outputChannel.show(true); });
+          }
+        } else if (result.kind === "err") {
+          const details = result.error.details as any;
+          outputChannel.show(true);
+          outputChannel.appendLine(`\n${HR}`);
+          outputChannel.appendLine(`[${ts}] Workflow: ${name} — FAILED`);
+          outputChannel.appendLine(HR);
+          outputChannel.appendLine(`  ✗ ${result.error.message}`);
+          if (details?.failedAt) outputChannel.appendLine(`  Failed at: ${details.failedAt}`);
+          outputChannel.appendLine("");
+          vscode.window.showErrorMessage(
+            `Workflow "${name}" failed — see Output`,
+            "Show Output"
+          ).then((choice) => { if (choice === "Show Output") outputChannel.show(true); });
+        }
       }
     )
   );

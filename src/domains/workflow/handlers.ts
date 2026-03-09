@@ -12,8 +12,8 @@ import {
   failure,
 } from "../../types";
 import { WORKFLOW_ERROR_CODES, GENERIC_ERROR_CODES } from "../../infrastructure/error-codes";
-import { ListWorkflowsResult, RunWorkflowResult } from "./types";
-import { WorkflowEngine } from "../../infrastructure/workflow-engine";
+import { ListWorkflowsResult, RunWorkflowResult, StepResult } from "./types";
+import { WorkflowEngine, StepExecutionResult } from "../../infrastructure/workflow-engine";
 
 /**
  * workflow.list — Show all available workflows.
@@ -99,20 +99,39 @@ export function createRunWorkflowHandler(
       const duration = Date.now() - startTime;
 
       if (executionResult.kind === "ok") {
+        const execCtx = executionResult.value;
+        const stepResults: StepResult[] = workflow.steps
+          .map((step) => execCtx.stepResults.get(step.id))
+          .filter((s): s is StepExecutionResult => s !== undefined)
+          .map((s) => ({
+            stepId: s.stepId,
+            success: s.success,
+            output: s.output,
+            error: s.error,
+          }));
+
+        const failedStep = stepResults.find((s) => !s.success);
+
         logger.info(
-          `Workflow completed: ${params.name}`,
+          `Workflow completed: ${params.name}${failedStep ? ` (failed at ${failedStep.stepId})` : ""}`,
           "WorkflowRunHandler"
         );
 
         return success({
           workflowName: params.name,
-          success: true,
+          success: !failedStep,
           duration,
           stepCount: workflow.steps.length,
-          message: "Workflow completed successfully",
+          failedAt: failedStep?.stepId,
+          message: failedStep
+            ? `Workflow completed with failure at step "${failedStep.stepId}"`
+            : "Workflow completed successfully",
+          stepResults,
         });
       } else {
-        const failedStepId = (executionResult.error.details as any)?.currentStep;
+        const failedStepId =
+          (executionResult.error.details as any)?.currentStep ??
+          executionResult.error.context;
         return failure({
           code: WORKFLOW_ERROR_CODES.WORKFLOW_EXECUTION_FAILED,
           message: `Workflow failed: ${executionResult.error.message}`,
@@ -120,6 +139,7 @@ export function createRunWorkflowHandler(
             duration,
             stepCount: workflow.steps.length,
             failedAt: failedStepId,
+            stepResults: [],
           },
           context: "workflow.run",
         });

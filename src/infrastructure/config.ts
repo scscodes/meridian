@@ -5,6 +5,7 @@
 import * as vscode from "vscode";
 import { ConfigProvider, AppError, Result, failure, success } from "../types";
 import { PruneConfig, PRUNE_DEFAULTS } from "../domains/hygiene/analytics-types";
+import { INFRASTRUCTURE_ERROR_CODES } from "./error-codes";
 
 /**
  * Typed configuration schema.
@@ -68,7 +69,7 @@ export class Config implements ConfigProvider {
       // Fall back to defaults so the extension still works
       this.store = { ...DEFAULTS };
       const error: AppError = {
-        code: "CONFIG_INIT_ERROR",
+        code: INFRASTRUCTURE_ERROR_CODES.CONFIG_INIT_ERROR,
         message: "Failed to initialize configuration",
         details: err,
       };
@@ -91,7 +92,7 @@ export class Config implements ConfigProvider {
       return success(void 0);
     } catch (err) {
       const error: AppError = {
-        code: "CONFIG_SET_ERROR",
+        code: INFRASTRUCTURE_ERROR_CODES.CONFIG_SET_ERROR,
         message: `Failed to set config key '${key}'`,
         details: err,
       };

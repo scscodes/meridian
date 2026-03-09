@@ -24,6 +24,7 @@ import {
 } from "../../infrastructure/workspace";
 import { WorkflowEngine, StepRunner } from "../../infrastructure/workflow-engine";
 import { validateWorkflowDefinition } from "./validation";
+import { WORKFLOW_ERROR_CODES } from "../../infrastructure/error-codes";
 
 /**
  * Workflow domain commands.
@@ -87,7 +88,7 @@ export class WorkflowDomainService implements DomainService {
       return success(void 0);
     } catch (err) {
       return failure({
-        code: "WORKFLOW_INIT_ERROR",
+        code: WORKFLOW_ERROR_CODES.WORKFLOW_INIT_ERROR,
         message: "Failed to initialize workflow domain",
         details: err,
         context: "WorkflowDomainService.initialize",
@@ -182,7 +183,7 @@ export class WorkflowDomainService implements DomainService {
   private createDefaultStepRunner(): StepRunner {
     return async (): Promise<Result<Record<string, unknown>>> => {
       return failure({
-        code: "STEP_RUNNER_NOT_AVAILABLE",
+        code: WORKFLOW_ERROR_CODES.STEP_RUNNER_NOT_AVAILABLE,
         message:
           "Step runner not initialized. Register workflow domain with router.",
         context: "WorkflowDomainService",

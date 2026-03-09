@@ -2,7 +2,7 @@
   "name": "meridian",
   "displayName": "Meridian",
   "description": "AI-powered git analytics, code hygiene, workflow engine, and chat assistant for VS Code",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "scscodes",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -10,8 +10,19 @@
     "type": "git",
     "url": "https://github.com/scscodes/meridian"
   },
-  "categories": ["Programming Languages", "SCM Providers", "Machine Learning"],
-  "keywords": ["git", "hygiene", "code-review", "ai", "workflow", "copilot"],
+  "categories": [
+    "Programming Languages",
+    "SCM Providers",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "git",
+    "hygiene",
+    "code-review",
+    "ai",
+    "workflow",
+    "copilot"
+  ],
   "engines": {
     "node": ">=22.22.0",
     "vscode": "^1.91.0"
@@ -256,7 +267,9 @@
               "description": "Optional function or symbol name to trace call sites for"
             }
           },
-          "required": ["filePath"]
+          "required": [
+            "filePath"
+          ]
         }
       },
       {
@@ -265,7 +278,9 @@
         "modelDescription": "Execute a registered agent with a target command or workflow. Use meridian_agent_list first to discover available agents and their capabilities.",
         "inputSchema": {
           "type": "object",
-          "required": ["agentId"],
+          "required": [
+            "agentId"
+          ],
           "properties": {
             "agentId": {
               "type": "string",
@@ -309,7 +324,11 @@
           "properties": {
             "period": {
               "type": "string",
-              "enum": ["3mo", "6mo", "12mo"],
+              "enum": [
+                "3mo",
+                "6mo",
+                "12mo"
+              ],
               "description": "Time period for the analytics report. Defaults to 3mo."
             },
             "author": {
@@ -332,7 +351,11 @@
           "properties": {
             "period": {
               "type": "string",
-              "enum": ["3mo", "6mo", "12mo"],
+              "enum": [
+                "3mo",
+                "6mo",
+                "12mo"
+              ],
               "description": "Time period for the analytics report. Defaults to 3mo."
             },
             "author": {
@@ -849,7 +872,8 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run bundle",
+    "bundle": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --external:typescript --format=cjs --platform=node --target=node20 && cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
     "compile": "tsc -p ./ && cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
@@ -869,6 +893,7 @@
     "@types/vscode": "^1.80.0",
     "@vitest/coverage-v8": "^1.0.4",
     "@vitest/ui": "^1.0.4",
+    "esbuild": "^0.25.12",
     "vitest": "^1.0.4"
   }
 }

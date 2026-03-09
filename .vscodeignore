@@ -3,6 +3,8 @@ tests/**
 tasks/**
 docs/**
 node_modules/**
+!node_modules/typescript
+!node_modules/typescript/**
 .vscode/**
 .claude/**
 .git/**

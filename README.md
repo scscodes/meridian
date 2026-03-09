@@ -19,6 +19,7 @@ Meridian brings smart commit grouping, PR generation and review, workspace hygie
 
 - **Automated Scanning** -- detect dead files, unused exports, oversized logs, and stale documentation across your workspace. Respects `.gitignore` and `.meridianignore`.
 - **Impact Analysis** -- trace the blast radius of a file or function change using the TypeScript Compiler API. See importers, call sites, test coverage, and an LLM-generated prose summary.
+- **Markdown AI Review** -- right-click any `.md` file in the Hygiene view or Explorer to send it to an LLM for structural and content improvement suggestions, returned inline in the chat panel.
 - **Cleanup & Analytics** -- batch-delete candidates with dry-run support, and view hygiene trends over time in a dedicated analytics dashboard.
 
 ### Workflows & Agents
@@ -43,6 +44,10 @@ Meridian brings smart commit grouping, PR generation and review, workspace hygie
 ### Hygiene Analytics Dashboard
 
 ![Hygiene Analytics](media/hygiene_analytics.png)
+
+### Markdown AI Review
+
+![Hygiene Markdown AI Review](media/hygiene_md_ai_review.png)
 
 ---
 

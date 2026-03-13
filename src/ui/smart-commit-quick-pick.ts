@@ -10,6 +10,7 @@
 
 import * as vscode from "vscode";
 import type { ChangeGroup, ApprovalUI, ApprovalItem } from "../domains/git/types";
+import { UI_SETTINGS } from "../constants";
 
 interface GroupQuickPickItem extends vscode.QuickPickItem {
   group: ChangeGroup;
@@ -62,8 +63,8 @@ function formatGroupStats(g: ChangeGroup): string {
 }
 
 function formatFilePaths(g: ChangeGroup): string {
-  const MAX = 5;
+  const max = UI_SETTINGS.SMART_COMMIT_MAX_FILE_PATHS;
   const paths = g.files.map((f) => f.path);
-  if (paths.length <= MAX) return paths.join(", ");
-  return `${paths.slice(0, MAX).join(", ")} +${paths.length - MAX} more`;
+  if (paths.length <= max) return paths.join(", ");
+  return `${paths.slice(0, max).join(", ")} +${paths.length - max} more`;
 }

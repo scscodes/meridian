@@ -11,10 +11,13 @@
 
 import * as vscode from "vscode";
 import { Command, CommandContext, DeadCodeItem, Logger, Result, WorkspaceScan } from "../../types";
+import { ImpactAnalysisResult } from "../../domains/hygiene/impact-analysis-handler";
 
 type Dispatcher = (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>>;
 
-type HygieneItemKind = "category" | "file" | "markdownFile" | "deadCodeFile" | "deadCodeIssue";
+type HygieneItemKind =
+  | "category" | "file" | "markdownFile" | "deadCodeFile" | "deadCodeIssue"
+  | "impactCategory" | "impactTarget" | "impactMetricGroup" | "impactFile";
 
 class HygieneTreeItem extends vscode.TreeItem {
   constructor(
@@ -35,7 +38,9 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
   private _onDidChangeTreeData = new vscode.EventEmitter<HygieneTreeItem | undefined | null | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  private cached: HygieneTreeItem[] | null = null;
+  private cachedScan: WorkspaceScan | null = null;
+  private cachedItems: HygieneTreeItem[] | null = null;
+  private lastImpactResult: ImpactAnalysisResult | null = null;
 
   constructor(
     private readonly dispatch: Dispatcher,
@@ -44,7 +49,15 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
   ) {}
 
   refresh(): void {
-    this.cached = null;
+    this.cachedScan = null;
+    this.cachedItems = null;
+    this._onDidChangeTreeData.fire();
+  }
+
+  /** Store last impact analysis result for tree expansion. */
+  setImpactResult(result: ImpactAnalysisResult | null): void {
+    this.lastImpactResult = result;
+    this.cachedItems = null;
     this._onDidChangeTreeData.fire();
   }
 
@@ -60,23 +73,26 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
   }
 
   private async getRootItems(): Promise<HygieneTreeItem[]> {
-    if (this.cached) return this.cached;
+    if (this.cachedItems) return this.cachedItems;
 
-    const result = await this.dispatch({ name: "hygiene.scan", params: {} }, this.ctx);
-    if (result.kind === "err") {
-      this.logger.warn("HygieneTreeProvider: scan failed", "HygieneTreeProvider", result.error);
-      const err = new HygieneTreeItem(
-        "Scan failed",
-        "category",
-        [],
-        vscode.TreeItemCollapsibleState.None,
-        result.error.code
-      );
-      err.iconPath = new vscode.ThemeIcon("error");
-      return [err];
+    if (!this.cachedScan) {
+      const result = await this.dispatch({ name: "hygiene.scan", params: {} }, this.ctx);
+      if (result.kind === "err") {
+        this.logger.warn("HygieneTreeProvider: scan failed", "HygieneTreeProvider", result.error);
+        const err = new HygieneTreeItem(
+          "Scan failed",
+          "category",
+          [],
+          vscode.TreeItemCollapsibleState.None,
+          result.error.code
+        );
+        err.iconPath = new vscode.ThemeIcon("error");
+        return [err];
+      }
+      this.cachedScan = result.value as WorkspaceScan;
     }
 
-    const scan = result.value as WorkspaceScan;
+    const scan = this.cachedScan;
 
     // -------------------------------------------------------------------------
     // Helpers
@@ -158,14 +174,75 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
       makeMarkdownItem(f.path, f.sizeBytes, f.lineCount)
     );
 
-    this.cached = [
+    const items: HygieneTreeItem[] = [];
+    if (this.lastImpactResult) {
+      items.push(this.buildImpactSection());
+    }
+    items.push(
       deadCodeSection,
       makeCategory("Dead Files", "trash", deadItems),
       makeCategory("Large Files", "database", largeItems),
       makeCategory("Log Files", "output", logItems),
       makeCategory("Markdown Files", "markdown", mdItems),
+    );
+    this.cachedItems = items;
+    return this.cachedItems;
+  }
+
+  private buildImpactSection(): HygieneTreeItem {
+    const r = this.lastImpactResult!;
+    const m = r.metrics;
+    const targetLabel = r.targetFunction
+      ? `${r.targetFunction}()`
+      : (r.targetPath?.split("/").pop() ?? "unknown");
+
+    const makeFileItems = (paths: string[]): HygieneTreeItem[] =>
+      paths.map(p => {
+        const label = p.split("/").pop() ?? p;
+        const it = new HygieneTreeItem(label, "impactFile", [], vscode.TreeItemCollapsibleState.None, p, p);
+        it.iconPath = new vscode.ThemeIcon("file");
+        it.tooltip = p;
+        it.command = { command: "vscode.open", title: "Open File", arguments: [vscode.Uri.file(p)] };
+        return it;
+      });
+
+    const makeGroup = (label: string, count: number, paths: string[]): HygieneTreeItem => {
+      const children = makeFileItems(paths);
+      const it = new HygieneTreeItem(
+        label,
+        "impactMetricGroup",
+        children,
+        children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+        String(count)
+      );
+      it.iconPath = new vscode.ThemeIcon("symbol-reference");
+      return it;
+    };
+
+    const groups = [
+      makeGroup("Importers", m.importers, m.importerPaths ?? []),
+      makeGroup("Call Sites", m.callSites, m.callSitePaths ?? []),
+      makeGroup("Test Files", m.testFiles, m.testFilePaths ?? []),
+      makeGroup("Dependent Files", m.dependentFiles, m.dependentFilePaths ?? []),
     ];
-    return this.cached;
+
+    const targetNode = new HygieneTreeItem(
+      targetLabel,
+      "impactTarget",
+      groups,
+      vscode.TreeItemCollapsibleState.Expanded,
+      r.targetPath
+    );
+    targetNode.iconPath = new vscode.ThemeIcon("symbol-method");
+
+    const section = new HygieneTreeItem(
+      "Impact Analysis",
+      "impactCategory",
+      [targetNode],
+      vscode.TreeItemCollapsibleState.Expanded
+    );
+    section.iconPath = new vscode.ThemeIcon("search");
+    return section;
   }
 
   // ---------------------------------------------------------------------------

@@ -452,6 +452,12 @@
         "category": "Workflow"
       },
       {
+        "command": "meridian.agent.run",
+        "title": "Agent: Run",
+        "icon": "$(play)",
+        "category": "Agent"
+      },
+      {
         "command": "meridian.agent.refresh",
         "title": "Agent: Refresh View",
         "category": "Agent"
@@ -582,6 +588,44 @@
             "artifact"
           ],
           "description": "File categories that are automatically flagged as prune candidates when older than minAgeDays."
+        },
+        "meridian.git.autofetch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically fetch from remote before git operations."
+        },
+        "meridian.git.branchClean": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically clean merged branches after pull."
+        },
+        "meridian.hygiene.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable workspace hygiene scanning."
+        },
+        "meridian.hygiene.scanInterval": {
+          "type": "number",
+          "default": 60,
+          "minimum": 1,
+          "description": "Interval in minutes between automatic hygiene scans."
+        },
+        "meridian.chat.model": {
+          "type": "string",
+          "default": "gpt-4",
+          "description": "Default language model for chat operations."
+        },
+        "meridian.chat.contextLines": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "Number of lines of context to include from the active file in chat requests."
+        },
+        "meridian.log.level": {
+          "type": "string",
+          "default": "info",
+          "enum": ["debug", "info", "warn", "error"],
+          "description": "Minimum log level for the Meridian output channel."
         }
       }
     },
@@ -776,6 +820,10 @@
           "when": "workspaceFolderCount > 0"
         },
         {
+          "command": "meridian.agent.run",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
           "command": "meridian.agent.refresh",
           "when": "workspaceFolderCount > 0"
         },
@@ -855,12 +903,22 @@
           "command": "meridian.workflow.run",
           "when": "view == meridian.workflow.view && viewItem == workflow",
           "group": "workflow@1"
+        },
+        {
+          "command": "meridian.agent.run",
+          "when": "view == meridian.agent.view && viewItem == agent",
+          "group": "agent@1"
         }
       ],
       "view/item/inline": [
         {
           "command": "meridian.workflow.run",
           "when": "view == meridian.workflow.view && viewItem == workflow",
+          "group": "inline"
+        },
+        {
+          "command": "meridian.agent.run",
+          "when": "view == meridian.agent.view && viewItem == agent",
           "group": "inline"
         },
         {

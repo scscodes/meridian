@@ -340,6 +340,15 @@ class RealGitProvider implements GitProvider {
     if (result.kind === "err") return result;
     return success(result.value.trim());
   }
+
+  async getUntrackedFiles(): Promise<Result<string[]>> {
+    const result = await git(
+      ["ls-files", "--others", "--exclude-standard"],
+      this.workspaceRoot
+    );
+    if (result.kind === "err") return result;
+    return success(result.value.split("\n").filter(Boolean));
+  }
 }
 
 /**

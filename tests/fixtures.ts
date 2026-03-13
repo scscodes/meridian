@@ -168,6 +168,10 @@ export class MockGitProvider implements GitProvider {
   async getMergeBase(_branch: string, _base?: string): Promise<Result<string>> {
     return success("abc0000");
   }
+
+  async getUntrackedFiles(): Promise<Result<string[]>> {
+    return success([]);
+  }
 }
 
 // ============================================================================

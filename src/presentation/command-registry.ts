@@ -31,7 +31,7 @@ export const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.generatePR",          "git.generatePR"],
   ["meridian.git.reviewPR",            "git.reviewPR"],
   ["meridian.git.commentPR",           "git.commentPR"],
-  ["meridian.git.resolveConflicts",    "git.resolveConflicts"],
+  // git.resolveConflicts — dedicated registration in specialized-commands.ts (tree expansion hooks)
   ["meridian.git.sessionBriefing",     "git.sessionBriefing"],
   ["meridian.chat.delegate",           "chat.delegate"],
 ];

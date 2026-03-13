@@ -11,7 +11,8 @@ import { formatResultMessage } from "../infrastructure/result-handler";
 import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider } from "../infrastructure/webview-provider";
-import { GeneratedPR, GeneratedPRReview, GeneratedPRComments, ConflictResolutionProse } from "../domains/git/types";
+import { GeneratedPR, GeneratedPRReview, GeneratedPRComments } from "../domains/git/types";
+import { UI_SETTINGS } from "../constants";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -19,7 +20,7 @@ export interface PresenterContext {
   hygieneAnalyticsPanel: HygieneAnalyticsWebviewProvider;
 }
 
-const HR = "─".repeat(60);
+const HR = "─".repeat(UI_SETTINGS.OUTPUT_HR_LENGTH);
 
 function ts(): string {
   return new Date().toISOString();
@@ -112,24 +113,7 @@ export async function presentResult(
       return true;
     }
 
-    case "git.resolveConflicts": {
-      const cr = result.value as ConflictResolutionProse;
-      outputChannel.show(true);
-      outputChannel.appendLine(`\n${HR}`);
-      outputChannel.appendLine(`[${ts()}] Conflict Resolution — ${cr.perFile?.length ?? 0} file(s)`);
-      outputChannel.appendLine(HR);
-      outputChannel.appendLine(`\n${cr.overview}\n`);
-      for (const f of cr.perFile ?? []) {
-        outputChannel.appendLine(`${f.path} → ${f.strategy}`);
-        outputChannel.appendLine(`  ${f.rationale}`);
-        for (const step of f.suggestedSteps ?? []) {
-          outputChannel.appendLine(`  • ${step}`);
-        }
-      }
-      outputChannel.appendLine("");
-      vscode.window.showInformationMessage(`Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output`);
-      return true;
-    }
+    // git.resolveConflicts — handled in specialized-commands.ts (tree expansion)
 
     case "chat.delegate": {
       const dr = result.value as { commandName: string; result: unknown };

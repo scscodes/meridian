@@ -265,4 +265,22 @@ export const DEAD_CODE_DIAGNOSTIC_CODES = new Set([6133, 6192, 6196, 6198, 6199,
 export const UI_SETTINGS = {
   /** Debounce delay for file watcher → tree refresh (ms) */
   WATCHER_DEBOUNCE_MS: 500,
+
+  /** Horizontal rule character count for Output channel sections */
+  OUTPUT_HR_LENGTH: 60,
+
+  /** Max file paths shown per group in Smart Commit QuickPick before "+N more" */
+  SMART_COMMIT_MAX_FILE_PATHS: 5,
+
+  /** Max sample items per category in the hygiene scan chat formatter */
+  CHAT_SCAN_MAX_HIGHLIGHTS: 3,
+
+  /** Number of recent commits shown in the Git sidebar tree */
+  GIT_TREE_RECENT_COMMITS: 3,
+
+  /** Max commit message length in tree labels before truncation with "…" */
+  TREE_COMMIT_MESSAGE_MAX_LENGTH: 50,
+
+  /** Max untracked files listed in the Git sidebar tree */
+  GIT_TREE_MAX_UNTRACKED: 15,
 } as const;

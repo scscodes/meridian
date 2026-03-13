@@ -10,14 +10,17 @@
 
 import * as vscode from "vscode";
 import { CommandRouter } from "../router";
-import { Command, CommandContext, CommandName } from "../types";
+import { Command, CommandContext, CommandName, GitStatus, WorkspaceScan, DeadCodeItem } from "../types";
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
 import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
 import { WorkflowTreeProvider } from "./tree-providers/workflow-tree-provider";
+import { GitTreeProvider } from "./tree-providers/git-tree-provider";
+import { HygieneTreeProvider } from "./tree-providers/hygiene-tree-provider";
 import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
+import { UI_SETTINGS } from "../constants";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
 const SLASH_MAP: Record<string, CommandName> = {
@@ -38,8 +41,12 @@ export function createChatParticipant(
   router: CommandRouter,
   ctx: CommandContext,
   logger: Logger,
-  workflowTree?: WorkflowTreeProvider
+  workflowTree?: WorkflowTreeProvider,
+  gitTree?: GitTreeProvider,
+  hygieneTree?: HygieneTreeProvider
 ): vscode.Disposable {
+  const trees: DispatchTrees = { workflowTree, gitTree, hygieneTree };
+
   const handler: vscode.ChatRequestHandler = async (request, _chatCtx, stream, _token) => {
     // Debug: log incoming request shape so issues can be diagnosed
     logger.info(
@@ -55,7 +62,7 @@ export function createChatParticipant(
       if (commandName) {
         logger.info(`Routing via request.command: ${cmd} → ${commandName}`, "ChatParticipant");
         stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, workflowTree);
+        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
       }
     }
 
@@ -66,14 +73,14 @@ export function createChatParticipant(
     if (firstWord in SLASH_MAP) {
       const commandName = SLASH_MAP[firstWord];
       stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, workflowTree);
+      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
     }
 
     // ── 3. "run <name>" shorthand ────────────────────────────────────────────
     if (firstWord === "run" && text.length > 4) {
       const name = text.slice(4).trim();
       stream.markdown(`\`@meridian\` → \`workflow.run\`\n\n`);
-      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, workflowTree);
+      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
     }
 
     // ── 4. NL → chat.delegate (single classification authority) ──────────────
@@ -90,12 +97,20 @@ export function createChatParticipant(
           const r = dr.result as RunWorkflowResult;
           workflowTree?.setLastRun(r.workflowName, r.success, r.duration, r.stepResults);
         }
+        // Update git tree if delegation resolved to conflict resolution
+        if (dr.commandName === "git.resolveConflicts" && dr.result) {
+          gitTree?.setLastConflictRun(dr.result as ConflictResolutionProse);
+        }
+        // Update hygiene tree if delegation resolved to impact analysis
+        if (dr.commandName === "hygiene.impactAnalysis" && dr.result) {
+          hygieneTree?.setImpactResult(dr.result as ImpactAnalysisResult);
+        }
         stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
         return formatCommandResult(dr.commandName as CommandName, dr.result, stream);
       } else {
         logger.warn("chat.delegate failed, falling back", "ChatParticipant", delegateResult.error);
         stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, workflowTree);
+        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, trees);
       }
     }
 
@@ -114,6 +129,12 @@ export function createChatParticipant(
 
 // ── Direct dispatch (slash commands, keywords, "run <name>") ────────────────
 
+interface DispatchTrees {
+  workflowTree?: WorkflowTreeProvider;
+  gitTree?: GitTreeProvider;
+  hygieneTree?: HygieneTreeProvider;
+}
+
 async function handleDirectDispatch(
   commandName: CommandName,
   params: Record<string, unknown>,
@@ -121,8 +142,9 @@ async function handleDirectDispatch(
   ctx: CommandContext,
   stream: vscode.ChatResponseStream,
   logger: Logger,
-  workflowTree?: WorkflowTreeProvider
+  trees: DispatchTrees
 ): Promise<void> {
+  const { workflowTree, gitTree, hygieneTree } = trees;
   // Auto-populate filePath for impact analysis from active editor
   if (commandName === "hygiene.impactAnalysis" && !params.filePath) {
     if (!ctx.activeFilePath) {
@@ -132,10 +154,14 @@ async function handleDirectDispatch(
     params = { ...params, filePath: ctx.activeFilePath };
   }
 
-  // Signal tree that workflow is starting (spinner) — chat.delegate path cannot do this
-  // because the run has already completed by the time we receive the result there
+  // Signal tree that workflow is starting (spinner)
   if (commandName === "workflow.run") {
     workflowTree?.setRunning(params.name as string);
+  }
+
+  // Signal git tree that conflict resolution is starting (spinner)
+  if (commandName === "git.resolveConflicts") {
+    gitTree?.setConflictRunning();
   }
 
   const cmd: Command = { name: commandName, params };
@@ -150,6 +176,18 @@ async function handleDirectDispatch(
       r?.duration ?? 0,
       r?.stepResults ?? []
     );
+  }
+
+  // Update git tree with conflict resolution results
+  if (commandName === "git.resolveConflicts") {
+    gitTree?.setLastConflictRun(
+      result.kind === "ok" ? (result.value as ConflictResolutionProse) : null
+    );
+  }
+
+  // Update hygiene tree with impact analysis results
+  if (commandName === "hygiene.impactAnalysis" && result.kind === "ok") {
+    hygieneTree?.setImpactResult(result.value as ImpactAnalysisResult);
   }
 
   if (result.kind === "ok") {
@@ -179,6 +217,68 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
       `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
     );
   },
+  "git.status": (value, stream) => {
+    const s = value as GitStatus;
+    const branch = s?.branch ?? "unknown";
+    const dirty = s?.isDirty ? "dirty" : "clean";
+    const staged = s?.staged ?? 0;
+    const unstaged = s?.unstaged ?? 0;
+    const untracked = s?.untracked ?? 0;
+    stream.markdown(
+      `**Branch:** \`${branch}\` (${dirty})\n\n` +
+      `| Status | Count |\n|---|---|\n` +
+      `| Staged | ${staged} |\n` +
+      `| Unstaged | ${unstaged} |\n` +
+      `| Untracked | ${untracked} |\n`
+    );
+  },
+  "hygiene.scan": (value, stream) => {
+    const scan = value as WorkspaceScan;
+    const deadFiles = scan?.deadFiles ?? [];
+    const largeFiles = scan?.largeFiles ?? [];
+    const logFiles = scan?.logFiles ?? [];
+    const markdownFiles = scan?.markdownFiles ?? [];
+    const deadCodeItems = (scan?.deadCode?.items ?? []) as DeadCodeItem[];
+    const MAX_HIGHLIGHTS = UI_SETTINGS.CHAT_SCAN_MAX_HIGHLIGHTS;
+
+    stream.markdown(
+      `**Hygiene scan summary**\n\n` +
+      `| Category | Count |\n|---|---|\n` +
+      `| Dead files | ${deadFiles.length} |\n` +
+      `| Large files | ${largeFiles.length} |\n` +
+      `| Log files | ${logFiles.length} |\n` +
+      `| Markdown | ${markdownFiles.length} |\n` +
+      `| Dead code | ${deadCodeItems.length} |\n\n`
+    );
+
+    const highlights: string[] = [];
+    if (deadFiles.length > 0) {
+      const samples = deadFiles.slice(0, MAX_HIGHLIGHTS).map(p => `\`${p}\``).join(", ");
+      highlights.push(`- **Dead files:** ${samples}`);
+    }
+    if (largeFiles.length > 0) {
+      const fmt = (f: { path: string; sizeBytes: number }) => {
+        const mb = f.sizeBytes / (1024 * 1024);
+        const size = mb >= 1 ? `${mb.toFixed(1)} MB` : `${(f.sizeBytes / 1024).toFixed(1)} KB`;
+        return `\`${f.path}\` (${size})`;
+      };
+      highlights.push(`- **Large files:** ${largeFiles.slice(0, MAX_HIGHLIGHTS).map(fmt).join("; ")}`);
+    }
+    if (logFiles.length > 0) {
+      const samples = logFiles.slice(0, MAX_HIGHLIGHTS).map(p => `\`${p}\``).join(", ");
+      highlights.push(`- **Log files:** ${samples}`);
+    }
+    if (deadCodeItems.length > 0) {
+      const fmt = (i: DeadCodeItem) => `\`${i.filePath}:${i.line}\` — ${i.message}`;
+      highlights.push(`- **Dead code:** ${deadCodeItems.slice(0, MAX_HIGHLIGHTS).map(fmt).join("; ")}`);
+    }
+
+    if (highlights.length > 0) {
+      stream.markdown(`**Highlights**\n\n${highlights.join("\n")}\n`);
+    } else {
+      stream.markdown("No issues found.\n");
+    }
+  },
   "git.sessionBriefing": (value, stream) => {
     stream.markdown(value as string);
   },
@@ -200,7 +300,15 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     }
   },
   "hygiene.impactAnalysis": (value, stream) => {
-    stream.markdown((value as ImpactAnalysisResult).summary);
+    const r = value as ImpactAnalysisResult;
+    stream.markdown(r.summary);
+    const m = r.metrics;
+    if (m) {
+      stream.markdown(
+        `\n\n*${m.importers} importer(s), ${m.callSites} call site(s), ` +
+        `${m.testFiles} test file(s), ${m.dependentFiles} dependent file(s)*\n`
+      );
+    }
   },
   "workflow.list": (value, stream) => {
     const r = value as ListWorkflowsResult;

@@ -127,6 +127,10 @@ export function formatResultMessage(
     }
     case "git.pull":
       return { level: "info", message: `Pulled: ${(v as { message?: string }).message ?? "up to date"}` };
+    case "git.analyzeInbound": {
+      const ic = v as { branch?: string; totalInbound?: number; conflicts?: unknown[] };
+      return { level: "info", message: `Inbound: ${ic.totalInbound ?? 0} remote change(s) on "${ic.branch ?? "unknown"}", ${ic.conflicts?.length ?? 0} conflict(s)` };
+    }
     case "git.commit":
       return { level: "info", message: `Committed: ${v}` };
     case "git.smartCommit": {

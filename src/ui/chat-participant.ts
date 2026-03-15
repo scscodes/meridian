@@ -13,9 +13,10 @@ import { CommandRouter } from "../router";
 import { Command, CommandContext, CommandName, GitStatus, WorkspaceScan, DeadCodeItem } from "../types";
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
-import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
+import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse, InboundChanges, SmartCommitBatchResult, GeneratedPRComments } from "../domains/git/types";
 import { DelegateResult } from "../domains/chat/handlers";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
+import { CleanupResult } from "../domains/hygiene/cleanup-handler";
 import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
 import { WorkflowTreeProvider } from "./tree-providers/workflow-tree-provider";
 import { GitTreeProvider } from "./tree-providers/git-tree-provider";
@@ -347,6 +348,69 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     }
     if (r.output && Object.keys(r.output).length > 0) {
       stream.markdown("**Output:**\n```json\n" + JSON.stringify(r.output, null, 2) + "\n```\n");
+    }
+  },
+  "git.analyzeInbound": (value, stream) => {
+    const r = value as InboundChanges;
+    const conflictCount = r.conflicts?.length ?? 0;
+    stream.markdown(
+      `**Inbound Changes** \u2014 \`${r.branch}\` from \`${r.remote}\`\n\n` +
+      `| Metric | Count |\n|---|---|\n` +
+      `| Remote changes | ${r.totalInbound} |\n` +
+      `| Local changes | ${r.totalLocal} |\n` +
+      `| Conflicts | ${conflictCount} |\n\n`
+    );
+    if (conflictCount > 0) {
+      stream.markdown("**Conflicts:**\n\n");
+      for (const c of r.conflicts) {
+        stream.markdown(`- \`${c.path}\` \u2014 **${c.severity}** (local: ${c.localStatus}, remote: ${c.remoteStatus})\n`);
+      }
+      stream.markdown("\n");
+    }
+    if (r.summary?.recommendations?.length) {
+      stream.markdown("**Recommendations:**\n\n");
+      for (const rec of r.summary.recommendations) {
+        stream.markdown(`- ${rec}\n`);
+      }
+    }
+  },
+  "git.smartCommit": (value, stream) => {
+    const r = value as SmartCommitBatchResult;
+    const dur = r.duration ? ` in ${(r.duration / 1000).toFixed(1)}s` : "";
+    stream.markdown(
+      `**Smart Commit** \u2014 ${r.totalGroups} group(s), ${r.totalFiles} file(s)${dur}\n\n`
+    );
+    for (const c of r.commits) {
+      stream.markdown(`- \`${c.hash.slice(0, 7)}\` ${c.message} (${c.files.length} file${c.files.length === 1 ? "" : "s"})\n`);
+    }
+  },
+  "git.pull": (_value, stream) => {
+    stream.markdown("**Git Pull** \u2014 up to date with remote.\n");
+  },
+  "git.commentPR": (value, stream) => {
+    const r = value as GeneratedPRComments;
+    stream.markdown(`**PR Comments** \u2014 ${r.comments?.length ?? 0} comment(s) for \`${r.branch}\`\n\n`);
+    for (const c of r.comments ?? []) {
+      const loc = c.line ? `:${c.line}` : "";
+      stream.markdown(`- \`${c.file}${loc}\`: ${c.comment}\n`);
+    }
+  },
+  "hygiene.cleanup": (value, stream) => {
+    const r = value as CleanupResult;
+    const mode = r.dryRun ? " (dry run)" : "";
+    stream.markdown(`**Cleanup${mode}** \u2014 ${r.deleted.length} deleted, ${r.failed.length} failed\n\n`);
+    if (r.deleted.length > 0) {
+      stream.markdown("**Deleted:**\n");
+      for (const f of r.deleted) {
+        stream.markdown(`- \`${f}\`\n`);
+      }
+      stream.markdown("\n");
+    }
+    if (r.failed.length > 0) {
+      stream.markdown("**Failed:**\n");
+      for (const f of r.failed) {
+        stream.markdown(`- \`${f.path}\`: ${f.reason}\n`);
+      }
     }
   },
 };

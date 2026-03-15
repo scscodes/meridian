@@ -134,7 +134,13 @@ export function registerSpecializedCommands(
       const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
       const ignorePath = nodePath.join(wsRoot, ".meridianignore");
       const pattern = nodePath.relative(wsRoot, filePath);
-      fs.appendFileSync(ignorePath, `\n${pattern}\n`);
+      try {
+        fs.appendFileSync(ignorePath, `\n${pattern}\n`);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(`Failed to update .meridianignore: ${errMsg}`);
+        return;
+      }
       vscode.window.showInformationMessage(`Added to .meridianignore: ${pattern}`);
       hygieneTree.refresh();
     }),
@@ -183,6 +189,7 @@ export function registerSpecializedCommands(
             outputChannel.appendLine("\n");
           }
         );
+        vscode.window.showInformationMessage(`Review of "${filename}" complete — see Output`);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         outputChannel.appendLine(`\n[FAILED] Review of ${filename}: ${errMsg}\n`);
@@ -354,10 +361,34 @@ export function registerSpecializedCommands(
         const r = result.value as AgentExecutionResult;
         const status = r.success ? "completed" : "failed";
         const target = r.executedCommand ?? r.executedWorkflow ?? "unknown";
-        vscode.window.showInformationMessage(
-          `Agent "${agentId}" ${status}: ${target} in ${r.durationMs}ms`
-        );
+
+        outputChannel.show(true);
+        outputChannel.appendLine(`\n${HR}`);
+        outputChannel.appendLine(`[${new Date().toISOString()}] Agent: ${r.agentId} — ${target} (${status} in ${r.durationMs}ms)`);
+        outputChannel.appendLine(HR);
+        for (const log of r.logs ?? []) {
+          outputChannel.appendLine(`  [${log.level}] ${log.message}`);
+        }
+        if (r.error) {
+          outputChannel.appendLine(`  ✗ ${r.error}`);
+        }
+        if (r.output && Object.keys(r.output).length > 0) {
+          outputChannel.appendLine(`  Output: ${JSON.stringify(r.output)}`);
+        }
+        outputChannel.appendLine("");
+
+        if (r.success) {
+          vscode.window.showInformationMessage(
+            `Agent "${agentId}" completed: ${target} in ${r.durationMs}ms`
+          );
+        } else {
+          vscode.window.showErrorMessage(
+            `Agent "${agentId}" failed: ${target} — see Output`,
+            "Show Output"
+          ).then(choice => { if (choice === "Show Output") outputChannel.show(true); });
+        }
       } else {
+        outputChannel.show(true);
         outputChannel.appendLine(`\n${HR}`);
         outputChannel.appendLine(`[${new Date().toISOString()}] Agent: ${agentId} — FAILED`);
         outputChannel.appendLine(HR);

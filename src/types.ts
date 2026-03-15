@@ -207,6 +207,7 @@ export interface DeadCodeScan {
   tsconfigPath: string | null; // null = no tsconfig found (fallback mode)
   durationMs: number;
   fileCount: number;
+  error?: string;
 }
 
 export interface WorkspaceScan {

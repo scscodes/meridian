@@ -260,16 +260,16 @@ export function createMockChange(overrides?: Partial<GitFileChange>): GitFileCha
   };
 }
 
-export const SAMPLE_GIT_LOG = `abc1234|author@example.com|2024-02-20T10:30:00Z|feat(api): add new endpoint
+export const SAMPLE_GIT_LOG = `abc1234\x00author@example.com\x002024-02-20T10:30:00Z\x00feat(api): add new endpoint
 2	1	src/api.ts
 1	0	src/types.ts
-def5678|author@example.com|2024-02-19T15:45:00Z|fix(bug): resolve caching issue
+def5678\x00author@example.com\x002024-02-19T15:45:00Z\x00fix(bug): resolve caching issue
 5	3	src/cache.ts
 2	1	tests/cache.test.ts`;
 
 export const SAMPLE_GIT_LOG_MALFORMED = `invalid log format
 without proper pipes and dates
-abc1234|only three fields here`;
+abc1234\x00only three fields here`;
 
 export const SAMPLE_WORKFLOW = {
   name: 'deploy-pipeline',
@@ -348,7 +348,7 @@ export function createTestGitLog(commitCount: number): string {
     const author = `author${i % 3}`;
     const date = new Date(Date.now() - i * 86400000).toISOString();
     const message = `feat(domain${i % 5}): change ${i}`;
-    lines.push(`${hash}|${author}|${date}|${message}`);
+    lines.push(`${hash}\x00${author}\x00${date}\x00${message}`);
     lines.push(`${i + 1}\t${Math.floor(i / 2)}\tsrc/file${i}.ts`);
   }
   return lines.join('\n');
@@ -424,28 +424,28 @@ export const REALISTIC_CHANGES_SCENARIO_3 = [
  * Sample git log: 6 commits with realistic data
  */
 export const REALISTIC_GIT_LOG_SMALL = `
-abc1234|Alice Smith|2026-02-24T10:30:00Z|feat(api): add user endpoints
+abc1234\x00Alice Smith\x002026-02-24T10:30:00Z\x00feat(api): add user endpoints
 150\t0\tsrc/api/user.ts
 80\t0\tsrc/api/types.ts
 25\t10\tdocs/api.md
 
-def5678|Bob Jones|2026-02-24T11:45:00Z|fix(auth): handle token expiry
+def5678\x00Bob Jones\x002026-02-24T11:45:00Z\x00fix(auth): handle token expiry
 120\t100\tsrc/auth/token.ts
 30\t20\ttests/auth.test.ts
 
-ghi9012|Alice Smith|2026-02-24T14:20:00Z|refactor: reorganize middleware
+ghi9012\x00Alice Smith\x002026-02-24T14:20:00Z\x00refactor: reorganize middleware
 200\t180\tsrc/middleware/auth.ts
 150\t140\tsrc/middleware/logging.ts
 
-jkl3456|Charlie Brown|2026-02-25T09:00:00Z|docs: update README
+jkl3456\x00Charlie Brown\x002026-02-25T09:00:00Z\x00docs: update README
 50\t20\tREADME.md
 10\t5\tdocs/CONTRIBUTING.md
 
-mno7890|Alice Smith|2026-02-25T10:30:00Z|chore: update dependencies
+mno7890\x00Alice Smith\x002026-02-25T10:30:00Z\x00chore: update dependencies
 5\t3\tpackage.json
 2\t2\tpackage-lock.json
 
-pqr1234|Bob Jones|2026-02-25T11:15:00Z|fix: address code review feedback
+pqr1234\x00Bob Jones\x002026-02-25T11:15:00Z\x00fix: address code review feedback
 30\t25\tsrc/api/user.ts
 15\t10\ttests/api.test.ts
 `;
@@ -466,7 +466,7 @@ export function generateMediumGitLog(): string {
     const messageType = ['feat', 'fix', 'refactor', 'docs', 'chore'][i % 5];
     const message = `${messageType}(${domain}): change ${i}`;
 
-    lines.push(`${hash}|${author}|${date}|${message}`);
+    lines.push(`${hash}\x00${author}\x00${date}\x00${message}`);
 
     // Add 1-5 file changes per commit
     const fileCount = (i % 5) + 1;

@@ -51,6 +51,9 @@ export const GIT_DEFAULTS = {
 
   /** Git operation timeout in milliseconds */
   OPERATION_TIMEOUT_MS: 30 * 1000,
+
+  /** Maximum diff size in bytes before truncation (for LLM token safety) */
+  MAX_DIFF_BYTES: 50_000,
 } as const;
 
 // ============================================================================

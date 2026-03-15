@@ -117,7 +117,7 @@ export class GitAnalyzer {
       const sinceStr = since.toISOString().split("T")[0];
       const untilStr = until.toISOString().split("T")[0];
 
-      let cmd = `git log --since="${sinceStr}" --until="${untilStr}" --pretty=format:"%H|%an|%ai|%s" --numstat`;
+      let cmd = `git log --since="${sinceStr}" --until="${untilStr}" --pretty=format:"%H%x00%an%x00%ai%x00%s" --numstat`;
 
       // Filter by author if specified
       if (opts.author) {
@@ -135,7 +135,7 @@ export class GitAnalyzer {
         if (!line.trim()) continue;
 
         // Commit header line: hash|author|date|message
-        if (line.includes("|")) {
+        if (line.includes("\0")) {
           // Save previous commit if exists
           if (currentCommit && currentCommit.hash) {
             const filesLines = commitLines.get(currentCommit.hash) || [];
@@ -148,7 +148,7 @@ export class GitAnalyzer {
             }
           }
 
-          const parts = line.split("|");
+          const parts = line.split("\0");
           if (parts.length >= 4) {
             currentCommit = {
               hash: parts[0],

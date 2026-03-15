@@ -13,6 +13,7 @@ import {
   GenerateProseFn,
 } from "../../types";
 import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
+import { GIT_DEFAULTS } from "../../constants";
 import {
   PRGenerationParams,
   GeneratedPR,
@@ -69,15 +70,19 @@ export async function gatherPRContext(
     });
   }
 
-  // 5. Get full diff for LLM context (non-fatal if fails)
+  // 5. Get full diff for LLM context (non-fatal if fails, truncated for token safety)
   const diffResult = await gitProvider.diff(rangeRef);
+  let diff = diffResult.kind === "ok" ? diffResult.value : "(diff unavailable)";
+  if (diff.length > GIT_DEFAULTS.MAX_DIFF_BYTES) {
+    diff = diff.slice(0, GIT_DEFAULTS.MAX_DIFF_BYTES) + "\n\n(diff truncated — exceeded size limit)";
+  }
 
   return success({
     branch,
     targetBranch,
     commits: commitsResult.value,
     changes,
-    diff: diffResult.kind === "ok" ? diffResult.value : "(diff unavailable)",
+    diff,
   });
 }
 
@@ -149,7 +154,7 @@ export function createGeneratePRHandler(
 
     const text = proseResult.value;
     const lines = text.split("\n");
-    const titleLine = lines.find(l => l.startsWith("# ")) ?? lines[0] ?? prContext.branch;
+    const titleLine = lines.find(l => l.startsWith("# ")) ?? lines.find(l => l.trim().length > 0) ?? prContext.branch;
     const title = titleLine.replace(/^#\s*/, "").trim();
     const body = text;
 
@@ -193,9 +198,11 @@ export function createReviewPRHandler(
         verdict: parsed.verdict ?? "comment",
       });
     } catch {
-      // Fallback: treat raw text as summary
-      logger.info(`PR review generated for ${ctx.branch} (text fallback)`, "git.reviewPR");
-      return success({ branch: ctx.branch, summary: proseResult.value, comments: [], verdict: "comment" as const });
+      logger.warn(
+        `PR review JSON parse failed for ${ctx.branch} (${proseResult.value.length} chars), using text fallback`,
+        "git.reviewPR"
+      );
+      return success({ branch: ctx.branch, summary: proseResult.value, comments: [], verdict: "comment" as const, _fallback: true });
     }
   };
 }
@@ -235,8 +242,11 @@ export function createCommentPRHandler(
       logger.info(`${comments.length} inline comment(s) generated for ${ctx.branch}`, "git.commentPR");
       return success({ branch: ctx.branch, comments });
     } catch {
-      logger.info(`PR comments generated for ${ctx.branch} (text fallback)`, "git.commentPR");
-      return success({ branch: ctx.branch, comments: [{ file: "(general)", comment: proseResult.value }] });
+      logger.warn(
+        `PR comments JSON parse failed for ${ctx.branch} (${proseResult.value.length} chars), using text fallback`,
+        "git.commentPR"
+      );
+      return success({ branch: ctx.branch, comments: [{ file: "(general)", comment: proseResult.value }], _fallback: true });
     }
   };
 }
@@ -291,8 +301,11 @@ export function createResolveConflictsHandler(
         perFile: Array.isArray(parsed.perFile) ? parsed.perFile : [],
       });
     } catch {
-      logger.info(`Conflict resolution generated (text fallback)`, "git.resolveConflicts");
-      return success({ overview: proseResult.value, perFile: [] });
+      logger.warn(
+        `Conflict resolution JSON parse failed (${proseResult.value.length} chars), using text fallback`,
+        "git.resolveConflicts"
+      );
+      return success({ overview: proseResult.value, perFile: [], _fallback: true });
     }
   };
 }

@@ -2,7 +2,7 @@
   "name": "meridian",
   "displayName": "Meridian",
   "description": "AI-powered git analytics, code hygiene, workflow engine, and chat assistant for VS Code",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "scscodes",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -624,7 +624,12 @@
         "meridian.log.level": {
           "type": "string",
           "default": "info",
-          "enum": ["debug", "info", "warn", "error"],
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
           "description": "Minimum log level for the Meridian output channel."
         }
       }

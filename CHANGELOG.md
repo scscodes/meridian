@@ -1,3 +1,18 @@
+# [1.1.0](https://github.com/scscodes/meridian/compare/v1.0.0...v1.1.0) (2026-03-15)
+
+
+### Bug Fixes
+
+* content generation edge cases — LLM fallback transparency, diff truncation, PR title, dead code errors, git log delimiter ([8d4c163](https://github.com/scscodes/meridian/commit/8d4c163e39e9469911091bc0bc714555ffc23d2e))
+
+
+### Features
+
+* chat formatters, hygiene stability, agent rendering completeness ([6796460](https://github.com/scscodes/meridian/commit/679646064e32621f9f3b2c5a246e6e56550684b1))
+* refine git and agent UX and config ([05f3323](https://github.com/scscodes/meridian/commit/05f33239c301c6ae1b8ce398882e07f8ae6a9b49))
+* UI/UX sprint — progress indicators, error compliance, NL classify-then-dispatch ([ad95a2b](https://github.com/scscodes/meridian/commit/ad95a2b3c48943d394d5fcc71aef8a9108ad8903))
+* unified UI/UX rendering strategy — ADR 006/007 + workflow.run pilot ([375d09d](https://github.com/scscodes/meridian/commit/375d09de9e4c4603f9922cd67694f0a1cc321a2f))
+
 # 1.0.0 (2026-03-09)
 
 

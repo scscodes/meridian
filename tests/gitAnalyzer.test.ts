@@ -27,10 +27,10 @@ describe('GitAnalyzer', () => {
   // Test 1: parseGitLog() with valid output
   it('should parse valid git log output', async () => {
     const gitLog = [
-      'abc1234|Alice|2026-02-20T10:30:00Z|feat(api): add endpoint',
+      'abc1234\x00Alice\x002026-02-20T10:30:00Z\x00feat(api): add endpoint',
       '10\t2\tsrc/api/handler.ts',
       '',
-      'def5678|Bob|2026-02-19T09:00:00Z|fix(core): resolve bug',
+      'def5678\x00Bob\x002026-02-19T09:00:00Z\x00fix(core): resolve bug',
       '5\t3\tsrc/core/service.ts',
       '2\t1\tsrc/core/types.ts',
     ].join('\n');
@@ -45,7 +45,7 @@ describe('GitAnalyzer', () => {
 
   // Test 2: parseGitLog() with malformed input (graceful)
   it('should gracefully handle malformed input', async () => {
-    mockedExecSync.mockReturnValue('notvalid\ngarbage\n|||');
+    mockedExecSync.mockReturnValue('notvalid\ngarbage\n\x00\x00\x00');
 
     const report = await analyzer.analyze({ period: '3mo' });
 
@@ -135,7 +135,7 @@ describe('GitAnalyzer', () => {
   // Test 5: cache hit returns memoized results
   it('should return memoized results on cache hit', async () => {
     const gitLog = [
-      'abc1234|Alice|2026-02-20T10:30:00Z|feat: add feature',
+      'abc1234\x00Alice\x002026-02-20T10:30:00Z\x00feat: add feature',
       '10\t2\tsrc/feature.ts',
     ].join('\n');
     mockedExecSync.mockReturnValue(gitLog);
@@ -151,7 +151,7 @@ describe('GitAnalyzer', () => {
   // Test 6: cache invalidation on new input
   it('should invalidate cache when input changes', async () => {
     const gitLog = [
-      'abc1234|Alice|2026-02-20T10:30:00Z|feat: initial',
+      'abc1234\x00Alice\x002026-02-20T10:30:00Z\x00feat: initial',
       '5\t1\tsrc/file.ts',
     ].join('\n');
     mockedExecSync.mockReturnValue(gitLog);
@@ -182,11 +182,11 @@ describe('GitAnalyzer', () => {
   it('should filter commits by path pattern', async () => {
     // Two commits: one touches src/api/**, the other touches docs/**
     const gitLog = [
-      'aaa111|Alice|2026-02-20T10:00:00Z|feat(api): add handler',
+      'aaa111\x00Alice\x002026-02-20T10:00:00Z\x00feat(api): add handler',
       '50\t10\tsrc/api/handler.ts',
       '20\t5\tsrc/api/types.ts',
       '',
-      'bbb222|Bob|2026-02-21T11:00:00Z|docs: update readme',
+      'bbb222\x00Bob\x002026-02-21T11:00:00Z\x00docs: update readme',
       '30\t10\tdocs/README.md',
       '15\t5\tdocs/GUIDE.md',
     ].join('\n');
@@ -217,7 +217,7 @@ describe('GitAnalyzer', () => {
   // Test 9: returns empty when pattern matches nothing
   it('should return empty commits when pattern matches nothing', async () => {
     const gitLog = [
-      'ccc333|Charlie|2026-02-22T09:00:00Z|feat: add handler',
+      'ccc333\x00Charlie\x002026-02-22T09:00:00Z\x00feat: add handler',
       '40\t15\tsrc/api/handler.ts',
     ].join('\n');
 
@@ -231,7 +231,7 @@ describe('GitAnalyzer', () => {
   // Bug 1 fix: file aggregation respects path filter (no bleed-through from non-matching files)
   it('should exclude non-matching files from commit metrics when pathPattern is set', async () => {
     const gitLog = [
-      'aaa111|Alice|2026-02-20T10:00:00Z|feat: mixed commit',
+      'aaa111\x00Alice\x002026-02-20T10:00:00Z\x00feat: mixed commit',
       '50\t10\tsrc/api/handler.ts',
       '20\t5\tdocs/README.md',
     ].join('\n');
@@ -253,17 +253,17 @@ describe('GitAnalyzer', () => {
   it('should report "up" for recent burst and "down" for old burst', async () => {
     // Setup A: 3 recent commits all on same day, 3 old spread over ~60 days → recent is denser
     const recentBurstLog = [
-      'r001|Alice|2026-03-03T10:00:00Z|feat: A', '5\t2\tsrc/a.ts',
+      'r001\x00Alice\x002026-03-03T10:00:00Z\x00feat: A', '5\t2\tsrc/a.ts',
       '',
-      'r002|Alice|2026-03-03T09:00:00Z|feat: B', '5\t2\tsrc/a.ts',
+      'r002\x00Alice\x002026-03-03T09:00:00Z\x00feat: B', '5\t2\tsrc/a.ts',
       '',
-      'r003|Alice|2026-03-03T08:00:00Z|feat: C', '5\t2\tsrc/a.ts',
+      'r003\x00Alice\x002026-03-03T08:00:00Z\x00feat: C', '5\t2\tsrc/a.ts',
       '',
-      'o001|Alice|2025-09-01T10:00:00Z|feat: D', '5\t2\tsrc/a.ts',
+      'o001\x00Alice\x002025-09-01T10:00:00Z\x00feat: D', '5\t2\tsrc/a.ts',
       '',
-      'o002|Alice|2025-08-01T10:00:00Z|feat: E', '5\t2\tsrc/a.ts',
+      'o002\x00Alice\x002025-08-01T10:00:00Z\x00feat: E', '5\t2\tsrc/a.ts',
       '',
-      'o003|Alice|2025-07-01T10:00:00Z|feat: F', '5\t2\tsrc/a.ts',
+      'o003\x00Alice\x002025-07-01T10:00:00Z\x00feat: F', '5\t2\tsrc/a.ts',
     ].join('\n');
 
     mockedExecSync.mockReturnValue(recentBurstLog);
@@ -274,17 +274,17 @@ describe('GitAnalyzer', () => {
 
     // Setup B: 3 recent spread over ~76 days, 3 old all on same day → old is denser
     const oldBurstLog = [
-      'r001|Alice|2026-03-01T10:00:00Z|feat: A', '5\t2\tsrc/a.ts',
+      'r001\x00Alice\x002026-03-01T10:00:00Z\x00feat: A', '5\t2\tsrc/a.ts',
       '',
-      'r002|Alice|2026-01-15T10:00:00Z|feat: B', '5\t2\tsrc/a.ts',
+      'r002\x00Alice\x002026-01-15T10:00:00Z\x00feat: B', '5\t2\tsrc/a.ts',
       '',
-      'r003|Alice|2025-12-15T10:00:00Z|feat: C', '5\t2\tsrc/a.ts',
+      'r003\x00Alice\x002025-12-15T10:00:00Z\x00feat: C', '5\t2\tsrc/a.ts',
       '',
-      'o001|Alice|2025-12-01T10:00:00Z|feat: D', '5\t2\tsrc/a.ts',
+      'o001\x00Alice\x002025-12-01T10:00:00Z\x00feat: D', '5\t2\tsrc/a.ts',
       '',
-      'o002|Alice|2025-12-01T10:00:00Z|feat: E', '5\t2\tsrc/a.ts',
+      'o002\x00Alice\x002025-12-01T10:00:00Z\x00feat: E', '5\t2\tsrc/a.ts',
       '',
-      'o003|Alice|2025-12-01T10:00:00Z|feat: F', '5\t2\tsrc/a.ts',
+      'o003\x00Alice\x002025-12-01T10:00:00Z\x00feat: F', '5\t2\tsrc/a.ts',
     ].join('\n');
 
     mockedExecSync.mockReturnValue(oldBurstLog);
@@ -305,9 +305,9 @@ describe('GitAnalyzer', () => {
     // Without fix: in a negative-offset TZ, Jan 5 00:30 UTC reads as Jan 4 locally → W01 (wrong)
     // With fix: UTC date components are used → W02 (correct)
     const gitLog = [
-      'w001|Alice|2026-01-04T23:30:00Z|feat: last day of W01', '5\t2\tsrc/a.ts',
+      'w001\x00Alice\x002026-01-04T23:30:00Z\x00feat: last day of W01', '5\t2\tsrc/a.ts',
       '',
-      'w002|Alice|2026-01-05T00:30:00Z|feat: first day of W02', '5\t2\tsrc/a.ts',
+      'w002\x00Alice\x002026-01-05T00:30:00Z\x00feat: first day of W02', '5\t2\tsrc/a.ts',
     ].join('\n');
 
     mockedExecSync.mockReturnValue(gitLog);

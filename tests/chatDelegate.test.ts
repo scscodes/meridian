@@ -80,4 +80,95 @@ describe("chat.delegate", () => {
     const err = assertFailure(result);
     expect(err.code).toBe("GIT_STATUS_ERROR");
   });
+
+  it("classifyOnly: returns classification without dispatching", async () => {
+    const logger = new MockLogger();
+    const dispatcher = makeDispatcher(success({ branch: "main" }));
+
+    const generateProseFn: GenerateProseFn = vi.fn(async () => success("git.reviewPR"));
+    const handler = createDelegateHandler(dispatcher, logger, generateProseFn);
+
+    const result = await handler(mockCtx, { task: "review my changes", classifyOnly: true });
+    const value = assertSuccess(result);
+
+    expect(value.dispatched).toBe(false);
+    expect(value.commandName).toBe("git.reviewPR");
+    expect(value.result).toBeNull();
+    expect(value.classifiedParams).toEqual({});
+    // Dispatcher should only have been called for workflow.list (discovery), not the classified command
+    expect(dispatcher).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "git.reviewPR" }),
+      expect.anything()
+    );
+  });
+
+  it("classifyOnly: returns workflow params for workflow.run classification", async () => {
+    const logger = new MockLogger();
+    const dispatcher = makeDispatcher(success({}));
+
+    const generateProseFn: GenerateProseFn = vi.fn(async () => success("workflow.run:deploy"));
+    const handler = createDelegateHandler(dispatcher, logger, generateProseFn);
+
+    const result = await handler(mockCtx, { task: "run deploy pipeline", classifyOnly: true });
+    const value = assertSuccess(result);
+
+    expect(value.dispatched).toBe(false);
+    expect(value.commandName).toBe("workflow.run");
+    expect(value.classifiedParams).toEqual({ name: "deploy" });
+    // Dispatcher should only have been called for workflow.list (discovery), not the classified command
+    expect(dispatcher).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "workflow.run" }),
+      expect.anything()
+    );
+  });
+
+  it("augments classifier prompt with available workflows", async () => {
+    const logger = new MockLogger();
+    const workflowListResult = success({
+      workflows: [
+        { name: "deploy", description: "Deploy to production" },
+        { name: "ci", description: "Run CI pipeline" },
+      ],
+    });
+    const dispatchValue = { verdict: "LGTM" };
+
+    const dispatcher = vi.fn(async (cmd: Command, _ctx: CommandContext) => {
+      if (cmd.name === "workflow.list") return workflowListResult;
+      return success(dispatchValue);
+    });
+
+    const generateProseFn: GenerateProseFn = vi.fn(async () => success("git.reviewPR"));
+    const handler = createDelegateHandler(dispatcher, logger, generateProseFn);
+
+    await handler(mockCtx, { task: "review my changes" });
+
+    // Verify the generateProseFn was called with augmented prompt
+    expect(generateProseFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemPrompt: expect.stringContaining("workflow.run:deploy"),
+      })
+    );
+    expect(generateProseFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemPrompt: expect.stringContaining("Deploy to production"),
+      })
+    );
+  });
+
+  it("workflow discovery failure does not break classification", async () => {
+    const logger = new MockLogger();
+    const dispatcher = vi.fn(async (cmd: Command, _ctx: CommandContext) => {
+      if (cmd.name === "workflow.list") throw new Error("workflow engine down");
+      return success({ branch: "main" });
+    });
+
+    const generateProseFn: GenerateProseFn = vi.fn(async () => success("git.status"));
+    const handler = createDelegateHandler(dispatcher, logger, generateProseFn);
+
+    const result = await handler(mockCtx, { task: "show status" });
+    const value = assertSuccess(result);
+
+    expect(value.dispatched).toBe(true);
+    expect(value.commandName).toBe("git.status");
+  });
 });

@@ -38,6 +38,10 @@ export interface ImpactAnalysisResult {
     callSites: number;
     testFiles: number;
     dependentFiles: number;
+    importerPaths?: string[];
+    callSitePaths?: string[];
+    testFilePaths?: string[];
+    dependentFilePaths?: string[];
   };
   targetPath?: string;
   targetFunction?: string;
@@ -201,6 +205,10 @@ export function createImpactAnalysisHandler(logger: Logger, generateProseFn?: Ge
           callSites: context.callSites.length,
           testFiles: context.testFiles.length,
           dependentFiles: context.dependentFiles.length,
+          importerPaths: context.importers,
+          callSitePaths: context.callSites,
+          testFilePaths: context.testFiles,
+          dependentFilePaths: context.dependentFiles,
         },
         targetPath: params.filePath,
         targetFunction: params.functionName,

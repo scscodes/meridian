@@ -116,7 +116,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     outputChannel, analyticsPanel, hygieneAnalyticsPanel,
   });
 
-  registerSpecializedCommands(context, router, outputChannel, ctxFn, trees.workflowTree, trees.hygieneTree);
+  registerSpecializedCommands(context, router, outputChannel, ctxFn, trees.workflowTree, trees.hygieneTree, trees.gitTree);
 
   const statusBar = setupStatusBar(context, gitProvider, () => {
     trees.gitTree.refresh();
@@ -133,7 +133,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   // ── Chat + LM tools ────────────────────────────────────────────────
-  context.subscriptions.push(createChatParticipant(router, cmdCtx, logger));
+  context.subscriptions.push(createChatParticipant(router, cmdCtx, logger, trees.workflowTree, trees.gitTree, trees.hygieneTree));
   context.subscriptions.push(...registerMeridianTools(router, cmdCtx, logger));
 
   // ── Finalize ────────────────────────────────────────────────────────

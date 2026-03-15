@@ -10,6 +10,20 @@ import { formatResultMessage } from "../infrastructure/result-handler";
 import { PruneConfig } from "../domains/hygiene/analytics-types";
 import { presentResult, PresenterContext } from "./result-presenters";
 
+/** Commands that show a progress notification during dispatch. */
+const PROGRESS_COMMANDS: ReadonlySet<CommandName> = new Set([
+  "git.generatePR", "git.reviewPR", "git.sessionBriefing",
+  "git.showAnalytics", "hygiene.scan",
+] as CommandName[]);
+
+const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
+  "git.generatePR": "Generating PR description...",
+  "git.reviewPR": "Reviewing branch changes...",
+  "git.sessionBriefing": "Generating session briefing...",
+  "git.showAnalytics": "Loading git analytics...",
+  "hygiene.scan": "Scanning workspace...",
+};
+
 /** VS Code command ID → internal CommandName */
 export const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.status",              "git.status"],
@@ -31,7 +45,7 @@ export const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.generatePR",          "git.generatePR"],
   ["meridian.git.reviewPR",            "git.reviewPR"],
   ["meridian.git.commentPR",           "git.commentPR"],
-  ["meridian.git.resolveConflicts",    "git.resolveConflicts"],
+  // git.resolveConflicts — dedicated registration in specialized-commands.ts (tree expansion hooks)
   ["meridian.git.sessionBriefing",     "git.sessionBriefing"],
   ["meridian.chat.delegate",           "chat.delegate"],
 ];
@@ -63,13 +77,21 @@ export function registerCommands(
           await presentResult(commandName, pruneResult, presenterCtx);
           if (pruneResult.kind !== "ok") {
             const { message } = formatResultMessage(commandName, pruneResult);
-            vscode.window.showErrorMessage(message);
+            outputChannel.show(true);
+            vscode.window.showErrorMessage(message, "Show Output")
+              .then(choice => { if (choice === "Show Output") outputChannel.show(true); });
           }
           return;
         }
 
         const command: Command = { name: commandName, params };
-        const result = await router.dispatch(command, cmdCtx);
+        const doDispatch = () => router.dispatch(command, cmdCtx);
+        const result = PROGRESS_COMMANDS.has(commandName)
+          ? await vscode.window.withProgress(
+              { location: vscode.ProgressLocation.Notification, title: PROGRESS_TITLES[commandName] ?? "Working...", cancellable: false },
+              doDispatch
+            )
+          : await doDispatch();
 
         const handled = await presentResult(commandName, result, presenterCtx);
         if (handled) return;
@@ -79,7 +101,9 @@ export function registerCommands(
         if (level === "info") {
           vscode.window.showInformationMessage(message);
         } else {
-          vscode.window.showErrorMessage(message);
+          outputChannel.show(true);
+          vscode.window.showErrorMessage(message, "Show Output")
+            .then(choice => { if (choice === "Show Output") outputChannel.show(true); });
         }
       }
     );

@@ -156,8 +156,10 @@ export function createScanHandler(
       let deadCode: DeadCodeScan = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 };
       try {
         deadCode = deadCodeAnalyzer.analyze(workspaceRoot);
-      } catch {
-        deadCode = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 };
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.warn(`Dead code scan failed: ${errMsg}`, "HygieneScanHandler");
+        deadCode = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0, error: errMsg };
       }
 
       const scan: WorkspaceScan = {

@@ -102,7 +102,10 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
         const report = await this.onFilter(msg.payload as AnalyticsOptions);
         this.panel?.webview.postMessage({ type: "init", payload: report });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.error("[Meridian] git analytics filter error:", e);
+        this.panel?.webview.postMessage({ type: "error", payload: msg });
+        vscode.window.showErrorMessage(`Git analytics filter failed: ${msg}`);
       }
     } else if (msg.type === "refresh") {
       try {
@@ -110,7 +113,10 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
         const report = await this.onFilter({ period } as AnalyticsOptions);
         this.panel?.webview.postMessage({ type: "init", payload: report });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.error("[Meridian] git analytics refresh error:", e);
+        this.panel?.webview.postMessage({ type: "error", payload: msg });
+        vscode.window.showErrorMessage(`Git analytics refresh failed: ${msg}`);
       }
     } else if (msg.type === "openFile") {
       const abs = path.join(this.workspaceRoot, msg.payload as string);
@@ -150,7 +156,10 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
         const report = await this.onRefresh();
         this.panel?.webview.postMessage({ type: "init", payload: report });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.error("[Meridian] hygiene analytics refresh error:", e);
+        this.panel?.webview.postMessage({ type: "error", payload: msg });
+        vscode.window.showErrorMessage(`Hygiene analytics refresh failed: ${msg}`);
       }
     } else if (msg.type === "openSettings") {
       vscode.commands.executeCommand("workbench.action.openSettings", "meridian.hygiene");

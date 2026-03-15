@@ -10,13 +10,19 @@
 
 import * as vscode from "vscode";
 import { CommandRouter } from "../router";
-import { Command, CommandContext, CommandName } from "../types";
+import { Command, CommandContext, CommandName, GitStatus, WorkspaceScan, DeadCodeItem } from "../types";
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
-import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
+import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse, InboundChanges, SmartCommitBatchResult, GeneratedPRComments } from "../domains/git/types";
+import { DelegateResult } from "../domains/chat/handlers";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
-import { ListWorkflowsResult } from "../domains/workflow/types";
+import { CleanupResult } from "../domains/hygiene/cleanup-handler";
+import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
+import { WorkflowTreeProvider } from "./tree-providers/workflow-tree-provider";
+import { GitTreeProvider } from "./tree-providers/git-tree-provider";
+import { HygieneTreeProvider } from "./tree-providers/hygiene-tree-provider";
 import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
+import { UI_SETTINGS } from "../constants";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
 const SLASH_MAP: Record<string, CommandName> = {
@@ -36,8 +42,13 @@ const SLASH_MAP: Record<string, CommandName> = {
 export function createChatParticipant(
   router: CommandRouter,
   ctx: CommandContext,
-  logger: Logger
+  logger: Logger,
+  workflowTree?: WorkflowTreeProvider,
+  gitTree?: GitTreeProvider,
+  hygieneTree?: HygieneTreeProvider
 ): vscode.Disposable {
+  const trees: DispatchTrees = { workflowTree, gitTree, hygieneTree };
+
   const handler: vscode.ChatRequestHandler = async (request, _chatCtx, stream, _token) => {
     // Debug: log incoming request shape so issues can be diagnosed
     logger.info(
@@ -53,7 +64,7 @@ export function createChatParticipant(
       if (commandName) {
         logger.info(`Routing via request.command: ${cmd} → ${commandName}`, "ChatParticipant");
         stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
+        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
       }
     }
 
@@ -64,32 +75,39 @@ export function createChatParticipant(
     if (firstWord in SLASH_MAP) {
       const commandName = SLASH_MAP[firstWord];
       stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger);
+      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
     }
 
     // ── 3. "run <name>" shorthand ────────────────────────────────────────────
     if (firstWord === "run" && text.length > 4) {
       const name = text.slice(4).trim();
       stream.markdown(`\`@meridian\` → \`workflow.run\`\n\n`);
-      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger);
+      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
     }
 
-    // ── 4. NL → chat.delegate (single classification authority) ──────────────
+    // ── 4. NL → classify via chat.delegate, then dispatch directly ────────
     if (text.length > 0) {
       stream.progress("Figuring out what you need...");
-      const delegateResult = await router.dispatch(
-        { name: "chat.delegate" as CommandName, params: { task: text } },
+
+      // Phase 1: classify only (no dispatch)
+      const classifyResult = await router.dispatch(
+        { name: "chat.delegate" as CommandName, params: { task: text, classifyOnly: true } },
         ctx
       );
-      if (delegateResult.kind === "ok") {
-        const dr = delegateResult.value as { commandName: string; result: unknown };
-        stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
-        return formatCommandResult(dr.commandName as CommandName, dr.result, stream);
-      } else {
-        logger.warn("chat.delegate failed, falling back", "ChatParticipant", delegateResult.error);
+
+      if (classifyResult.kind !== "ok") {
+        logger.warn("chat.delegate classification failed, falling back", "ChatParticipant", classifyResult.error);
         stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger);
+        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, trees);
       }
+
+      const classified = classifyResult.value as DelegateResult;
+      const commandName = classified.commandName as CommandName;
+      const params = classified.classifiedParams ?? {};
+
+      // Phase 2: dispatch through handleDirectDispatch (has spinner + tree hooks)
+      stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
+      return handleDirectDispatch(commandName, params, router, ctx, stream, logger, trees);
     }
 
     // ── 6. Empty prompt fallback ─────────────────────────────────────────────
@@ -107,14 +125,22 @@ export function createChatParticipant(
 
 // ── Direct dispatch (slash commands, keywords, "run <name>") ────────────────
 
+interface DispatchTrees {
+  workflowTree?: WorkflowTreeProvider;
+  gitTree?: GitTreeProvider;
+  hygieneTree?: HygieneTreeProvider;
+}
+
 async function handleDirectDispatch(
   commandName: CommandName,
   params: Record<string, unknown>,
   router: CommandRouter,
   ctx: CommandContext,
   stream: vscode.ChatResponseStream,
-  logger: Logger
+  logger: Logger,
+  trees: DispatchTrees
 ): Promise<void> {
+  const { workflowTree, gitTree, hygieneTree } = trees;
   // Auto-populate filePath for impact analysis from active editor
   if (commandName === "hygiene.impactAnalysis" && !params.filePath) {
     if (!ctx.activeFilePath) {
@@ -124,8 +150,41 @@ async function handleDirectDispatch(
     params = { ...params, filePath: ctx.activeFilePath };
   }
 
+  // Signal tree that workflow is starting (spinner)
+  if (commandName === "workflow.run") {
+    workflowTree?.setRunning(params.name as string);
+  }
+
+  // Signal git tree that conflict resolution is starting (spinner)
+  if (commandName === "git.resolveConflicts") {
+    gitTree?.setConflictRunning();
+  }
+
   const cmd: Command = { name: commandName, params };
   const result = await router.dispatch(cmd, ctx);
+
+  // Update tree with step results after workflow completes
+  if (commandName === "workflow.run") {
+    const r = result.kind === "ok" ? (result.value as RunWorkflowResult) : null;
+    workflowTree?.setLastRun(
+      params.name as string,
+      r?.success ?? false,
+      r?.duration ?? 0,
+      r?.stepResults ?? []
+    );
+  }
+
+  // Update git tree with conflict resolution results
+  if (commandName === "git.resolveConflicts") {
+    gitTree?.setLastConflictRun(
+      result.kind === "ok" ? (result.value as ConflictResolutionProse) : null
+    );
+  }
+
+  // Update hygiene tree with impact analysis results
+  if (commandName === "hygiene.impactAnalysis" && result.kind === "ok") {
+    hygieneTree?.setImpactResult(result.value as ImpactAnalysisResult);
+  }
 
   if (result.kind === "ok") {
     formatCommandResult(commandName, result.value, stream);
@@ -154,6 +213,68 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
       `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
     );
   },
+  "git.status": (value, stream) => {
+    const s = value as GitStatus;
+    const branch = s?.branch ?? "unknown";
+    const dirty = s?.isDirty ? "dirty" : "clean";
+    const staged = s?.staged ?? 0;
+    const unstaged = s?.unstaged ?? 0;
+    const untracked = s?.untracked ?? 0;
+    stream.markdown(
+      `**Branch:** \`${branch}\` (${dirty})\n\n` +
+      `| Status | Count |\n|---|---|\n` +
+      `| Staged | ${staged} |\n` +
+      `| Unstaged | ${unstaged} |\n` +
+      `| Untracked | ${untracked} |\n`
+    );
+  },
+  "hygiene.scan": (value, stream) => {
+    const scan = value as WorkspaceScan;
+    const deadFiles = scan?.deadFiles ?? [];
+    const largeFiles = scan?.largeFiles ?? [];
+    const logFiles = scan?.logFiles ?? [];
+    const markdownFiles = scan?.markdownFiles ?? [];
+    const deadCodeItems = (scan?.deadCode?.items ?? []) as DeadCodeItem[];
+    const MAX_HIGHLIGHTS = UI_SETTINGS.CHAT_SCAN_MAX_HIGHLIGHTS;
+
+    stream.markdown(
+      `**Hygiene scan summary**\n\n` +
+      `| Category | Count |\n|---|---|\n` +
+      `| Dead files | ${deadFiles.length} |\n` +
+      `| Large files | ${largeFiles.length} |\n` +
+      `| Log files | ${logFiles.length} |\n` +
+      `| Markdown | ${markdownFiles.length} |\n` +
+      `| Dead code | ${deadCodeItems.length} |\n\n`
+    );
+
+    const highlights: string[] = [];
+    if (deadFiles.length > 0) {
+      const samples = deadFiles.slice(0, MAX_HIGHLIGHTS).map(p => `\`${p}\``).join(", ");
+      highlights.push(`- **Dead files:** ${samples}`);
+    }
+    if (largeFiles.length > 0) {
+      const fmt = (f: { path: string; sizeBytes: number }) => {
+        const mb = f.sizeBytes / (1024 * 1024);
+        const size = mb >= 1 ? `${mb.toFixed(1)} MB` : `${(f.sizeBytes / 1024).toFixed(1)} KB`;
+        return `\`${f.path}\` (${size})`;
+      };
+      highlights.push(`- **Large files:** ${largeFiles.slice(0, MAX_HIGHLIGHTS).map(fmt).join("; ")}`);
+    }
+    if (logFiles.length > 0) {
+      const samples = logFiles.slice(0, MAX_HIGHLIGHTS).map(p => `\`${p}\``).join(", ");
+      highlights.push(`- **Log files:** ${samples}`);
+    }
+    if (deadCodeItems.length > 0) {
+      const fmt = (i: DeadCodeItem) => `\`${i.filePath}:${i.line}\` — ${i.message}`;
+      highlights.push(`- **Dead code:** ${deadCodeItems.slice(0, MAX_HIGHLIGHTS).map(fmt).join("; ")}`);
+    }
+
+    if (highlights.length > 0) {
+      stream.markdown(`**Highlights**\n\n${highlights.join("\n")}\n`);
+    } else {
+      stream.markdown("No issues found.\n");
+    }
+  },
   "git.sessionBriefing": (value, stream) => {
     stream.markdown(value as string);
   },
@@ -175,7 +296,15 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     }
   },
   "hygiene.impactAnalysis": (value, stream) => {
-    stream.markdown((value as ImpactAnalysisResult).summary);
+    const r = value as ImpactAnalysisResult;
+    stream.markdown(r.summary);
+    const m = r.metrics;
+    if (m) {
+      stream.markdown(
+        `\n\n*${m.importers} importer(s), ${m.callSites} call site(s), ` +
+        `${m.testFiles} test file(s), ${m.dependentFiles} dependent file(s)*\n`
+      );
+    }
   },
   "workflow.list": (value, stream) => {
     const r = value as ListWorkflowsResult;
@@ -187,6 +316,15 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     for (const w of r.workflows) {
       const steps = `${w.stepCount} step${w.stepCount === 1 ? "" : "s"}`;
       stream.markdown(`- **${w.name}** (${steps})${w.description ? ` — ${w.description}` : ""}\n`);
+    }
+  },
+  "workflow.run": (value, stream) => {
+    const r = value as RunWorkflowResult;
+    const icon = r.success ? "\u2713" : "\u2717";
+    stream.markdown(`**${icon} ${r.workflowName}** \u2014 ${r.stepCount} step(s) in ${(r.duration / 1000).toFixed(1)}s\n\n`);
+    for (const step of r.stepResults ?? []) {
+      const s = step.success ? "\u2713" : "\u2717";
+      stream.markdown(`- ${s} \`${step.stepId}\`${step.error ? `: ${step.error}` : ""}\n`);
     }
   },
   "agent.list": (value, stream) => {
@@ -204,12 +342,75 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     const r = value as AgentExecutionResult;
     const what = r.executedCommand ?? r.executedWorkflow ?? "unknown";
     const status = r.success ? "succeeded" : "failed";
-    stream.markdown(`**Agent \`${r.agentId}\`** ran \`${what}\` — ${status} in ${r.durationMs}ms\n\n`);
+    stream.markdown(`**Agent \`${r.agentId}\`** ran \`${what}\` \u2014 ${status} in ${r.durationMs}ms\n\n`);
     if (r.error) {
       stream.markdown(`**Error:** ${r.error}\n\n`);
     }
     if (r.output && Object.keys(r.output).length > 0) {
       stream.markdown("**Output:**\n```json\n" + JSON.stringify(r.output, null, 2) + "\n```\n");
+    }
+  },
+  "git.analyzeInbound": (value, stream) => {
+    const r = value as InboundChanges;
+    const conflictCount = r.conflicts?.length ?? 0;
+    stream.markdown(
+      `**Inbound Changes** \u2014 \`${r.branch}\` from \`${r.remote}\`\n\n` +
+      `| Metric | Count |\n|---|---|\n` +
+      `| Remote changes | ${r.totalInbound} |\n` +
+      `| Local changes | ${r.totalLocal} |\n` +
+      `| Conflicts | ${conflictCount} |\n\n`
+    );
+    if (conflictCount > 0) {
+      stream.markdown("**Conflicts:**\n\n");
+      for (const c of r.conflicts) {
+        stream.markdown(`- \`${c.path}\` \u2014 **${c.severity}** (local: ${c.localStatus}, remote: ${c.remoteStatus})\n`);
+      }
+      stream.markdown("\n");
+    }
+    if (r.summary?.recommendations?.length) {
+      stream.markdown("**Recommendations:**\n\n");
+      for (const rec of r.summary.recommendations) {
+        stream.markdown(`- ${rec}\n`);
+      }
+    }
+  },
+  "git.smartCommit": (value, stream) => {
+    const r = value as SmartCommitBatchResult;
+    const dur = r.duration ? ` in ${(r.duration / 1000).toFixed(1)}s` : "";
+    stream.markdown(
+      `**Smart Commit** \u2014 ${r.totalGroups} group(s), ${r.totalFiles} file(s)${dur}\n\n`
+    );
+    for (const c of r.commits) {
+      stream.markdown(`- \`${c.hash.slice(0, 7)}\` ${c.message} (${c.files.length} file${c.files.length === 1 ? "" : "s"})\n`);
+    }
+  },
+  "git.pull": (_value, stream) => {
+    stream.markdown("**Git Pull** \u2014 up to date with remote.\n");
+  },
+  "git.commentPR": (value, stream) => {
+    const r = value as GeneratedPRComments;
+    stream.markdown(`**PR Comments** \u2014 ${r.comments?.length ?? 0} comment(s) for \`${r.branch}\`\n\n`);
+    for (const c of r.comments ?? []) {
+      const loc = c.line ? `:${c.line}` : "";
+      stream.markdown(`- \`${c.file}${loc}\`: ${c.comment}\n`);
+    }
+  },
+  "hygiene.cleanup": (value, stream) => {
+    const r = value as CleanupResult;
+    const mode = r.dryRun ? " (dry run)" : "";
+    stream.markdown(`**Cleanup${mode}** \u2014 ${r.deleted.length} deleted, ${r.failed.length} failed\n\n`);
+    if (r.deleted.length > 0) {
+      stream.markdown("**Deleted:**\n");
+      for (const f of r.deleted) {
+        stream.markdown(`- \`${f}\`\n`);
+      }
+      stream.markdown("\n");
+    }
+    if (r.failed.length > 0) {
+      stream.markdown("**Failed:**\n");
+      for (const f of r.failed) {
+        stream.markdown(`- \`${f.path}\`: ${f.reason}\n`);
+      }
     }
   },
 };
@@ -228,4 +429,3 @@ function formatCommandResult(
   const msg = formatResultMessage(commandName, { kind: "ok", value });
   stream.markdown(msg.message);
 }
-

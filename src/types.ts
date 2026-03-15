@@ -123,6 +123,7 @@ export interface GitProvider {
   getRecentCommits(count: number): Promise<Result<RecentCommit[]>>;
   getCommitRange(from: string, to?: string): Promise<Result<RecentCommit[]>>;
   getMergeBase(branch: string, base?: string): Promise<Result<string>>;
+  getUntrackedFiles(): Promise<Result<string[]>>;
 }
 
 export interface WorkspaceProvider {
@@ -206,6 +207,7 @@ export interface DeadCodeScan {
   tsconfigPath: string | null; // null = no tsconfig found (fallback mode)
   durationMs: number;
   fileCount: number;
+  error?: string;
 }
 
 export interface WorkspaceScan {

@@ -140,6 +140,19 @@ JSON-defined agents in `.vscode/agents/`. Capability validation before execution
 
 **Startup validation** — `router.validateDomains()` runs all `initialize()` methods before the extension reports ready; fail-fast on misconfiguration.
 
+**Rendering Surface Decision Matrix** (ADR 006) — surface choice is determined by output shape and trigger source, not command domain. The matrix:
+- Structured multi-entity reports (analytics) → Webview panel
+- Ordered step sequences with per-item pass/fail → Tree panel expansion
+- Long-form prose (PR body, briefing, conflict resolution) → Output channel + clipboard
+- Short scalar/status → Toast or chat inline
+- NL-triggered results (chat path) → Chat markdown
+
+The output channel is a last resort. All commands whose happy path writes to the output channel must offer a "Show Output" error button — enforced centrally in `command-registry.ts`.
+
+**`RESULT_FORMATTERS` pattern** — `src/ui/chat-participant.ts` maintains a `Partial<Record<CommandName, ResultFormatter>>` map. Adding chat output for a new command requires only a new entry in this map; no changes to dispatch logic. This decouples display strategy from routing.
+
+**WorkflowTreeProvider step expansion** (ADR 007) — after `workflow.run` completes, `WorkflowTreeProvider` stores `stepResults: StepResult[]` per workflow in `lastRuns`. Items become `TreeItemCollapsibleState.Collapsed`; `getChildren` returns `WorkflowStepTreeItem` children with `pass`/`error` ThemeIcons. The provider is wired to both the panel path (`specialized-commands.ts`) and the chat path (`chat-participant.ts`) via `setRunning`/`setLastRun` callbacks.
+
 ---
 
 ## Error Handling

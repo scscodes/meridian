@@ -67,12 +67,14 @@ export function createContextHandler(
 
 export interface DelegateParams {
   task: string;
+  classifyOnly?: boolean;
 }
 
 export interface DelegateResult {
   dispatched: boolean;
   commandName: string;
   result: unknown;
+  classifiedParams?: Record<string, unknown>;
 }
 
 /** Minimal dispatcher interface; satisfied by CommandRouter.dispatch */
@@ -112,9 +114,29 @@ export function createDelegateHandler(
 
       logger.info(`Classifying task: "${task}"`, "ChatDelegateHandler");
 
+      // Fetch available workflow names to augment the classifier
+      let workflowContext = "";
+      try {
+        const wfResult = await dispatcher(
+          { name: "workflow.list" as any, params: {} },
+          ctx
+        );
+        if (wfResult.kind === "ok") {
+          const wfData = wfResult.value as { workflows: Array<{ name: string; description?: string }> };
+          if (wfData.workflows.length > 0) {
+            workflowContext = "\n\nAvailable workflows:\n" +
+              wfData.workflows.map(w =>
+                `  workflow.run:${w.name}${w.description ? ` — ${w.description}` : ""}`
+              ).join("\n");
+          }
+        }
+      } catch {
+        // Non-critical: classifier still works without workflow context
+      }
+
       const classifyResult = await generateProseFn({
         domain: "chat",
-        systemPrompt: getPrompt("DELEGATE_CLASSIFIER"),
+        systemPrompt: getPrompt("DELEGATE_CLASSIFIER") + workflowContext,
         data: { task },
       });
 
@@ -135,6 +157,15 @@ export function createDelegateHandler(
       }
 
       logger.info(`Classified as: "${commandName}" (raw: "${raw}")`, "ChatDelegateHandler");
+
+      if (params.classifyOnly) {
+        return success({
+          dispatched: false,
+          commandName,
+          result: null,
+          classifiedParams: dispatchParams,
+        });
+      }
 
       const dispatchResult = await dispatcher({ name: commandName as any, params: dispatchParams }, ctx);
 

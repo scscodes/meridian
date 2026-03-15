@@ -54,7 +54,10 @@ export function registerSpecializedCommands(
         }
 
         workflowTree.setRunning(name);
-        const result = await router.dispatch({ name: "workflow.run", params: { name } }, freshCtx);
+        const result = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Running workflow "${name}"...`, cancellable: false },
+          () => router.dispatch({ name: "workflow.run", params: { name } }, freshCtx)
+        );
         const r = result.kind === "ok" ? (result.value as RunWorkflowResult) : null;
         workflowTree.setLastRun(name, r?.success ?? false, r?.duration ?? 0, r?.stepResults ?? []);
 
@@ -168,15 +171,25 @@ export function registerSpecializedCommands(
       ];
 
       try {
-        const cts = new vscode.CancellationTokenSource();
-        context.subscriptions.push(cts);
-        const response = await model.sendRequest(messages, {}, cts.token);
-        for await (const fragment of response.text) {
-          outputChannel.append(fragment);
-        }
-        outputChannel.appendLine("\n");
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Reviewing ${filename}...`, cancellable: false },
+          async () => {
+            const cts = new vscode.CancellationTokenSource();
+            context.subscriptions.push(cts);
+            const response = await model.sendRequest(messages, {}, cts.token);
+            for await (const fragment of response.text) {
+              outputChannel.append(fragment);
+            }
+            outputChannel.appendLine("\n");
+          }
+        );
       } catch (err) {
-        outputChannel.appendLine(`[Error] Review failed: ${err instanceof Error ? err.message : String(err)}`);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        outputChannel.appendLine(`\n[FAILED] Review of ${filename}: ${errMsg}\n`);
+        vscode.window.showErrorMessage(
+          `AI review failed for "${filename}"`,
+          "Show Output"
+        ).then(choice => { if (choice === "Show Output") outputChannel.show(true); });
       }
     }),
   );
@@ -204,7 +217,10 @@ export function registerSpecializedCommands(
       const params: Record<string, unknown> = { filePath };
       if (functionName) params.functionName = functionName;
 
-      const result = await router.dispatch({ name: "hygiene.impactAnalysis", params }, freshCtx);
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Analyzing impact...", cancellable: false },
+        () => router.dispatch({ name: "hygiene.impactAnalysis", params }, freshCtx)
+      );
       if (result.kind === "ok") {
         const val = result.value as any;
         outputChannel.show(true);
@@ -238,10 +254,27 @@ export function registerSpecializedCommands(
       const ts = new Date().toISOString();
 
       gitTree.setConflictRunning();
-      const result = await router.dispatch({ name: "git.resolveConflicts", params: {} }, freshCtx);
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Analyzing merge conflicts...", cancellable: false },
+        () => router.dispatch({ name: "git.resolveConflicts", params: {} }, freshCtx)
+      );
 
       if (result.kind === "ok") {
         const cr = result.value as ConflictResolutionProse;
+        outputChannel.show(true);
+        outputChannel.appendLine(`\n${HR}`);
+        outputChannel.appendLine(`[${ts}] Conflict Resolution — ${cr.perFile?.length ?? 0} file(s)`);
+        outputChannel.appendLine(HR);
+        outputChannel.appendLine(cr.overview);
+        outputChannel.appendLine("");
+        for (const f of cr.perFile ?? []) {
+          outputChannel.appendLine(`  ${f.path} → ${f.strategy}`);
+          outputChannel.appendLine(`    ${f.rationale}`);
+          for (const step of f.suggestedSteps ?? []) {
+            outputChannel.appendLine(`      • ${step}`);
+          }
+        }
+        outputChannel.appendLine("");
         gitTree.setLastConflictRun(cr);
         await vscode.env.clipboard.writeText(cr.overview);
         vscode.window.showInformationMessage(
@@ -313,7 +346,10 @@ export function registerSpecializedCommands(
         params.targetCommand = picked.label;
       }
 
-      const result = await router.dispatch({ name: "agent.execute", params }, freshCtx);
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Running agent "${agentId}"...`, cancellable: false },
+        () => router.dispatch({ name: "agent.execute", params }, freshCtx)
+      );
       if (result.kind === "ok") {
         const r = result.value as AgentExecutionResult;
         const status = r.success ? "completed" : "failed";

@@ -14,6 +14,7 @@ import { Command, CommandContext, CommandName, GitStatus, WorkspaceScan, DeadCod
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse } from "../domains/git/types";
+import { DelegateResult } from "../domains/chat/handlers";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
 import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
 import { WorkflowTreeProvider } from "./tree-providers/workflow-tree-provider";
@@ -83,35 +84,29 @@ export function createChatParticipant(
       return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
     }
 
-    // ── 4. NL → chat.delegate (single classification authority) ──────────────
+    // ── 4. NL → classify via chat.delegate, then dispatch directly ────────
     if (text.length > 0) {
       stream.progress("Figuring out what you need...");
-      const delegateResult = await router.dispatch(
-        { name: "chat.delegate" as CommandName, params: { task: text } },
+
+      // Phase 1: classify only (no dispatch)
+      const classifyResult = await router.dispatch(
+        { name: "chat.delegate" as CommandName, params: { task: text, classifyOnly: true } },
         ctx
       );
-      if (delegateResult.kind === "ok") {
-        const dr = delegateResult.value as { commandName: string; result: unknown };
-        // Update workflow tree if delegation resolved to a workflow run
-        if (dr.commandName === "workflow.run" && dr.result) {
-          const r = dr.result as RunWorkflowResult;
-          workflowTree?.setLastRun(r.workflowName, r.success, r.duration, r.stepResults);
-        }
-        // Update git tree if delegation resolved to conflict resolution
-        if (dr.commandName === "git.resolveConflicts" && dr.result) {
-          gitTree?.setLastConflictRun(dr.result as ConflictResolutionProse);
-        }
-        // Update hygiene tree if delegation resolved to impact analysis
-        if (dr.commandName === "hygiene.impactAnalysis" && dr.result) {
-          hygieneTree?.setImpactResult(dr.result as ImpactAnalysisResult);
-        }
-        stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
-        return formatCommandResult(dr.commandName as CommandName, dr.result, stream);
-      } else {
-        logger.warn("chat.delegate failed, falling back", "ChatParticipant", delegateResult.error);
+
+      if (classifyResult.kind !== "ok") {
+        logger.warn("chat.delegate classification failed, falling back", "ChatParticipant", classifyResult.error);
         stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
         return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, trees);
       }
+
+      const classified = classifyResult.value as DelegateResult;
+      const commandName = classified.commandName as CommandName;
+      const params = classified.classifiedParams ?? {};
+
+      // Phase 2: dispatch through handleDirectDispatch (has spinner + tree hooks)
+      stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
+      return handleDirectDispatch(commandName, params, router, ctx, stream, logger, trees);
     }
 
     // ── 6. Empty prompt fallback ─────────────────────────────────────────────

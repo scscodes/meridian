@@ -10,6 +10,20 @@ import { formatResultMessage } from "../infrastructure/result-handler";
 import { PruneConfig } from "../domains/hygiene/analytics-types";
 import { presentResult, PresenterContext } from "./result-presenters";
 
+/** Commands that show a progress notification during dispatch. */
+const PROGRESS_COMMANDS: ReadonlySet<CommandName> = new Set([
+  "git.generatePR", "git.reviewPR", "git.sessionBriefing",
+  "git.showAnalytics", "hygiene.scan",
+] as CommandName[]);
+
+const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
+  "git.generatePR": "Generating PR description...",
+  "git.reviewPR": "Reviewing branch changes...",
+  "git.sessionBriefing": "Generating session briefing...",
+  "git.showAnalytics": "Loading git analytics...",
+  "hygiene.scan": "Scanning workspace...",
+};
+
 /** VS Code command ID → internal CommandName */
 export const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
   ["meridian.git.status",              "git.status"],
@@ -71,7 +85,13 @@ export function registerCommands(
         }
 
         const command: Command = { name: commandName, params };
-        const result = await router.dispatch(command, cmdCtx);
+        const doDispatch = () => router.dispatch(command, cmdCtx);
+        const result = PROGRESS_COMMANDS.has(commandName)
+          ? await vscode.window.withProgress(
+              { location: vscode.ProgressLocation.Notification, title: PROGRESS_TITLES[commandName] ?? "Working...", cancellable: false },
+              doDispatch
+            )
+          : await doDispatch();
 
         const handled = await presentResult(commandName, result, presenterCtx);
         if (handled) return;

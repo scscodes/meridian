@@ -53,18 +53,27 @@ export function setupStatusBar(
   // Status bar click → QuickPick with top actions
   context.subscriptions.push(
     vscode.commands.registerCommand("meridian.statusBar.clicked", async () => {
-      const pick = await vscode.window.showQuickPick(
+      interface StatusBarQuickPickItem extends vscode.QuickPickItem {
+        command?: string;
+      }
+
+      const pick = await vscode.window.showQuickPick<StatusBarQuickPickItem>(
         [
-          { label: "$(git-commit) Smart Commit",  command: "meridian.git.smartCommit" },
-          { label: "$(search) Hygiene Scan",       command: "meridian.hygiene.scan" },
-          { label: "$(graph) Git Analytics",       command: "meridian.git.showAnalytics" },
-          { label: "$(graph) Hygiene Analytics",   command: "meridian.hygiene.showAnalytics" },
-          { label: "$(refresh) Refresh All Views", command: "meridian.refreshAll" },
+          { label: "$(git-commit) Smart Commit",        command: "meridian.git.smartCommit" },
+          { label: "$(git-pull-request) Generate PR",    command: "meridian.git.generatePR" },
+          { label: "$(eye) Review PR",                   command: "meridian.git.reviewPR" },
+          { label: "$(book) Session Briefing",           command: "meridian.git.sessionBriefing" },
+          { label: "", kind: vscode.QuickPickItemKind.Separator },
+          { label: "$(search) Hygiene Scan",             command: "meridian.hygiene.scan" },
+          { label: "$(graph) Git Analytics",             command: "meridian.git.showAnalytics" },
+          { label: "$(graph) Hygiene Analytics",         command: "meridian.hygiene.showAnalytics" },
+          { label: "", kind: vscode.QuickPickItemKind.Separator },
+          { label: "$(refresh) Refresh All Views",       command: "meridian.refreshAll" },
         ],
         { placeHolder: "Meridian — choose an action" }
       );
-      if (pick) {
-        vscode.commands.executeCommand((pick as any).command);
+      if (pick?.command) {
+        vscode.commands.executeCommand(pick.command);
       }
     })
   );

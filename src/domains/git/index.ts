@@ -31,7 +31,7 @@ export {
   createExportJsonHandler,
   createExportCsvHandler,
 } from "./analytics-handler";
-export { GitAnalyzer } from "./analytics-service";
+export { GitAnalyzer, gitReportToCsv } from "./analytics-service";
 export {
   FileChange,
   ChangeGroup,

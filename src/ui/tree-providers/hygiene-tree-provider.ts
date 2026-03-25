@@ -17,7 +17,8 @@ type Dispatcher = (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>
 
 type HygieneItemKind =
   | "category" | "file" | "markdownFile" | "deadCodeFile" | "deadCodeIssue"
-  | "impactCategory" | "impactTarget" | "impactMetricGroup" | "impactFile";
+  | "impactCategory" | "impactTarget" | "impactMetricGroup" | "impactFile"
+  | "report";
 
 class HygieneTreeItem extends vscode.TreeItem {
   constructor(
@@ -174,7 +175,20 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
       makeMarkdownItem(f.path, f.sizeBytes, f.lineCount)
     );
 
-    const items: HygieneTreeItem[] = [];
+    const reportItem = new HygieneTreeItem(
+      "View Hygiene Report",
+      "report",
+      [],
+      vscode.TreeItemCollapsibleState.None
+    );
+    reportItem.iconPath = new vscode.ThemeIcon("graph");
+    reportItem.tooltip = "Open the Hygiene Analytics report";
+    reportItem.command = {
+      command: "meridian.hygiene.showAnalytics",
+      title: "View Hygiene Report",
+    };
+
+    const items: HygieneTreeItem[] = [reportItem];
     if (this.lastImpactResult) {
       items.push(this.buildImpactSection());
     }

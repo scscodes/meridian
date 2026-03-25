@@ -329,16 +329,12 @@ document.getElementById("refreshBtn")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "refresh" });
 });
 
-document.getElementById("settingsBtn")?.addEventListener("click", () => {
-  vscode?.postMessage({ type: "openSettings" });
-});
-
 document.getElementById("exportJsonBtn")?.addEventListener("click", () => {
-  if (report) download("hygiene-analytics.json", JSON.stringify(report, null, 2), "application/json");
+  vscode?.postMessage({ type: "export", format: "json" });
 });
 
 document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
-  if (report) download("hygiene-analytics.csv", buildHygieneCsv(report.files), "text/csv");
+  vscode?.postMessage({ type: "export", format: "csv" });
 });
 
 // Event delegation for click-to-open paths
@@ -386,24 +382,3 @@ function destroyChart(key) {
   if (charts[key]) { charts[key].destroy(); delete charts[key]; }
 }
 
-function download(filename, content, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function buildHygieneCsv(files) {
-  const header = "path,size_bytes,line_count,age_days,category,prune_candidate";
-  const rows = (files || []).map((f) =>
-    [f.path, f.sizeBytes, f.lineCount, f.ageDays, f.category, f.isPruneCandidate]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(",")
-  );
-  return [header, ...rows].join("\r\n");
-}

@@ -9,7 +9,7 @@ import { GitProvider, GitStatus, RecentCommit, Logger } from "../../types";
 import { ConflictResolution, ConflictResolutionProse } from "../../domains/git/types";
 import { UI_SETTINGS } from "../../constants";
 
-type GitItemKind = "branch" | "changeGroup" | "changedFile" | "commit" | "conflictGroup" | "conflictFile";
+type GitItemKind = "branch" | "changeGroup" | "changedFile" | "commit" | "conflictGroup" | "conflictFile" | "report";
 
 class GitTreeItem extends vscode.TreeItem {
   filePath?: string;
@@ -117,6 +117,18 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
       this.cached = result.value;
     }
 
+    const reportItem = new GitTreeItem(
+      "View Git Report",
+      "report",
+      vscode.TreeItemCollapsibleState.None
+    );
+    reportItem.iconPath = new vscode.ThemeIcon("graph");
+    reportItem.tooltip = "Open the Git Analytics report";
+    reportItem.command = {
+      command: "meridian.git.showAnalytics",
+      title: "View Git Report",
+    };
+
     const s = this.cached;
     const dirty = s.isDirty ? "dirty" : "clean";
     const branchItem = new GitTreeItem(
@@ -127,7 +139,7 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     );
     branchItem.iconPath = new vscode.ThemeIcon(s.isDirty ? "git-branch" : "check");
 
-    const items: TreeElement[] = [branchItem];
+    const items: TreeElement[] = [reportItem, branchItem];
 
     if (this.conflictRunning || this.lastConflictRun) {
       const fileCount = this.lastConflictRun?.perFile?.length ?? 0;

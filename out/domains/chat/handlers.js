@@ -8,6 +8,7 @@ exports.createDelegateHandler = createDelegateHandler;
 const types_1 = require("../../types");
 const error_codes_1 = require("../../infrastructure/error-codes");
 const prompt_registry_1 = require("../../infrastructure/prompt-registry");
+const command_catalog_1 = require("../../infrastructure/command-catalog");
 // ============================================================================
 // Context Handler
 // ============================================================================
@@ -39,14 +40,8 @@ function createContextHandler(gitProvider, logger) {
         }
     };
 }
-const KNOWN_COMMANDS = new Set([
-    "git.status", "git.smartCommit", "git.pull", "git.analyzeInbound",
-    "git.showAnalytics", "git.exportJson", "git.exportCsv",
-    "git.generatePR", "git.reviewPR", "git.commentPR",
-    "git.resolveConflicts", "git.sessionBriefing",
-    "hygiene.scan", "hygiene.showAnalytics", "hygiene.cleanup", "hygiene.impactAnalysis",
-    "workflow.list", "workflow.run", "agent.list", "agent.execute",
-]);
+// Derived from COMMAND_CATALOG — do not edit here directly.
+const KNOWN_COMMANDS = command_catalog_1.KNOWN_COMMAND_NAMES;
 /**
  * chat.delegate — Programmatic task router.
  * Uses the LLM to classify a free-form task description into a command, then

@@ -257,12 +257,20 @@ export interface WorkflowStep {
   onSuccess?: string; // Next step id or "exit"
   onFailure?: string; // Next step id or "exit"
   conditions?: WorkflowCondition[];
+  retry?: {
+    maxAttempts: number; // Total attempts (not retries); clamped to min 1
+    delayMs?: number; // Initial delay ms, default 1000
+    backoffMultiplier?: number; // Default 2
+    maxDelayMs?: number; // Cap on backoff, default 5000
+  };
+  timeout?: number; // Per-attempt timeout ms; undefined = no timeout
 }
 
 export interface WorkflowCondition {
-  type: "success" | "failure" | "output" | "env";
-  key?: string; // For output/env conditions
+  type: "success" | "failure" | "output" | "variable" | "env"; // "env" kept as alias for "variable"
+  key?: string; // For output/variable conditions
   value?: unknown;
+  nextStepId?: string; // Branch target when condition matches
 }
 
 export interface WorkflowDefinition {

@@ -2,14 +2,15 @@
  * Chat/Copilot Domain Service — local context gathering and task delegation.
  */
 import { DomainService, ChatCommandName, Handler, Logger, GitProvider, Result } from "../../types";
-import { CommandDispatcher, GenerateProseFn } from "./handlers";
+import { CommandDispatcher } from "./handlers";
+import { GenerateProseFn } from "../../types";
 /**
  * Chat domain commands.
  */
 export declare const CHAT_COMMANDS: ChatCommandName[];
 export declare class ChatDomainService implements DomainService {
     readonly name = "chat";
-    handlers: Partial<Record<ChatCommandName, Handler>>;
+    handlers: Partial<Record<ChatCommandName, Handler<any, any>>>;
     private logger;
     constructor(gitProvider: GitProvider, logger: Logger, dispatcher: CommandDispatcher, generateProseFn?: GenerateProseFn);
     initialize(): Promise<Result<void>>;

@@ -14,6 +14,7 @@ const handlers_1 = require("./handlers");
 const workspace_1 = require("../../infrastructure/workspace");
 const workflow_engine_1 = require("../../infrastructure/workflow-engine");
 const validation_1 = require("./validation");
+const error_codes_1 = require("../../infrastructure/error-codes");
 /**
  * Workflow domain commands.
  */
@@ -50,7 +51,7 @@ class WorkflowDomainService {
         }
         catch (err) {
             return (0, types_1.failure)({
-                code: "WORKFLOW_INIT_ERROR",
+                code: error_codes_1.WORKFLOW_ERROR_CODES.WORKFLOW_INIT_ERROR,
                 message: "Failed to initialize workflow domain",
                 details: err,
                 context: "WorkflowDomainService.initialize",
@@ -124,7 +125,7 @@ class WorkflowDomainService {
     createDefaultStepRunner() {
         return async () => {
             return (0, types_1.failure)({
-                code: "STEP_RUNNER_NOT_AVAILABLE",
+                code: error_codes_1.WORKFLOW_ERROR_CODES.STEP_RUNNER_NOT_AVAILABLE,
                 message: "Step runner not initialized. Register workflow domain with router.",
                 context: "WorkflowDomainService",
             });

@@ -194,4 +194,13 @@ export interface AgentDefinition {
     workflowTriggers?: string[];
     metadata?: Record<string, unknown>;
 }
+/**
+ * Injectable prose generation function — avoids transitive vscode import in tests.
+ * Compatible with generateProse() from infrastructure/prose-generator.
+ */
+export type GenerateProseFn = (request: {
+    domain: "hygiene" | "git" | "chat";
+    systemPrompt: string;
+    data: Record<string, unknown>;
+}) => Promise<Result<string>>;
 //# sourceMappingURL=types.d.ts.map

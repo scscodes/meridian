@@ -8,7 +8,7 @@
  * ✓ Graceful degradation (cache miss fallback)
  */
 import { DomainService, GitCommandName, Handler, Logger, GitProvider, Result } from "../../types";
-import { GenerateProseFn } from "./pr-handlers";
+import { GenerateProseFn } from "../../types";
 import { ApprovalUI } from "./types";
 import { ChangeGrouper, CommitMessageSuggester, BatchCommitter } from "./smart-commit-service";
 import { InboundAnalyzer } from "./inbound-analyzer";
@@ -16,7 +16,7 @@ import { GitAnalyzer } from "./analytics-service";
 export declare const GIT_COMMANDS: GitCommandName[];
 export declare class GitDomainService implements DomainService {
     readonly name = "git";
-    handlers: Partial<Record<GitCommandName, Handler>>;
+    handlers: Partial<Record<GitCommandName, Handler<any, any>>>;
     private gitProvider;
     private logger;
     changeGrouper: ChangeGrouper;

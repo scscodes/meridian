@@ -111,14 +111,6 @@ export interface AnalyticsOptions {
     pathPattern?: string;
 }
 /**
- * Cached analytics result with timestamp
- */
-export interface CachedAnalytics {
-    report: GitAnalyticsReport;
-    cachedAt: Date;
-    key: string;
-}
-/**
  * Webview message format
  */
 export type AnalyticsWebviewMessageType = "init" | "filter" | "export" | "refresh";

@@ -14,9 +14,9 @@
     <div class="header-row">
       <h1>Git Analytics — Meridian</h1>
       <div class="header-actions">
-        <button id="refreshBtn" class="btn-secondary">↺ Refresh</button>
-        <button id="exportJson" class="btn-secondary">↓ JSON</button>
         <button id="exportCsv" class="btn-secondary">↓ CSV</button>
+        <button id="exportJson" class="btn-secondary">↓ JSON</button>
+        <button id="refreshBtn">↺ Refresh</button>
       </div>
     </div>
 
@@ -38,16 +38,16 @@
       <div class="card"><h3>Avg Files / Commit</h3><p class="value" id="filesPerCommit">—</p></div>
       <div class="card"><h3>Avg + Lines / Commit</h3><p class="value ins-val" id="avgInsPerCommit">—</p></div>
       <div class="card"><h3>Avg − Lines / Commit</h3><p class="value del-val" id="avgDelPerCommit">—</p></div>
-      <div class="card"><h3>Churn Rate</h3><p class="value" id="churnRate">—</p></div>
+      <div class="card"><h3>Churn Rate <span class="info-hint" title="Avg lines changed (added + deleted) per commit, averaged across all files">&#9432;</span></h3><p class="value" id="churnRate">—</p></div>
     </div>
 
     <div class="charts">
       <div class="chart-container">
-        <h3>Churn by File Type</h3>
+        <h3>Churn by File Type <span class="info-hint" title="Sum of per-file volatility grouped by extension">&#9432;</span></h3>
         <canvas id="churnByTypeChart"></canvas>
       </div>
       <div class="chart-container">
-        <h3>Churn by Directory</h3>
+        <h3>Churn by Directory <span class="info-hint" title="Sum of per-file volatility grouped by parent directory">&#9432;</span></h3>
         <canvas id="churnByDirChart"></canvas>
       </div>
     </div>
@@ -78,7 +78,7 @@
             <th>Commits</th>
             <th>+Lines</th>
             <th>-Lines</th>
-            <th>Volatility</th>
+            <th title="(insertions + deletions) / commits for this file">Volatility</th>
             <th>Risk</th>
           </tr>
         </thead>

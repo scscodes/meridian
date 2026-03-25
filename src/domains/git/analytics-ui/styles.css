@@ -159,12 +159,18 @@ button:hover {
   border: 1px solid var(--vscode-input-border, #555);
   padding: 14px 16px;
   border-radius: 6px;
-  height: 220px; /* constrain donut size ~50% of previous */
+  aspect-ratio: 5 / 2;
+  min-height: 140px;
+  max-height: 220px;
+}
+
+.chart-container h3 {
+  opacity: 0.85;
 }
 
 .chart-container canvas {
   max-width: 100%;
-  height: auto !important;
+  max-height: 100%;
 }
 
 /* Churn bar (inline in commits table) */
@@ -291,6 +297,21 @@ td code {
 .risk-high   { color: #ef4444; font-weight: 600; }
 .risk-medium { color: #f59e0b; font-weight: 500; }
 .risk-low    { color: #22c55e; font-weight: 500; }
+
+/* Info hints */
+
+.info-hint {
+  font-size: 11px;
+  opacity: 0.35;
+  cursor: help;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.info-hint:hover {
+  opacity: 0.7;
+}
 
 /* Responsive */
 

@@ -108,6 +108,8 @@ export function createRunWorkflowHandler(
             success: s.success,
             output: s.output,
             error: s.error,
+            attempts: s.attempts,
+            timedOut: s.timedOut,
           }));
 
         const failedStep = stepResults.find((s) => !s.success);

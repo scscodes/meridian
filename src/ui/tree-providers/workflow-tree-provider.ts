@@ -36,7 +36,9 @@ class WorkflowStepTreeItem extends vscode.TreeItem {
   constructor(public readonly step: StepResult) {
     super(step.stepId, vscode.TreeItemCollapsibleState.None);
     this.iconPath = new vscode.ThemeIcon(step.success ? "pass" : "error");
-    this.description = step.error ?? (step.success ? "" : "failed");
+    const retryNote = (step.attempts ?? 1) > 1 ? ` (${step.attempts} attempts)` : "";
+    const errorText = step.timedOut ? "timed out" : (step.error ?? (step.success ? "" : "failed"));
+    this.description = step.success ? retryNote.trim() : `${errorText}${retryNote}`;
     this.contextValue = "workflowStep";
   }
 }

@@ -493,49 +493,52 @@ export class GitAnalyzer {
    * Export analytics to CSV
    */
   exportToCSV(report: GitAnalyticsReport): string {
-    // Escape double-quotes in CSV string fields per RFC 4180
-    const csvStr = (value: string): string => `"${value.replace(/"/g, '""')}"`;
-
-    const lines: string[] = [];
-
-    // Summary section
-    lines.push("Git Analytics Report");
-    lines.push(`Period,${report.period}`);
-    lines.push(`Generated,${report.generatedAt.toISOString()}`);
-    lines.push("");
-
-    // Summary stats
-    lines.push("Summary");
-    lines.push(
-      `Total Commits,Total Authors,Total Files Modified,Lines Added,Lines Deleted,Commit Frequency (per week),Avg Commit Size,Churn Rate`
-    );
-    const sum = report.summary;
-    lines.push(
-      `${sum.totalCommits},${sum.totalAuthors},${sum.totalFilesModified},${sum.totalLinesAdded},${sum.totalLinesDeleted},${sum.commitFrequency.toFixed(2)},${sum.averageCommitSize.toFixed(2)},${sum.churnRate.toFixed(2)}`
-    );
-    lines.push("");
-
-    // Files section
-    lines.push("Files");
-    lines.push(
-      "Path,Commits,Insertions,Deletions,Volatility,Risk,Authors,Last Modified"
-    );
-    for (const file of report.files.slice(0, ANALYTICS_SETTINGS.CSV_MAX_FILES)) {
-      lines.push(
-        `${csvStr(file.path)},${file.commitCount},${file.insertions},${file.deletions},${file.volatility.toFixed(2)},${file.risk},${csvStr(file.authors.join(";"))},${file.lastModified.toISOString()}`
-      );
-    }
-    lines.push("");
-
-    // Authors section
-    lines.push("Authors");
-    lines.push("Name,Commits,Insertions,Deletions,Files Changed,Last Active");
-    for (const author of report.authors) {
-      lines.push(
-        `${csvStr(author.name)},${author.commits},${author.insertions},${author.deletions},${author.filesChanged},${author.lastActive.toISOString()}`
-      );
-    }
-
-    return lines.join("\n");
+    return gitReportToCsv(report);
   }
+}
+
+/**
+ * Convert a git analytics report to CSV format.
+ * Standalone so both the analyzer and webview provider can use it.
+ */
+export function gitReportToCsv(report: GitAnalyticsReport): string {
+  const csvStr = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+
+  const lines: string[] = [];
+
+  lines.push("Git Analytics Report");
+  lines.push(`Period,${report.period}`);
+  lines.push(`Generated,${report.generatedAt.toISOString()}`);
+  lines.push("");
+
+  lines.push("Summary");
+  lines.push(
+    `Total Commits,Total Authors,Total Files Modified,Lines Added,Lines Deleted,Commit Frequency (per week),Avg Commit Size,Churn Rate`
+  );
+  const sum = report.summary;
+  lines.push(
+    `${sum.totalCommits},${sum.totalAuthors},${sum.totalFilesModified},${sum.totalLinesAdded},${sum.totalLinesDeleted},${sum.commitFrequency.toFixed(2)},${sum.averageCommitSize.toFixed(2)},${sum.churnRate.toFixed(2)}`
+  );
+  lines.push("");
+
+  lines.push("Files");
+  lines.push(
+    "Path,Commits,Insertions,Deletions,Volatility,Risk,Authors,Last Modified"
+  );
+  for (const file of report.files.slice(0, ANALYTICS_SETTINGS.CSV_MAX_FILES)) {
+    lines.push(
+      `${csvStr(file.path)},${file.commitCount},${file.insertions},${file.deletions},${file.volatility.toFixed(2)},${file.risk},${csvStr(file.authors.join(";"))},${file.lastModified.toISOString()}`
+    );
+  }
+  lines.push("");
+
+  lines.push("Authors");
+  lines.push("Name,Commits,Insertions,Deletions,Files Changed,Last Active");
+  for (const author of report.authors) {
+    lines.push(
+      `${csvStr(author.name)},${author.commits},${author.insertions},${author.deletions},${author.filesChanged},${author.lastActive.toISOString()}`
+    );
+  }
+
+  return lines.join("\n");
 }

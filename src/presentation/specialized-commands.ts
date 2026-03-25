@@ -70,8 +70,9 @@ export function registerSpecializedCommands(
           outputChannel.appendLine(HR);
           for (const step of r.stepResults) {
             const icon = step.success ? "✓" : "✗";
-            const detail = step.error ? `: ${step.error}` : "";
-            outputChannel.appendLine(`  ${icon} ${step.stepId}${detail}`);
+            const retryNote = (step.attempts ?? 1) > 1 ? ` (${step.attempts} attempts)` : "";
+            const detail = step.timedOut ? ": timed out" : (step.error ? `: ${step.error}` : "");
+            outputChannel.appendLine(`  ${icon} ${step.stepId}${detail}${retryNote}`);
           }
           outputChannel.appendLine("");
 

@@ -324,7 +324,9 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     stream.markdown(`**${icon} ${r.workflowName}** \u2014 ${r.stepCount} step(s) in ${(r.duration / 1000).toFixed(1)}s\n\n`);
     for (const step of r.stepResults ?? []) {
       const s = step.success ? "\u2713" : "\u2717";
-      stream.markdown(`- ${s} \`${step.stepId}\`${step.error ? `: ${step.error}` : ""}\n`);
+      const retryNote = (step.attempts ?? 1) > 1 ? ` _(${step.attempts} attempts)_` : "";
+      const detail = step.timedOut ? ": timed out" : (step.error ? `: ${step.error}` : "");
+      stream.markdown(`- ${s} \`${step.stepId}\`${detail}${retryNote}\n`);
     }
   },
   "agent.list": (value, stream) => {

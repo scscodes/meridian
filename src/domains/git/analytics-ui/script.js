@@ -112,11 +112,12 @@ function renderChurnByFileTypeChart() {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: "bottom",
-          labels: { color: "#d4d4d4", padding: 12, font: { size: 11 } },
+          position: "right",
+          align: "center",
+          labels: { color: "#e8e8e8", padding: 10, font: { size: 12 }, boxWidth: 12 },
         },
       },
     },
@@ -165,11 +166,12 @@ function renderChurnByDirectoryChart() {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: "bottom",
-          labels: { color: "#d4d4d4", padding: 12, font: { size: 11 } },
+          position: "right",
+          align: "center",
+          labels: { color: "#e8e8e8", padding: 10, font: { size: 12 }, boxWidth: 12 },
         },
       },
     },
@@ -270,15 +272,11 @@ document.getElementById("applyFilters")?.addEventListener("click", () => {
 document.getElementById("refreshBtn")?.addEventListener("click", postRefresh);
 
 document.getElementById("exportJson")?.addEventListener("click", () => {
-  if (!analyticsData) return;
-  const json = JSON.stringify(analyticsData, null, 2);
-  download("git-analytics.json", json, "application/json");
+  vscode?.postMessage({ type: "export", format: "json" });
 });
 
 document.getElementById("exportCsv")?.addEventListener("click", () => {
-  if (!analyticsData) return;
-  const csv = generateCSV();
-  download("git-analytics.csv", csv, "text/csv");
+  vscode?.postMessage({ type: "export", format: "csv" });
 });
 
 /**
@@ -287,63 +285,6 @@ document.getElementById("exportCsv")?.addEventListener("click", () => {
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
-}
-
-/**
- * Helper: Download file
- */
-function download(filename, content, mimeType = "text/plain") {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Generate CSV export
- */
-function generateCSV() {
-  const lines = [];
-
-  lines.push("Git Analytics Report");
-  lines.push(`Period,${analyticsData.period}`);
-  lines.push(`Generated,${new Date(analyticsData.generatedAt).toISOString()}`);
-  lines.push("");
-
-  lines.push("Summary");
-  const sum = analyticsData.summary;
-  lines.push(
-    "Total Commits,Total Authors,Total Files,Lines Added,Lines Deleted,Commit Frequency,Avg Commit Size,Churn Rate"
-  );
-  lines.push(
-    `${sum.totalCommits},${sum.totalAuthors},${sum.totalFilesModified},${sum.totalLinesAdded},${sum.totalLinesDeleted},${sum.commitFrequency.toFixed(2)},${sum.averageCommitSize.toFixed(2)},${sum.churnRate.toFixed(2)}`
-  );
-  lines.push("");
-
-  lines.push("Files");
-  lines.push("Path,Commits,Insertions,Deletions,Volatility,Risk,Authors,Last Modified");
-  for (const file of analyticsData.files.slice(0, 100)) {
-    const authors = Array.from(file.authors || []).join(";");
-    lines.push(
-      `"${file.path}",${file.commitCount},${file.insertions},${file.deletions},${file.volatility.toFixed(2)},${file.risk},"${authors}",${new Date(file.lastModified).toISOString()}`
-    );
-  }
-  lines.push("");
-
-  lines.push("Authors");
-  lines.push("Name,Commits,Insertions,Deletions,Files Changed,Last Active");
-  for (const author of analyticsData.authors) {
-    lines.push(
-      `"${author.name}",${author.commits},${author.insertions},${author.deletions},${author.filesChanged},${new Date(author.lastActive).toISOString()}`
-    );
-  }
-
-  return lines.join("\n");
 }
 
 /**

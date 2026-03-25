@@ -4,7 +4,7 @@
  */
 
 import { Logger, Result, failure, success, Command, CommandContext } from "../types";
-import { WorkflowDefinition, WorkflowStep } from "../types";
+import { WorkflowCondition, WorkflowDefinition, WorkflowStep } from "../types";
 
 /**
  * Step execution result includes output for conditional branching.
@@ -15,6 +15,8 @@ export interface StepExecutionResult {
   output?: Record<string, unknown>;
   error?: string;
   nextStepId?: string; // Resolved next step based on conditions
+  attempts?: number; // Total attempts executed (>1 means retries occurred)
+  timedOut?: boolean; // True if final failure was a timeout
 }
 
 /**
@@ -82,8 +84,8 @@ export class WorkflowEngine {
           "WorkflowEngine.execute"
         );
 
-        // Resolve next step based on condition
-        const nextStepId = stepResult.nextStepId || this.resolveNextStep(step, stepResult);
+        // Resolve next step based on conditions
+        const nextStepId = stepResult.nextStepId || this.resolveNextStep(step, stepResult, executionCtx);
         if (!nextStepId || nextStepId === "exit") {
           break;
         }
@@ -119,57 +121,130 @@ export class WorkflowEngine {
   }
 
   /**
-   * Execute single workflow step.
+   * Execute single workflow step with retry and timeout support.
    */
   private async executeStep(
     step: WorkflowStep,
     commandContext: CommandContext,
     executionCtx: WorkflowExecutionContext
   ): Promise<StepExecutionResult> {
-    try {
-      // Build command with interpolated params
-      const params = this.interpolateParams(step.params, executionCtx.variables);
+    const params = this.interpolateParams(step.params, executionCtx.variables);
+    const command: Command = { name: step.command, params };
 
-      const command: Command = {
-        name: step.command,
-        params,
-      };
+    const maxAttempts = Math.max(1, step.retry?.maxAttempts ?? 1);
+    const delayMs = Math.max(0, step.retry?.delayMs ?? 1000);
+    const multiplier = step.retry?.backoffMultiplier ?? 2;
+    const maxDelay = step.retry?.maxDelayMs ?? 5000;
+    const timeoutMs = step.timeout;
 
-      // Run step via handler
-      const result = await this.stepRunner(command, commandContext);
+    let lastError: string | undefined;
+    let lastTimedOut = false;
 
-      const stepResult: StepExecutionResult = {
-        stepId: step.id,
-        success: result.kind === "ok",
-        output: result.kind === "ok" ? result.value : undefined,
-      };
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const runnerPromise = this.stepRunner(command, commandContext);
+        const result = timeoutMs != null && timeoutMs > 0
+          ? await this.withTimeout(runnerPromise, timeoutMs)
+          : await runnerPromise;
 
-      if (result.kind === "err") {
-        stepResult.error = result.error.message;
+        if (result.kind === "ok") {
+          return {
+            stepId: step.id,
+            success: true,
+            output: result.value,
+            attempts: attempt,
+          };
+        }
+
+        lastError = result.error.message;
+        lastTimedOut = false;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        lastTimedOut = msg.includes("timed out after");
+        lastError = msg;
       }
 
-      return stepResult;
-    } catch (err) {
-      return {
-        stepId: step.id,
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
+      if (attempt < maxAttempts) {
+        const backoff = Math.min(delayMs * multiplier ** (attempt - 1), maxDelay);
+        this.logger.info(
+          `Retrying step ${step.id} (attempt ${attempt + 1}/${maxAttempts}) after ${backoff}ms`,
+          "WorkflowEngine.executeStep"
+        );
+        await this.delay(backoff);
+      }
+    }
+
+    return {
+      stepId: step.id,
+      success: false,
+      error: lastError,
+      attempts: maxAttempts,
+      timedOut: lastTimedOut,
+    };
+  }
+
+  /**
+   * Resolve next step — evaluate conditions first, fall back to onSuccess/onFailure.
+   */
+  private resolveNextStep(
+    step: WorkflowStep,
+    result: StepExecutionResult,
+    executionCtx: WorkflowExecutionContext
+  ): string | undefined {
+    if (step.conditions?.length) {
+      for (const condition of step.conditions) {
+        if (this.evaluateCondition(condition, result, executionCtx)) {
+          return condition.nextStepId ?? (result.success ? step.onSuccess : step.onFailure);
+        }
+      }
+    }
+    return result.success ? step.onSuccess : step.onFailure;
+  }
+
+  /**
+   * Evaluate a single workflow condition against step result and execution state.
+   */
+  private evaluateCondition(
+    condition: WorkflowCondition,
+    result: StepExecutionResult,
+    executionCtx: WorkflowExecutionContext
+  ): boolean {
+    switch (condition.type) {
+      case "success":
+        return result.success;
+      case "failure":
+        return !result.success;
+      case "output":
+        return condition.key != null && result.output?.[condition.key] === condition.value;
+      case "variable":
+      case "env":
+        return condition.key != null && executionCtx.variables[condition.key] === condition.value;
+      default:
+        return false;
     }
   }
 
   /**
-   * Resolve next step based on conditions.
+   * Race a promise against a timeout.
    */
-  private resolveNextStep(
-    step: WorkflowStep,
-    result: StepExecutionResult
-  ): string | undefined {
-    if (result.success) {
-      return step.onSuccess;
-    } else {
-      return step.onFailure;
-    }
+  private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`Step timed out after ${ms}ms`)),
+        ms
+      );
+      promise.then(
+        (v) => { clearTimeout(timer); resolve(v); },
+        (e) => { clearTimeout(timer); reject(e); }
+      );
+    });
+  }
+
+  /**
+   * Delay helper for retry backoff.
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

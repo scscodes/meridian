@@ -714,16 +714,19 @@ describe('Integration: Workflow Execution', () => {
           params: {},
           onSuccess: 'exit',
           onFailure: 'exit',
-          retries: 3,
+          retry: { maxAttempts: 3, delayMs: 0 },
         },
       ],
     };
 
     const result = await engine.execute(workflow, createMockContext());
 
-    // With retry logic in engine, should eventually succeed
     expect(result.kind).toBe('ok');
-    expect(attempts).toBeGreaterThanOrEqual(1);
+    if (result.kind === 'ok') {
+      const stepResult = result.value.stepResults.get('retry-step');
+      expect(stepResult?.success).toBe(true);
+      expect(stepResult?.attempts).toBe(3);
+    }
   });
 
   it('workflow with variables: step can access shared variables', async () => {

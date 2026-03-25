@@ -1,7 +1,7 @@
 /**
  * Hygiene Domain Service — workspace cleanup and maintenance.
  */
-import { DomainService, HygieneCommandName, Handler, Logger, WorkspaceProvider, Result } from "../../types";
+import { DomainService, HygieneCommandName, Handler, Logger, WorkspaceProvider, Result, GenerateProseFn } from "../../types";
 import { HygieneAnalyzer } from "./analytics-service";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 /**
@@ -10,15 +10,16 @@ import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 export declare const HYGIENE_COMMANDS: HygieneCommandName[];
 export declare class HygieneDomainService implements DomainService {
     readonly name = "hygiene";
-    handlers: Partial<Record<HygieneCommandName, Handler>>;
+    handlers: Partial<Record<HygieneCommandName, Handler<any, any>>>;
     analyzer: HygieneAnalyzer;
     deadCodeAnalyzer: DeadCodeAnalyzer;
     private logger;
     private scanIntervalMs;
-    constructor(workspaceProvider: WorkspaceProvider, logger: Logger);
+    private _timer;
+    private readonly workspaceRoot;
+    constructor(workspaceProvider: WorkspaceProvider, logger: Logger, workspaceRoot?: string, generateProseFn?: GenerateProseFn);
     /**
      * Initialize domain — set up background scan scheduling.
-     * In a real extension, this would register a timer.
      */
     initialize(): Promise<Result<void>>;
     /**
@@ -29,5 +30,5 @@ export declare class HygieneDomainService implements DomainService {
 /**
  * Factory function — creates and returns hygiene domain service.
  */
-export declare function createHygieneDomain(workspaceProvider: WorkspaceProvider, logger: Logger): HygieneDomainService;
+export declare function createHygieneDomain(workspaceProvider: WorkspaceProvider, logger: Logger, workspaceRoot?: string, generateProseFn?: GenerateProseFn): HygieneDomainService;
 //# sourceMappingURL=service.d.ts.map

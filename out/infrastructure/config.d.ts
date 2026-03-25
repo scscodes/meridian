@@ -2,6 +2,7 @@
  * Configuration Provider — Typed schema, validation.
  */
 import { ConfigProvider, Result } from "../types";
+import { PruneConfig } from "../domains/hygiene/analytics-types";
 /**
  * Typed configuration schema.
  * No magic keys; all config paths are explicit constants.
@@ -29,12 +30,14 @@ export declare class Config implements ConfigProvider {
     private store;
     /**
      * Load config from VS Code workspace settings.
-     * In a real extension, this would call vscode.workspace.getConfiguration().
-     * For now, use defaults + in-memory override.
      */
     initialize(): Promise<Result<void>>;
     get<T>(key: string, defaultValue?: T): T | undefined;
     set<T>(key: string, value: T): Promise<Result<void>>;
+    /**
+     * Read current prune config from VS Code settings (reads fresh each call).
+     */
+    getPruneConfig(): PruneConfig;
     /**
      * Export current configuration (for debugging).
      */

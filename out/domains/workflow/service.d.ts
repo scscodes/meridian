@@ -9,7 +9,7 @@ import { StepRunner } from "../../infrastructure/workflow-engine";
 export declare const WORKFLOW_COMMANDS: WorkflowCommandName[];
 export declare class WorkflowDomainService implements DomainService {
     readonly name = "workflow";
-    handlers: Partial<Record<WorkflowCommandName, Handler>>;
+    handlers: Partial<Record<WorkflowCommandName, Handler<any, any>>>;
     private logger;
     private workflowCache;
     private workflowEngine;

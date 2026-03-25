@@ -1,7 +1,7 @@
 /**
  * Chat/Copilot Domain Handlers — local context gathering and task delegation.
  */
-import { Handler, CommandContext, Command, Result, ChatContext, Logger, GitProvider } from "../../types";
+import { Handler, CommandContext, Command, Result, ChatContext, Logger, GitProvider, GenerateProseFn } from "../../types";
 /**
  * chat.context — Gather chat context from workspace + git.
  * Returns active file path, current git branch, and git status.
@@ -17,15 +17,8 @@ export interface DelegateResult {
 }
 /** Minimal dispatcher interface; satisfied by CommandRouter.dispatch */
 export type CommandDispatcher = (command: Command, ctx: CommandContext) => Promise<Result<unknown>>;
-/**
- * Minimal prose generation interface — compatible with generateProse from infrastructure
- * without introducing a cross-domain import.
- */
-export type GenerateProseFn = (req: {
-    domain: "hygiene" | "git" | "chat";
-    systemPrompt: string;
-    data: Record<string, unknown>;
-}) => Promise<Result<string>>;
+/** Re-exported for backward compatibility — canonical definition in src/types.ts */
+export type { GenerateProseFn } from "../../types";
 /**
  * chat.delegate — Programmatic task router.
  * Uses the LLM to classify a free-form task description into a command, then

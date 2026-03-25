@@ -15,7 +15,10 @@ export declare abstract class BaseWebviewProvider<TReport> {
     protected abstract getViewId(): string;
     protected abstract getViewTitle(): string;
     protected abstract getUiDirSegments(): string[];
-    protected abstract handleMessage(msg: any): Promise<void>;
+    protected abstract handleMessage(msg: {
+        type: string;
+        [key: string]: unknown;
+    }): Promise<void>;
     openPanel(report: TReport): Promise<void>;
     private buildHtml;
 }

@@ -72,6 +72,8 @@ exports.CHAT_ERROR_CODES = {
 // Workflow Engine Error Codes
 // ============================================================================
 exports.WORKFLOW_ERROR_CODES = {
+    WORKFLOW_INIT_ERROR: "WORKFLOW_INIT_ERROR",
+    STEP_RUNNER_NOT_AVAILABLE: "STEP_RUNNER_NOT_AVAILABLE",
     WORKFLOW_EXECUTION_ERROR: "WORKFLOW_EXECUTION_ERROR",
     INVALID_NEXT_STEP: "INVALID_NEXT_STEP",
     STEP_EXECUTION_ERROR: "STEP_EXECUTION_ERROR",
@@ -109,6 +111,8 @@ exports.ROUTER_ERROR_CODES = {
 // Infrastructure Error Codes
 // ============================================================================
 exports.INFRASTRUCTURE_ERROR_CODES = {
+    CONFIG_INIT_ERROR: "CONFIG_INIT_ERROR",
+    CONFIG_SET_ERROR: "CONFIG_SET_ERROR",
     CONFIG_READ_ERROR: "CONFIG_READ_ERROR",
     CONFIG_WRITE_ERROR: "CONFIG_WRITE_ERROR",
     WORKSPACE_NOT_FOUND: "WORKSPACE_NOT_FOUND",

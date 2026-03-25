@@ -28,6 +28,8 @@ export interface StepResult {
   success: boolean;
   output?: Record<string, unknown>;
   error?: string;
+  attempts?: number; // Total attempts executed (>1 means retries occurred)
+  timedOut?: boolean; // True if final failure was a timeout
 }
 
 /**

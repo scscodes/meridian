@@ -528,7 +528,31 @@ export const WORKFLOW_SCENARIO_WITH_RETRY = {
   name: 'retry-workflow',
   description: 'Workflow with retry logic',
   steps: [
-    { id: 'pull', command: 'git.pull' as const, params: {}, onSuccess: 'exit', onFailure: 'exit', retries: 3 },
+    { id: 'pull', command: 'git.pull' as const, params: {}, onSuccess: 'exit', onFailure: 'exit', retry: { maxAttempts: 3 } },
+  ],
+};
+
+export const WORKFLOW_SCENARIO_WITH_TIMEOUT = {
+  name: 'timeout-workflow',
+  description: 'Workflow with step timeout',
+  steps: [
+    { id: 'slow', command: 'git.pull' as const, params: {}, onSuccess: 'exit', onFailure: 'exit', timeout: 500 },
+  ],
+};
+
+export const WORKFLOW_SCENARIO_WITH_CONDITIONS = {
+  name: 'conditional-workflow',
+  description: 'Workflow with output-based branching',
+  steps: [
+    {
+      id: 'check', command: 'git.status' as const, params: {},
+      onSuccess: 'clean-path', onFailure: 'exit',
+      conditions: [
+        { type: 'output' as const, key: 'isDirty', value: true, nextStepId: 'dirty-path' },
+      ],
+    },
+    { id: 'clean-path', command: 'git.pull' as const, params: {}, onSuccess: 'exit', onFailure: 'exit' },
+    { id: 'dirty-path', command: 'git.commit' as const, params: { message: 'auto' }, onSuccess: 'exit', onFailure: 'exit' },
   ],
 };
 

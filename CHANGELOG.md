@@ -1,3 +1,11 @@
+# [1.2.0](https://github.com/scscodes/meridian/compare/v1.1.0...v1.2.0) (2026-03-25)
+
+
+### Features
+
+* report discoverability and analytics export standardization ([832ef7b](https://github.com/scscodes/meridian/commit/832ef7bb8530eef5ba0210ca783baa0901337706))
+* workflow retries, timeouts, and conditional step routing ([1038916](https://github.com/scscodes/meridian/commit/1038916468b248f39578da6fcce40863b8607161))
+
 # [1.1.0](https://github.com/scscodes/meridian/compare/v1.0.0...v1.1.0) (2026-03-15)
 
 

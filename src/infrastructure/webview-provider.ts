@@ -1,11 +1,4 @@
-/**
- * Webview Providers — base class + Git/Hygiene analytics subclasses.
- *
- * BaseWebviewProvider<T> centralizes: panel lifecycle, buildHtml(), CSP nonce
- * injection, asset URI rewriting, and export (save dialog + file write).
- * Subclasses provide view metadata, domain-specific message handling, and CSV formatting.
- */
-
+// Export must be host-side because VS Code webview CSP blocks blob downloads.
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
@@ -61,6 +54,7 @@ export abstract class BaseWebviewProvider<TReport> {
 
       this.panel.onDidDispose(() => {
         this.panel = null;
+        this.lastReport = null;
       });
 
       this.panel.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
@@ -109,6 +103,13 @@ export abstract class BaseWebviewProvider<TReport> {
 
     await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
     vscode.window.showInformationMessage(`Exported to ${path.basename(uri.fsPath)}`);
+  }
+
+  protected handleError(label: string, e: unknown): void {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[Meridian] ${label}:`, e);
+    this.panel?.webview.postMessage({ type: "error", payload: msg });
+    vscode.window.showErrorMessage(`${label}: ${msg}`);
   }
 
   private buildHtml(webview: vscode.Webview, uiDirUri: vscode.Uri): string {
@@ -163,21 +164,15 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
         const report = await this.onFilter(msg.payload as AnalyticsOptions);
         this.updateReport(report);
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.error("[Meridian] git analytics filter error:", e);
-        this.panel?.webview.postMessage({ type: "error", payload: errMsg });
-        vscode.window.showErrorMessage(`Git analytics filter failed: ${errMsg}`);
+        this.handleError("Git analytics filter failed", e);
       }
     } else if (msg.type === "refresh") {
       try {
-        const period = (msg.payload as any)?.period ?? "3mo";
+        const period = (msg.payload as { period?: string })?.period ?? "3mo";
         const report = await this.onFilter({ period } as AnalyticsOptions);
         this.updateReport(report);
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.error("[Meridian] git analytics refresh error:", e);
-        this.panel?.webview.postMessage({ type: "error", payload: errMsg });
-        vscode.window.showErrorMessage(`Git analytics refresh failed: ${errMsg}`);
+        this.handleError("Git analytics refresh failed", e);
       }
     } else if (msg.type === "openFile") {
       const abs = path.join(this.workspaceRoot, msg.payload as string);
@@ -241,16 +236,13 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
         const report = await this.onRefresh();
         this.updateReport(report);
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.error("[Meridian] hygiene analytics refresh error:", e);
-        this.panel?.webview.postMessage({ type: "error", payload: errMsg });
-        vscode.window.showErrorMessage(`Hygiene analytics refresh failed: ${errMsg}`);
+        this.handleError("Hygiene analytics refresh failed", e);
       }
     } else if (msg.type === "openFile") {
-      const abs = path.join(this.workspaceRoot, msg["path"] as string);
+      const abs = path.join(this.workspaceRoot, msg.path as string);
       vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
     } else if (msg.type === "revealFile") {
-      const abs = path.join(this.workspaceRoot, msg["path"] as string);
+      const abs = path.join(this.workspaceRoot, msg.path as string);
       vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(abs));
     }
   }

@@ -159,18 +159,21 @@ button:hover {
   border: 1px solid var(--vscode-input-border, #555);
   padding: 14px 16px;
   border-radius: 6px;
-  aspect-ratio: 5 / 2;
-  min-height: 140px;
-  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  height: 200px;
+  overflow: hidden;
 }
 
 .chart-container h3 {
   opacity: 0.85;
+  flex-shrink: 0;
 }
 
-.chart-container canvas {
-  max-width: 100%;
-  max-height: 100%;
+.chart-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Churn bar (inline in commits table) */

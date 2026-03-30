@@ -209,8 +209,17 @@ export class GitAnalyzer {
         const deletions = parseInt(parts[1]) || 0;
         const path = parts[2].trim();
 
-        if (path) {
-          files.push({ path, insertions, deletions });
+        // Normalize git rename notation to destination path.
+        // Brace form:  "src/{old.ts => new.ts}" → "src/new.ts"
+        // Simple form: "old.ts => new.ts"       → "new.ts"
+        const normalizedPath = path.includes(" => ")
+          ? (path.includes("{")
+              ? path.replace(/\{[^}]* => ([^}]*)\}/g, "$1")
+              : path.split(" => ").pop()!)
+          : path;
+
+        if (normalizedPath) {
+          files.push({ path: normalizedPath, insertions, deletions });
           totalInsertions += insertions;
           totalDeletions += deletions;
         }

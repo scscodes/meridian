@@ -75,6 +75,20 @@ function renderCharts() {
 }
 
 /**
+ * Normalize git rename notation to the destination path.
+ * Defense-in-depth layer; backend normalizes first.
+ *   "src/{old => new}/f.ts"  → "src/new/f.ts"
+ *   "old.ts => new.ts"       → "new.ts"
+ */
+function normalizeGitPath(p) {
+  if (p.includes(" => ")) {
+    if (p.includes("{")) return p.replace(/\{[^}]* => ([^}]*)\}/g, "$1");
+    return p.split(" => ").pop();
+  }
+  return p;
+}
+
+/**
  * Render churn grouped by file extension (donut, top 5 + Other)
  */
 function renderChurnByFileTypeChart() {
@@ -88,7 +102,8 @@ function renderChurnByFileTypeChart() {
   const files = analyticsData.files || [];
   const byExt = {};
   for (const f of files) {
-    const parts = f.path.split(".");
+    const normalizedPath = normalizeGitPath(f.path);
+    const parts = normalizedPath.split(".");
     const ext = parts.length > 1 ? "." + parts.pop() : "(none)";
     byExt[ext] = (byExt[ext] || 0) + f.volatility;
   }
@@ -142,7 +157,8 @@ function renderChurnByDirectoryChart() {
   const files = analyticsData.files || [];
   const byDir = {};
   for (const f of files) {
-    const parts = f.path.split("/");
+    const normalizedPath = normalizeGitPath(f.path);
+    const parts = normalizedPath.split("/");
     const dir = parts.length > 1 ? parts[parts.length - 2] : "(root)";
     byDir[dir] = (byDir[dir] || 0) + f.volatility;
   }

@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/scscodes/meridian/compare/v1.2.0...v1.2.1) (2026-03-30)
+
+
+### Bug Fixes
+
+* git analytics doughnut chart overflow and rename label corruption ([b73c668](https://github.com/scscodes/meridian/commit/b73c66899de3b53b6e45b0b98560e693cced9247))
+
 # [1.2.0](https://github.com/scscodes/meridian/compare/v1.1.0...v1.2.0) (2026-03-25)
 
 

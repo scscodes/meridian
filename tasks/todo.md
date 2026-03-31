@@ -19,3 +19,4 @@
 - 10 missing error constants added to `error-codes.ts`
 - Remaining inline error codes are in `service.ts` init paths (out of scope)
 - `out/` diffs are pre-existing from prior build; not part of this sprint
+- Screenshot seed files captured and cleaned up.

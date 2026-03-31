@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/scscodes/meridian/compare/v1.2.1...v1.3.0) (2026-03-31)
+
+
+### Features
+
+* catalog-anchored manifest — normalized command registry ([2293ed3](https://github.com/scscodes/meridian/commit/2293ed3293238debd06997baf2cd7a64f57aa18a))
+
 ## [1.2.1](https://github.com/scscodes/meridian/compare/v1.2.0...v1.2.1) (2026-03-30)
 
 

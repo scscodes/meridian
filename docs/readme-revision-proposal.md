@@ -1,6 +1,6 @@
 # README Revision Proposal
 
-**Status:** Shelved — pending follow-up on feature accuracy before drafting prose.
+**Status:** Complete — all items verified, draft promoted to README.
 **Date:** 2026-03-30
 
 ---
@@ -172,10 +172,10 @@ Before drafting prose, need to verify accuracy of feature descriptions:
 - [x] PR Review: single per-PR verdict (approve/request-changes/comment), per-file comments with severity (critical/suggestion/nit)
 - [x] PR Comments: per-file/per-line inline comments, actionable feedback, line numbers optional
 - [x] Session Briefing: branch state, last 10 commits, uncommitted files, flags (large count, detached HEAD) — no conflict detection
-- [ ] Analytics: confirm chart types and export formats available
-- [ ] Hygiene Scan: confirm detection categories and cleanup flow
-- [ ] Impact Analysis: confirm what's traced (importers, call sites, test coverage, LLM summary?)
-- [ ] Workflows: confirm current capabilities (retries, timeouts, conditional routing)
-- [ ] Agents: confirm what agent profiles can do
+- [x] Analytics: doughnut charts (churn by file type, churn by directory) plus bar charts (commit activity), export as JSON and CSV
+- [x] Hygiene Scan: detects dead files, large files, stale logs, markdown files, dead code (unused imports/locals/parameters); cleanup supports dry-run
+- [x] Impact Analysis: traces importers, call sites, test-file coverage, plus LLM prose summary of blast radius
+- [x] Workflows: retries, timeouts, and conditional step routing (all confirmed in source)
+- [x] Agents: reusable execution profiles that run approved commands and workflow targets
 
 These should be validated against current source before writing the final copy.

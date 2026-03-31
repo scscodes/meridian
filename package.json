@@ -374,120 +374,120 @@
       {
         "command": "meridian.git.status",
         "title": "Git: Show Status",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.pull",
         "title": "Git: Pull",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.commit",
         "title": "Git: Commit",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.smartCommit",
         "title": "Git: Smart Commit (Interactive)",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.scan",
         "title": "Hygiene: Scan Workspace",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.cleanup",
         "title": "Hygiene: Cleanup",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.deleteFile",
         "title": "Hygiene: Delete File",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.ignoreFile",
         "title": "Hygiene: Ignore File",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.reviewFile",
         "title": "Hygiene: Review with AI",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.chat.context",
         "title": "Chat: Get Context",
-        "category": "Chat"
+        "category": "Meridian"
       },
       {
         "command": "meridian.workflow.list",
         "title": "Workflow: List All",
-        "category": "Workflow"
+        "category": "Meridian"
       },
       {
         "command": "meridian.workflow.run",
         "title": "Workflow: Run",
-        "category": "Workflow"
+        "category": "Meridian"
       },
       {
         "command": "meridian.agent.list",
         "title": "Agent: List All",
-        "category": "Agent"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.refresh",
         "title": "Git: Refresh View",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.refresh",
         "title": "Hygiene: Refresh View",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.workflow.refresh",
         "title": "Workflow: Refresh View",
-        "category": "Workflow"
+        "category": "Meridian"
       },
       {
         "command": "meridian.agent.run",
         "title": "Agent: Run",
         "icon": "$(play)",
-        "category": "Agent"
+        "category": "Meridian"
       },
       {
         "command": "meridian.agent.refresh",
         "title": "Agent: Refresh View",
-        "category": "Agent"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.showAnalytics",
         "title": "Git: Show Analytics",
         "icon": "$(graph)",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.exportJson",
         "title": "Git: Export Analytics JSON",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.exportCsv",
         "title": "Git: Export Analytics CSV",
-        "category": "Git"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.showAnalytics",
         "title": "Hygiene: Show Analytics",
         "icon": "$(graph)",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.hygiene.impactAnalysis",
         "title": "Hygiene: Impact Analysis",
-        "category": "Hygiene"
+        "category": "Meridian"
       },
       {
         "command": "meridian.git.generatePR",
@@ -516,12 +516,12 @@
       },
       {
         "command": "meridian.statusBar.clicked",
-        "title": "Meridian: Quick Actions",
+        "title": "Quick Actions",
         "category": "Meridian"
       },
       {
         "command": "meridian.refreshAll",
-        "title": "Meridian: Refresh All Views",
+        "title": "Refresh All Views",
         "category": "Meridian"
       }
     ],
@@ -764,10 +764,6 @@
           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
         },
         {
-          "command": "meridian.git.refresh",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
           "command": "meridian.hygiene.scan",
           "when": "workspaceFolderCount > 0"
         },
@@ -785,10 +781,6 @@
         },
         {
           "command": "meridian.hygiene.reviewFile",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.hygiene.refresh",
           "when": "workspaceFolderCount > 0"
         },
         {
@@ -812,27 +804,11 @@
           "when": "workspaceFolderCount > 0"
         },
         {
-          "command": "meridian.workflow.refresh",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
           "command": "meridian.agent.list",
           "when": "workspaceFolderCount > 0"
         },
         {
           "command": "meridian.agent.run",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.agent.refresh",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.statusBar.clicked",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.refreshAll",
           "when": "workspaceFolderCount > 0"
         }
       ],
@@ -931,15 +907,16 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run bundle",
-    "bundle": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --external:typescript --format=cjs --platform=node --target=node20 && cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
-    "compile": "tsc -p ./ && cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
+    "copy-assets": "cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
+    "bundle": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --external:typescript --format=cjs --platform=node --target=node20 && npm run copy-assets",
+    "compile": "tsc -p ./ && npm run copy-assets",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
-    "lint": "echo 'Linting would run here'",
+    "lint": "npx vitest run tests/manifest.test.ts",
     "release": "semantic-release"
   },
   "dependencies": {

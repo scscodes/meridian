@@ -24,30 +24,56 @@ const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
   "hygiene.scan": "Scanning workspace...",
 };
 
-/** VS Code command ID → internal CommandName */
-export const COMMAND_MAP: ReadonlyArray<[string, CommandName]> = [
-  ["meridian.git.status",              "git.status"],
-  ["meridian.git.pull",                "git.pull"],
-  ["meridian.git.commit",              "git.commit"],
-  ["meridian.git.smartCommit",         "git.smartCommit"],
-  ["meridian.git.analyzeInbound",      "git.analyzeInbound"],
-  ["meridian.hygiene.scan",            "hygiene.scan"],
-  ["meridian.hygiene.cleanup",         "hygiene.cleanup"],
-  // hygiene.impactAnalysis — dedicated registration (active-file fallback + function name prompt)
-  ["meridian.chat.context",            "chat.context"],
-  ["meridian.workflow.list",           "workflow.list"],
-  ["meridian.agent.list",              "agent.list"],
-  ["meridian.agent.execute",           "agent.execute"],
-  ["meridian.git.showAnalytics",       "git.showAnalytics"],
-  ["meridian.git.exportJson",          "git.exportJson"],
-  ["meridian.git.exportCsv",           "git.exportCsv"],
-  ["meridian.hygiene.showAnalytics",   "hygiene.showAnalytics"],
-  ["meridian.git.generatePR",          "git.generatePR"],
-  ["meridian.git.reviewPR",            "git.reviewPR"],
-  ["meridian.git.commentPR",           "git.commentPR"],
+/**
+ * Presentation-layer command metadata.
+ * Mirrors the role of CatalogEntry in command-catalog.ts, but for the VS Code surface:
+ * maps VS Code command IDs to internal CommandNames with display metadata.
+ *
+ * title undefined    = internal command (not declared in contributes.commands)
+ * showInPalette true = appears in commandPalette (requires title)
+ * requiresGit true   = commandPalette entry also gates on gitOpenRepositoryCount > 0
+ */
+export interface CommandMapEntry {
+  readonly vsCodeId: string;
+  readonly commandName: CommandName;
+  /** Display title for contributes.commands. Undefined = internal/LM-tool-only, not manifest-declared. */
+  readonly title?: string;
+  readonly icon?: string;
+  /** Expose in commandPalette. Only meaningful when title is defined. */
+  readonly showInPalette?: boolean;
+  /** commandPalette entry also requires gitOpenRepositoryCount > 0 */
+  readonly requiresGit?: boolean;
+}
+
+/** VS Code command ID → internal CommandName + display metadata */
+export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
+  // ── Git ─────────────────────────────────────────────────────────────────────
+  { vsCodeId: "meridian.git.status",            commandName: "git.status",           title: "Git: Show Status",               showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.pull",              commandName: "git.pull",             title: "Git: Pull",                      showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.commit",            commandName: "git.commit",           title: "Git: Commit",                    showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.smartCommit",       commandName: "git.smartCommit",      title: "Git: Smart Commit (Interactive)", showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.analyzeInbound",    commandName: "git.analyzeInbound"    /* LM tool only — not manifest-declared */                                        },
+  { vsCodeId: "meridian.git.showAnalytics",     commandName: "git.showAnalytics",    title: "Git: Show Analytics",            showInPalette: true,  requiresGit: true,  icon: "$(graph)" },
+  { vsCodeId: "meridian.git.exportJson",        commandName: "git.exportJson",       title: "Git: Export Analytics JSON",     showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.exportCsv",         commandName: "git.exportCsv",        title: "Git: Export Analytics CSV",      showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.generatePR",        commandName: "git.generatePR",       title: "Git: Generate PR Description",   showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.reviewPR",          commandName: "git.reviewPR",         title: "Git: Review PR (AI)",            showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.commentPR",         commandName: "git.commentPR",        title: "Git: Generate PR Comments",      showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Git: Session Briefing (AI)",     showInPalette: true,  requiresGit: true  },
   // git.resolveConflicts — dedicated registration in specialized-commands.ts (tree expansion hooks)
-  ["meridian.git.sessionBriefing",     "git.sessionBriefing"],
-  ["meridian.chat.delegate",           "chat.delegate"],
+  // ── Hygiene ──────────────────────────────────────────────────────────────────
+  { vsCodeId: "meridian.hygiene.scan",          commandName: "hygiene.scan",         title: "Hygiene: Scan Workspace",        showInPalette: true  },
+  { vsCodeId: "meridian.hygiene.cleanup",       commandName: "hygiene.cleanup",      title: "Hygiene: Cleanup",               showInPalette: true  },
+  { vsCodeId: "meridian.hygiene.showAnalytics", commandName: "hygiene.showAnalytics",title: "Hygiene: Show Analytics",        showInPalette: true,                     icon: "$(graph)" },
+  // hygiene.impactAnalysis — dedicated registration per ADR 005 (active-file fallback + function name prompt)
+  // ── Chat ─────────────────────────────────────────────────────────────────────
+  { vsCodeId: "meridian.chat.context",          commandName: "chat.context",         title: "Chat: Get Context",              showInPalette: true  },
+  { vsCodeId: "meridian.chat.delegate",         commandName: "chat.delegate"         /* LM tool only — not manifest-declared */                                        },
+  // ── Workflow ──────────────────────────────────────────────────────────────────
+  { vsCodeId: "meridian.workflow.list",         commandName: "workflow.list",        title: "Workflow: List All",             showInPalette: true  },
+  // ── Agent ─────────────────────────────────────────────────────────────────────
+  { vsCodeId: "meridian.agent.list",            commandName: "agent.list",           title: "Agent: List All",                showInPalette: true  },
+  { vsCodeId: "meridian.agent.execute",         commandName: "agent.execute"         /* LM tool only — not manifest-declared */                                        },
 ];
 
 /**
@@ -62,7 +88,7 @@ export function registerCommands(
   readPruneConfig: () => PruneConfig,
   presenterCtx: PresenterContext
 ): void {
-  for (const [vsCodeId, commandName] of COMMAND_MAP) {
+  for (const { vsCodeId, commandName } of COMMAND_MAP) {
     const disposable = vscode.commands.registerCommand(
       vsCodeId,
       async (params: Record<string, unknown> = {}) => {

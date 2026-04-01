@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/scscodes/meridian/compare/v1.3.0...v1.4.0) (2026-04-01)
+
+
+### Features
+
+* session briefing webview, smart commit LLM enhancement, remove out/ from tracking ([cffcfbc](https://github.com/scscodes/meridian/commit/cffcfbc08eb4d97123579749389fd61f357cfb73))
+
 # [1.3.0](https://github.com/scscodes/meridian/compare/v1.2.1...v1.3.0) (2026-03-31)
 
 

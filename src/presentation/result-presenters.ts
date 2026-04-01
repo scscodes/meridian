@@ -10,14 +10,15 @@ import { CommandName, Result } from "../types";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
-import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider } from "../infrastructure/webview-provider";
-import { GeneratedPR, GeneratedPRReview, GeneratedPRComments } from "../domains/git/types";
+import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider, SessionBriefingWebviewProvider } from "../infrastructure/webview-provider";
+import { GeneratedPR, GeneratedPRReview, GeneratedPRComments, SessionBriefingReport } from "../domains/git/types";
 import { UI_SETTINGS } from "../constants";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
   analyticsPanel: AnalyticsWebviewProvider;
   hygieneAnalyticsPanel: HygieneAnalyticsWebviewProvider;
+  sessionBriefingPanel: SessionBriefingWebviewProvider;
 }
 
 const HR = "─".repeat(UI_SETTINGS.OUTPUT_HR_LENGTH);
@@ -38,7 +39,7 @@ export async function presentResult(
 ): Promise<boolean> {
   if (result.kind !== "ok") return false;
 
-  const { outputChannel, analyticsPanel, hygieneAnalyticsPanel } = ctx;
+  const { outputChannel, analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = ctx;
 
   switch (commandName) {
     case "git.showAnalytics": {
@@ -101,15 +102,11 @@ export async function presentResult(
     }
 
     case "git.sessionBriefing": {
-      const briefing = result.value as string;
-      outputChannel.show(true);
-      outputChannel.appendLine(`\n${HR}`);
-      outputChannel.appendLine(`[${ts()}] Session Briefing`);
-      outputChannel.appendLine(HR);
-      outputChannel.appendLine(briefing);
-      outputChannel.appendLine("");
-      await vscode.env.clipboard.writeText(briefing);
-      vscode.window.showInformationMessage("Session briefing copied to clipboard");
+      const report = result.value as SessionBriefingReport;
+      await sessionBriefingPanel.openPanel(report);
+      outputChannel.appendLine(`[${ts()}] Session briefing panel opened`);
+      await vscode.env.clipboard.writeText(report.summary);
+      vscode.window.showInformationMessage("Session briefing opened — summary copied to clipboard");
       return true;
     }
 

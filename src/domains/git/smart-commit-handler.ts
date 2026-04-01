@@ -10,8 +10,10 @@ import {
   Logger,
   GitProvider,
   GitFileChange,
+  GenerateProseFn,
 } from "../../types";
 import { GIT_ERROR_CODES, GENERIC_ERROR_CODES } from "../../infrastructure/error-codes";
+import { GIT_DEFAULTS } from "../../constants";
 import {
   FileChange,
   ChangeGroup,
@@ -25,17 +27,14 @@ import {
   BatchCommitter,
 } from "./smart-commit-service";
 
-/**
- * Example: git.smartCommit — Interactive staged commit with validation.
- * Demonstrates complex workflow: stage → diff → validate message → commit.
- */
 export function createSmartCommitHandler(
   gitProvider: GitProvider,
   logger: Logger,
   changeGrouper: ChangeGrouper,
   messageSuggester: CommitMessageSuggester,
   batchCommitter: BatchCommitter,
-  approvalUI?: ApprovalUI
+  approvalUI?: ApprovalUI,
+  generateProseFn?: GenerateProseFn
 ): Handler<SmartCommitParams, SmartCommitBatchResult> {
   return async (
     _ctx: CommandContext,
@@ -107,11 +106,29 @@ export function createSmartCommitHandler(
         "GitSmartCommitHandler"
       );
 
-      // Step 4: Suggest commit messages for each group
-      const groupsWithMessages = groups.map((g: ChangeGroup) => ({
-        ...g,
-        suggestedMessage: messageSuggester.suggest(g),
-      }));
+      // Step 4: Suggest commit messages for each group (LLM-enhanced when available)
+      let groupsWithMessages: ChangeGroup[];
+
+      if (generateProseFn) {
+        // Fetch per-group diffs and enhance messages in parallel
+        groupsWithMessages = await Promise.all(
+          groups.map(async (g) => {
+            const paths = g.files.map((f) => f.path);
+            const diffResult = await gitProvider.getUncommittedDiff(paths);
+            let diff = diffResult.kind === "ok" ? diffResult.value : "";
+            if (diff.length > GIT_DEFAULTS.MAX_DIFF_BYTES) {
+              diff = diff.slice(0, GIT_DEFAULTS.MAX_DIFF_BYTES) + "\n[diff truncated]";
+            }
+            const msg = await messageSuggester.enhanceMessage(g, diff, generateProseFn);
+            return { ...g, suggestedMessage: msg };
+          })
+        );
+      } else {
+        groupsWithMessages = groups.map((g: ChangeGroup) => ({
+          ...g,
+          suggestedMessage: messageSuggester.suggest(g),
+        }));
+      }
 
       // Step 5: Present to user for approval (or auto-approve)
       let approvedGroups: ChangeGroup[];

@@ -126,6 +126,10 @@ export class MockGitProvider implements GitProvider {
     return success(this.diffOutput);
   }
 
+  async getUncommittedDiff(): Promise<Result<string>> {
+    return success(this.diffOutput);
+  }
+
   async stage(paths: string[]): Promise<Result<void>> {
     this.stagedPaths = paths;
     return success(void 0);

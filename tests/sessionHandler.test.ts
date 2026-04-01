@@ -32,7 +32,12 @@ describe('git.sessionBriefing', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.value).toBe('# Session Briefing\nAll clear.');
+      expect(result.value.summary).toBe('# Session Briefing\nAll clear.');
+      expect(result.value.branch).toBe('develop');
+      expect(result.value.isDirty).toBe(true);
+      expect(result.value.staged).toBe(2);
+      expect(result.value.uncommittedFiles).toHaveLength(2);
+      expect(result.value.generatedAt).toBeTruthy();
     }
   });
 

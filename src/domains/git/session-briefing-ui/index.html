@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {{WEBVIEW_CSP_SOURCE}} 'nonce-{{NONCE}}'; style-src {{WEBVIEW_CSP_SOURCE}} 'unsafe-inline'; img-src {{WEBVIEW_CSP_SOURCE}} data:;">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Session Briefing</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="briefing-panel">
+
+    <div class="header-row">
+      <h1>Session Briefing</h1>
+      <div class="header-actions">
+        <button id="exportCsv" class="btn-secondary">&#8595; CSV</button>
+        <button id="exportJson" class="btn-secondary">&#8595; JSON</button>
+        <button id="refreshBtn">&#8634; Refresh</button>
+      </div>
+    </div>
+
+    <div class="branch-bar" id="branchBar"></div>
+
+    <div class="summary-cards" id="summaryCards"></div>
+
+    <div id="flagsSection"></div>
+
+    <div class="table-container">
+      <h3>Recent Commits <span class="table-hint">(last 10)</span></h3>
+      <table id="commitsTable">
+        <thead>
+          <tr>
+            <th data-col="shortHash">Hash <span class="sort-arrow"></span></th>
+            <th data-col="author">Author <span class="sort-arrow"></span></th>
+            <th data-col="message">Message <span class="sort-arrow"></span></th>
+            <th data-col="insertions">+ Lines <span class="sort-arrow"></span></th>
+            <th data-col="deletions">- Lines <span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="commitsTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="table-container" id="uncommittedSection">
+      <h3>Uncommitted Changes <span class="table-hint" id="uncommittedCount"></span></h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Path</th>
+          </tr>
+        </thead>
+        <tbody id="uncommittedTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary-section" id="summarySection">
+      <h3>AI Summary</h3>
+      <div id="summaryContent" class="summary-content"></div>
+    </div>
+
+  </div>
+
+  <script src="script.js" nonce="{{NONCE}}"></script>
+</body>
+</html>

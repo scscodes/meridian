@@ -108,12 +108,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const trees = setupTreeProviders(context, gitProvider, logger, workspaceRoot, dispatch, cmdCtx);
 
-  const { analyticsPanel, hygieneAnalyticsPanel } = createWebviewPanels(
+  const { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = createWebviewPanels(
     context, router, workspaceRoot, ctxFn, () => config.getPruneConfig()
   );
 
   registerCommands(context, router, outputChannel, ctxFn, () => config.getPruneConfig(), {
-    outputChannel, analyticsPanel, hygieneAnalyticsPanel,
+    outputChannel, analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel,
   });
 
   registerSpecializedCommands(context, router, outputChannel, ctxFn, trees.workflowTree, trees.hygieneTree, trees.gitTree);
@@ -138,6 +138,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Finalize ────────────────────────────────────────────────────────
   statusBar.update();
+
+  // Auto-launch session briefing if configured
+  const autoLaunch = vscode.workspace.getConfiguration("meridian")
+    .get<boolean>("sessionBriefing.autoLaunch", false);
+  if (autoLaunch) {
+    void vscode.commands.executeCommand("meridian.git.sessionBriefing");
+  }
 
   logger.info(`Extension activated with ${router.listDomains().length} domains`, "activate");
   logger.info(`Registered ${COMMAND_MAP.length} commands`, "activate");

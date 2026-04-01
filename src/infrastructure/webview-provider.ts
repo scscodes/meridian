@@ -6,6 +6,7 @@ import * as crypto from "crypto";
 import { GitAnalyticsReport, AnalyticsOptions } from "../domains/git/analytics-types";
 import { gitReportToCsv } from "../domains/git/analytics-service";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
+import { SessionBriefingReport } from "../domains/git/types";
 
 // ============================================================================
 // Base Class
@@ -244,6 +245,73 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
     } else if (msg.type === "revealFile") {
       const abs = path.join(this.workspaceRoot, msg.path as string);
       vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(abs));
+    }
+  }
+}
+
+// ============================================================================
+// Session Briefing Webview
+// ============================================================================
+
+export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionBriefingReport> {
+  private readonly workspaceRoot: string;
+  private readonly onRefresh: () => Promise<SessionBriefingReport>;
+
+  constructor(
+    extensionUri: vscode.Uri,
+    workspaceRoot: string,
+    onRefresh: () => Promise<SessionBriefingReport>
+  ) {
+    super(extensionUri);
+    this.workspaceRoot = workspaceRoot;
+    this.onRefresh = onRefresh;
+  }
+
+  protected getViewId(): string { return "meridian.sessionBriefing"; }
+  protected getViewTitle(): string { return "Session Briefing — Meridian"; }
+  protected getUiDirSegments(): string[] { return ["out", "domains", "git", "session-briefing-ui"]; }
+  protected getExportFilenamePrefix(): string { return "meridian-session-briefing"; }
+
+  protected reportToCsv(report: SessionBriefingReport): string {
+    const csvStr = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines: string[] = [];
+
+    lines.push("Session Briefing Report");
+    lines.push(`Generated,${report.generatedAt}`);
+    lines.push(`Branch,${csvStr(report.branch)}`);
+    lines.push(`Dirty,${report.isDirty}`);
+    lines.push(`Staged,${report.staged}`);
+    lines.push(`Unstaged,${report.unstaged}`);
+    lines.push(`Untracked,${report.untracked}`);
+    lines.push("");
+
+    lines.push("Recent Commits");
+    lines.push("Hash,Author,Message,Insertions,Deletions");
+    for (const c of report.recentCommits) {
+      lines.push(`${c.shortHash},${csvStr(c.author)},${csvStr(c.message)},${c.insertions},${c.deletions}`);
+    }
+    lines.push("");
+
+    lines.push("Uncommitted Files");
+    lines.push("Path,Status");
+    for (const f of report.uncommittedFiles) {
+      lines.push(`${csvStr(f.path)},${f.status}`);
+    }
+
+    return lines.join("\n");
+  }
+
+  protected async onMessage(msg: { type: string; [key: string]: unknown }): Promise<void> {
+    if (msg.type === "refresh") {
+      try {
+        const report = await this.onRefresh();
+        this.updateReport(report);
+      } catch (e) {
+        this.handleError("Session briefing refresh failed", e);
+      }
+    } else if (msg.type === "openFile") {
+      const abs = path.join(this.workspaceRoot, msg.payload as string);
+      vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
     }
   }
 }

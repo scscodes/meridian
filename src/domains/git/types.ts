@@ -2,6 +2,8 @@
  * Git Domain Types — Smart Commit Grouping, Batch Commits & Inbound Analysis
  */
 
+import { RecentCommit } from "../../types";
+
 /**
  * File change metadata extracted from git status/diff
  */
@@ -84,6 +86,26 @@ export interface ApprovalItem {
  *   - null           → user cancelled the entire flow (Escape)
  */
 export type ApprovalUI = (groups: ChangeGroup[]) => Promise<ApprovalItem[] | null>;
+
+// ============================================================================
+// Session Briefing Types
+// ============================================================================
+
+export interface SessionBriefingReport {
+  generatedAt: string;
+  branch: string;
+  isDirty: boolean;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+  recentCommits: RecentCommit[];
+  uncommittedFiles: Array<{
+    path: string;
+    status: "A" | "M" | "D" | "R";
+  }>;
+  flags: string[];
+  summary: string;
+}
 
 // ============================================================================
 // PR Generation Types

@@ -7,12 +7,13 @@
 import {
   Handler,
   CommandContext,
+  GenerateProseFn,
   success,
   Logger,
   GitProvider,
 } from "../../types";
-import { GenerateProseFn } from "./pr-handlers";
 import { getPrompt } from "../../infrastructure/prompt-registry";
+import { SessionBriefingReport } from "./types";
 
 /**
  * git.sessionBriefing — Generate a session briefing from current workspace state.
@@ -21,20 +22,17 @@ export function createSessionBriefingHandler(
   gitProvider: GitProvider,
   logger: Logger,
   generateProseFn: GenerateProseFn
-): Handler<Record<string, never>, string> {
+): Handler<Record<string, never>, SessionBriefingReport> {
   return async (_ctx: CommandContext) => {
-    // 1. Current branch + dirty state
-    const statusResult = await gitProvider.status();
+    const [statusResult, commitsResult, changesResult] = await Promise.all([
+      gitProvider.status(),
+      gitProvider.getRecentCommits(10),
+      gitProvider.getAllChanges(),
+    ]);
     if (statusResult.kind === "err") return statusResult;
-    const status = statusResult.value;
-
-    // 2. Recent commits (last 10)
-    const commitsResult = await gitProvider.getRecentCommits(10);
     if (commitsResult.kind === "err") return commitsResult;
-
-    // 3. Uncommitted file list
-    const changesResult = await gitProvider.getAllChanges();
     if (changesResult.kind === "err") return changesResult;
+    const status = statusResult.value;
 
     const uncommitted = changesResult.value;
 
@@ -47,6 +45,8 @@ export function createSessionBriefingHandler(
       flags.push("Detached HEAD — not on a named branch");
     }
 
+    const uncommittedFiles = uncommitted.map((f) => ({ path: f.path, status: f.status }));
+
     const proseResult = await generateProseFn({
       domain: "git",
       systemPrompt: getPrompt("SESSION_BRIEFING"),
@@ -57,7 +57,7 @@ export function createSessionBriefingHandler(
         unstaged: status.unstaged,
         untracked: status.untracked,
         recentCommits: commitsResult.value,
-        uncommittedFiles: uncommitted.map((f) => ({ path: f.path, status: f.status })),
+        uncommittedFiles,
         flags,
       },
     });
@@ -65,6 +65,18 @@ export function createSessionBriefingHandler(
     if (proseResult.kind === "err") return proseResult;
 
     logger.info(`Session briefing generated for branch '${status.branch}'`, "git.sessionBriefing");
-    return success(proseResult.value);
+
+    return success({
+      generatedAt: new Date().toISOString(),
+      branch: status.branch,
+      isDirty: status.isDirty,
+      staged: status.staged,
+      unstaged: status.unstaged,
+      untracked: status.untracked,
+      recentCommits: commitsResult.value,
+      uncommittedFiles,
+      flags,
+      summary: proseResult.value,
+    });
   };
 }

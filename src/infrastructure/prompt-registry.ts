@@ -16,6 +16,7 @@ export type PromptId =
   | "PR_COMMENT"
   | "CONFLICT_RESOLUTION"
   | "SESSION_BRIEFING"
+  | "SMART_COMMIT_MESSAGE"
   | "DELEGATE_CLASSIFIER"
   | "IMPACT_ANALYSIS";
 
@@ -122,6 +123,24 @@ Guidelines:
 - Keep it scannable — bullets over prose
 - Flag anything that needs attention before starting work
 - If the workspace is clean, say so clearly`,
+
+  // ── git/smart-commit ────────────────────────────────────────────────
+
+  SMART_COMMIT_MESSAGE: `You are a commit message generator. Given a unified diff and file metadata, produce a concise description of what changed and why.
+
+Output: a single line, lowercase, no period at the end. Do not include a type prefix or scope — just the description.
+
+Examples of good descriptions:
+- "add retry logic with exponential backoff for API calls"
+- "fix off-by-one error in pagination cursor"
+- "extract validation helpers into shared module"
+- "remove deprecated analytics endpoint"
+
+Guidelines:
+- Focus on the intent and effect of the change, not the filenames
+- Be specific — "fix null check" is better than "fix bug"
+- Keep it under 72 characters
+- If the diff is too large to summarize in one line, describe the dominant change`,
 
   // ── chat/handlers ───────────────────────────────────────────────────
 

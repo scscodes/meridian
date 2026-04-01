@@ -104,7 +104,8 @@ export class GitDomainService implements DomainService {
         this.changeGrouper,
         this.messageSuggester,
         this.batchCommitter,
-        approvalUI
+        approvalUI,
+        generateProseFn
       ),
       "git.analyzeInbound": createAnalyzeInboundHandler(
         this.inboundAnalyzer,

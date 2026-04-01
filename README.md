@@ -20,7 +20,7 @@ Meridian covers the full PR lifecycle from branch diff to final polish. Generate
 
 Session Briefing gives you immediate context: branch state, recent commits, uncommitted files, and workspace flags like large change counts or detached HEAD. Start your day oriented, or get your bearings after switching branches.
 
-Git Analytics visualizes churn, volatility, authorship, and commit trends in one dashboard, with JSON and CSV export for reporting or downstream analysis.
+Git Analytics visualizes churn, volatility, and authorship in one dashboard, with JSON and CSV export for reporting or downstream analysis.
 
 ![Git Analytics](media/feat-git-analytics.png)
 
@@ -48,7 +48,7 @@ Define JSON workflows with retries, timeouts, and conditional step routing for r
 
 ## Requirements
 
-- VS Code 1.90+
+- VS Code 1.91+
 - Node.js 22+
 
 ## License

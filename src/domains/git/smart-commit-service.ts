@@ -12,6 +12,7 @@ import {
   GitProvider,
   Logger,
   Result,
+  GenerateProseFn,
   failure,
   success,
 } from "../../types";
@@ -22,6 +23,7 @@ import {
   SuggestedMessage,
   CommitInfo,
 } from "./types";
+import { getPrompt } from "../../infrastructure/prompt-registry";
 
 // ============================================================================
 // Change Grouper — Semantic Clustering of File Changes
@@ -216,6 +218,49 @@ export class CommitMessageSuggester {
       R: "rename",
     };
     return verbs[status] || "modify";
+  }
+
+  /**
+   * Generate an LLM-enhanced commit message using diff content.
+   * Falls back to deterministic suggest() on any failure.
+   */
+  async enhanceMessage(
+    group: ChangeGroup,
+    diff: string,
+    generateProseFn: GenerateProseFn
+  ): Promise<SuggestedMessage> {
+    const deterministic = this.suggest(group);
+
+    if (!diff.trim()) return deterministic;
+
+    try {
+      const result = await generateProseFn({
+        domain: "git",
+        systemPrompt: getPrompt("SMART_COMMIT_MESSAGE"),
+        data: {
+          files: group.files.map((f) => ({
+            path: f.path,
+            status: f.status,
+            additions: f.additions,
+            deletions: f.deletions,
+          })),
+          diff,
+        },
+      });
+
+      if (result.kind !== "ok" || !result.value.trim()) return deterministic;
+
+      // Use LLM description with deterministic type/scope
+      const description = result.value.trim().split("\n")[0];
+      return {
+        type: deterministic.type,
+        scope: deterministic.scope,
+        description,
+        full: `${deterministic.type}${deterministic.scope ? `(${deterministic.scope})` : ""}: ${description}`,
+      };
+    } catch {
+      return deterministic;
+    }
   }
 }
 

@@ -124,6 +124,7 @@ export interface GitProvider {
   getCommitRange(from: string, to?: string): Promise<Result<RecentCommit[]>>;
   getMergeBase(branch: string, base?: string): Promise<Result<string>>;
   getUntrackedFiles(): Promise<Result<string[]>>;
+  getUncommittedDiff(paths?: string[]): Promise<Result<string>>;
 }
 
 export interface WorkspaceProvider {

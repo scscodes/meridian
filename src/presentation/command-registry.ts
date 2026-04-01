@@ -51,7 +51,7 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   { vsCodeId: "meridian.git.status",            commandName: "git.status",           title: "Git: Show Status",               showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.pull",              commandName: "git.pull",             title: "Git: Pull",                      showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.commit",            commandName: "git.commit",           title: "Git: Commit",                    showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.smartCommit",       commandName: "git.smartCommit",      title: "Git: Smart Commit (Interactive)", showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.smartCommit",       commandName: "git.smartCommit",      title: "Git: Smart Commit (Interactive)", showInPalette: true,  requiresGit: true,  icon: "$(git-commit)" },
   { vsCodeId: "meridian.git.analyzeInbound",    commandName: "git.analyzeInbound"    /* LM tool only — not manifest-declared */                                        },
   { vsCodeId: "meridian.git.showAnalytics",     commandName: "git.showAnalytics",    title: "Git: Show Analytics",            showInPalette: true,  requiresGit: true,  icon: "$(graph)" },
   { vsCodeId: "meridian.git.exportJson",        commandName: "git.exportJson",       title: "Git: Export Analytics JSON",     showInPalette: true,  requiresGit: true  },
@@ -59,7 +59,7 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   { vsCodeId: "meridian.git.generatePR",        commandName: "git.generatePR",       title: "Git: Generate PR Description",   showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.reviewPR",          commandName: "git.reviewPR",         title: "Git: Review PR (AI)",            showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.commentPR",         commandName: "git.commentPR",        title: "Git: Generate PR Comments",      showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Git: Session Briefing (AI)",     showInPalette: true,  requiresGit: true  },
+  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Git: Session Briefing (AI)",     showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
   // git.resolveConflicts — dedicated registration in specialized-commands.ts (tree expansion hooks)
   // ── Hygiene ──────────────────────────────────────────────────────────────────
   { vsCodeId: "meridian.hygiene.scan",          commandName: "hygiene.scan",         title: "Hygiene: Scan Workspace",        showInPalette: true  },

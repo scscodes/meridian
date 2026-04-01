@@ -389,6 +389,7 @@
       {
         "command": "meridian.git.smartCommit",
         "title": "Git: Smart Commit (Interactive)",
+        "icon": "$(git-commit)",
         "category": "Meridian"
       },
       {
@@ -512,6 +513,7 @@
       {
         "command": "meridian.git.sessionBriefing",
         "title": "Git: Session Briefing (AI)",
+        "icon": "$(notebook)",
         "category": "Meridian"
       },
       {
@@ -620,6 +622,11 @@
           "default": 50,
           "minimum": 1,
           "description": "Number of lines of context to include from the active file in chat requests."
+        },
+        "meridian.sessionBriefing.autoLaunch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically open a Session Briefing panel when the extension activates."
         },
         "meridian.log.level": {
           "type": "string",
@@ -847,6 +854,16 @@
           "command": "meridian.hygiene.showAnalytics",
           "when": "view == meridian.hygiene.view",
           "group": "navigation"
+        },
+        {
+          "command": "meridian.git.smartCommit",
+          "when": "view == meridian.git.view",
+          "group": "navigation"
+        },
+        {
+          "command": "meridian.git.sessionBriefing",
+          "when": "view == meridian.git.view",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -912,7 +929,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run bundle",
-    "copy-assets": "cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
+    "copy-assets": "cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && rm -rf out/domains/git/session-briefing-ui && cp -r src/domains/git/session-briefing-ui out/domains/git/session-briefing-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
     "bundle": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --external:typescript --format=cjs --platform=node --target=node20 && npm run copy-assets",
     "compile": "tsc -p ./ && npm run copy-assets",
     "watch": "tsc -watch -p ./",

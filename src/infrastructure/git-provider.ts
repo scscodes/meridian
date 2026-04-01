@@ -194,6 +194,15 @@ class RealGitProvider implements GitProvider {
     return git(args, this.workspaceRoot);
   }
 
+  async getUncommittedDiff(paths?: string[]): Promise<Result<string>> {
+    // All changes (staged + unstaged) relative to HEAD
+    const args = ["diff", "HEAD"];
+    if (paths && paths.length > 0) {
+      args.push("--", ...paths);
+    }
+    return git(args, this.workspaceRoot);
+  }
+
   async stage(paths: string[]): Promise<Result<void>> {
     if (paths.length === 0) return success(undefined);
     const result = await git(["add", "--", ...paths], this.workspaceRoot);

@@ -5,7 +5,9 @@
  *   1. request.command  — VS Code routes /slash commands here (no leading slash)
  *   2. SLASH_MAP        — explicit "/keyword" in prompt (legacy fallback)
  *   3. "run <name>"     — shorthand for workflow.run
- *   4. chat.delegate    — NL classification + dispatch via single authority
+ *
+ * Free-text input is not classified; users are nudged toward Copilot's native
+ * tool-use (which has access to all Meridian LM tools) or slash commands.
  */
 
 import * as vscode from "vscode";
@@ -14,7 +16,6 @@ import { Command, CommandContext, CommandName, GitStatus, WorkspaceScan, DeadCod
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse, InboundChanges, SmartCommitBatchResult, GeneratedPRComments } from "../domains/git/types";
-import { DelegateResult } from "../domains/chat/handlers";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
 import { CleanupResult } from "../domains/hygiene/cleanup-handler";
 import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
@@ -85,32 +86,20 @@ export function createChatParticipant(
       return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
     }
 
-    // ── 4. NL → classify via chat.delegate, then dispatch directly ────────
+    // ── 4. Free text — nudge toward Copilot or slash commands ────────────
     if (text.length > 0) {
-      stream.progress("Figuring out what you need...");
-
-      // Phase 1: classify only (no dispatch)
-      const classifyResult = await router.dispatch(
-        { name: "chat.delegate" as CommandName, params: { task: text, classifyOnly: true } },
-        ctx
+      stream.markdown(
+        `I don't have a slash command for that, but **Copilot can use Meridian tools directly** — ` +
+        `just ask without the \`@meridian\` prefix.\n\n` +
+        `**Available slash commands:**\n` +
+        `\`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` ` +
+        `\`/workflows\` \`/agents\` \`/analytics\` \`/impact\`\n\n` +
+        `Or describe what you need to Copilot — it has access to all Meridian capabilities as tools.`
       );
-
-      if (classifyResult.kind !== "ok") {
-        logger.warn("chat.delegate classification failed, falling back", "ChatParticipant", classifyResult.error);
-        stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, trees);
-      }
-
-      const classified = classifyResult.value as DelegateResult;
-      const commandName = classified.commandName as CommandName;
-      const params = classified.classifiedParams ?? {};
-
-      // Phase 2: dispatch through handleDirectDispatch (has spinner + tree hooks)
-      stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, params, router, ctx, stream, logger, trees);
+      return;
     }
 
-    // ── 6. Empty prompt fallback ─────────────────────────────────────────────
+    // ── 5. Empty prompt fallback ─────────────────────────────────────────────
     stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/pr\`, \`/review\`, \`/briefing\`, \`/conflicts\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
   };
 
@@ -194,7 +183,7 @@ async function handleDirectDispatch(
   }
 }
 
-// ── Result formatting (shared by direct dispatch + chat.delegate path) ───────
+// ── Result formatting (shared by all dispatch paths) ────────────────────────
 // Add new formatters here — no need to touch dispatch logic.
 
 type ResultFormatter = (value: unknown, stream: vscode.ChatResponseStream) => void;

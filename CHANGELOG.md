@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/scscodes/meridian/compare/v1.4.0...v1.5.0) (2026-04-07)
+
+
+### Features
+
+* **skill:** add built-in skill domain with session overview, PR ready, and pre-merge recipes ([693a084](https://github.com/scscodes/meridian/commit/693a0849348e6f3d36d78aa62b9d84614e2cdac3))
+
 # [1.4.0](https://github.com/scscodes/meridian/compare/v1.3.0...v1.4.0) (2026-04-01)
 
 

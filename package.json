@@ -120,7 +120,7 @@
       {
         "name": "meridian_git_status",
         "displayName": "Meridian: Git Status",
-        "modelDescription": "Check the current git branch, whether the working tree is dirty, and counts of staged, unstaged, and untracked files.",
+        "modelDescription": "Returns branch name, dirty/clean state, and counts of staged, unstaged, and untracked files. Good starting point to understand the current workspace state before other operations.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -129,7 +129,7 @@
       {
         "name": "meridian_git_smart_commit",
         "displayName": "Meridian: Smart Commit",
-        "modelDescription": "Automatically group staged file changes by semantic type, suggest commit messages, and commit all groups in batch.",
+        "modelDescription": "Requires uncommitted changes (staged or unstaged) in the workspace. Analyzes diffs to group related changes and generates descriptive commit messages for each group. Interactive — presents groups for user approval before committing.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -138,7 +138,7 @@
       {
         "name": "meridian_git_analyze_inbound",
         "displayName": "Meridian: Analyze Inbound Changes",
-        "modelDescription": "Fetch and analyze incoming changes from the remote branch, detecting conflicts and summarizing diffs before merging.",
+        "modelDescription": "Fetches from the remote and analyzes what would change on merge. Returns counts of remote vs local changes, detected conflicts with severity, and recommendations. Call this before merging or pulling to understand risk. Pairs well with meridian_git_resolve_conflicts for conflict handling.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -147,7 +147,7 @@
       {
         "name": "meridian_hygiene_scan",
         "displayName": "Meridian: Hygiene Scan",
-        "modelDescription": "Scan the workspace for hygiene issues such as unused files, dead code, and oversized log files.",
+        "modelDescription": "Scan the workspace for hygiene issues: dead/orphaned files not referenced by any import, large files exceeding size thresholds, log/temp files that may be stale, and dead code (unused exports, unreferenced functions). Returns categorized counts and highlighted examples.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -156,7 +156,7 @@
       {
         "name": "meridian_workflow_run",
         "displayName": "Meridian: Run Workflow",
-        "modelDescription": "Execute a named workflow from the .vscode/workflows/ directory. Use meridian_workflow_list first if you don't know the workflow name.",
+        "modelDescription": "Execute a named workflow by running its steps sequentially through the command router. Returns per-step success/failure status, duration, and any errors. Use meridian_workflow_list first if you don't know the workflow name.",
         "inputSchema": {
           "type": "object",
           "required": [
@@ -173,7 +173,7 @@
       {
         "name": "meridian_git_show_analytics",
         "displayName": "Meridian: Git Analytics",
-        "modelDescription": "Generate a git analytics report covering commit frequency, code churn, author contributions, and file volatility metrics.",
+        "modelDescription": "Generate a comprehensive git analytics report covering commit frequency, code churn, author contributions, file volatility, and trend analysis. Opens an interactive webview panel with charts and tables. Optionally specify a time period.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -192,7 +192,7 @@
       {
         "name": "meridian_chat_delegate",
         "displayName": "Meridian: Delegate Task",
-        "modelDescription": "Route a natural language task description to the appropriate Meridian command. Use when you need to analyze, review, brief, or perform a git/hygiene operation but don't know the exact command. Provide a clear task description and Meridian will classify and execute the right command.",
+        "modelDescription": "Programmatic task router — classifies a natural language task description into a Meridian command and executes it. Intended for automated pipelines, workflows, and agent orchestration. For interactive use, prefer asking Copilot directly — it can invoke Meridian tools natively with better parameter handling.",
         "inputSchema": {
           "type": "object",
           "required": [
@@ -209,7 +209,7 @@
       {
         "name": "meridian_git_generate_pr",
         "displayName": "Meridian: Generate PR",
-        "modelDescription": "Generate a pull request description from the current branch changes, including title, summary, and change breakdown.",
+        "modelDescription": "Generate a pull request description from the current branch's changes relative to the default branch. Analyzes commits, changed files, and diffs to produce a title, summary, change breakdown, and test plan in markdown. Returns structured PR content ready for review.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -218,7 +218,7 @@
       {
         "name": "meridian_git_review_pr",
         "displayName": "Meridian: Review PR",
-        "modelDescription": "Review current branch changes and return a verdict (approve/request-changes) with per-file comments and severity ratings.",
+        "modelDescription": "Perform an AI code review of the current branch's changes. Returns a verdict (approve, request-changes, or comment) with per-file comments categorized by severity (critical, suggestion, nit). Use before opening a PR for self-review, or to review others' branches.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -227,7 +227,7 @@
       {
         "name": "meridian_git_comment_pr",
         "displayName": "Meridian: Comment PR",
-        "modelDescription": "Generate inline code review comments for changed files in the current branch.",
+        "modelDescription": "Generate granular inline code review comments for changed files in the current branch. More detailed than meridian_git_review_pr — produces file-level and line-level feedback. Use when you need specific, actionable comments rather than an overall verdict.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -236,7 +236,7 @@
       {
         "name": "meridian_git_resolve_conflicts",
         "displayName": "Meridian: Resolve Conflicts",
-        "modelDescription": "Detect git merge conflicts and suggest resolution strategies per file, including rationale for each recommendation.",
+        "modelDescription": "Analyze detected git merge conflicts and suggest resolution strategies per file. Returns keep-ours, keep-theirs, manual-merge, or review-needed with rationale for each. Call meridian_git_analyze_inbound first to detect conflicts, then use this tool for resolution guidance.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -245,7 +245,7 @@
       {
         "name": "meridian_git_session_briefing",
         "displayName": "Meridian: Session Briefing",
-        "modelDescription": "Generate a session briefing covering branch state, recent commits, uncommitted work, and suggested next steps.",
+        "modelDescription": "Generate a comprehensive morning session briefing covering current branch state, recent commit history, uncommitted changes, and any flags that need attention. Uses AI to produce a scannable markdown summary. Ideal as a start-of-day orientation.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -254,7 +254,7 @@
       {
         "name": "meridian_hygiene_impact",
         "displayName": "Meridian: Impact Analysis",
-        "modelDescription": "Trace the blast radius of a file or function change using TypeScript Compiler API. Returns importers, call sites, test coverage, and a prose summary.",
+        "modelDescription": "Trace the blast radius of changing a specific file or function using the TypeScript Compiler API. Returns importers, call sites, test file coverage, dependent file count, and a prose summary assessing risk. Essential before refactoring shared code.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -275,7 +275,7 @@
       {
         "name": "meridian_agent_execute",
         "displayName": "Meridian: Execute Agent",
-        "modelDescription": "Execute a registered agent with a target command or workflow. Use meridian_agent_list first to discover available agents and their capabilities.",
+        "modelDescription": "Execute a registered agent with a target command or workflow. The agent must have the target in its capabilities list. Use meridian_agent_list first to discover available agents and verify their capabilities before calling this tool.",
         "inputSchema": {
           "type": "object",
           "required": [
@@ -300,7 +300,7 @@
       {
         "name": "meridian_workflow_list",
         "displayName": "Meridian: List Workflows",
-        "modelDescription": "List all available workflows defined in .vscode/workflows/. Returns names, descriptions, and step counts. Call this before meridian_workflow_run when you don't know the workflow name.",
+        "modelDescription": "List all available workflows defined in .vscode/workflows/ (workspace) and bundled with the extension. Returns names, descriptions, and step counts for each workflow. Call this first to discover available workflow names before using meridian_workflow_run.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -309,7 +309,7 @@
       {
         "name": "meridian_agent_list",
         "displayName": "Meridian: List Agents",
-        "modelDescription": "List all registered agents defined in .vscode/agents/. Returns agent IDs, descriptions, and capabilities. Call this before meridian_agent_execute when you don't know the agent ID.",
+        "modelDescription": "List all registered agents defined in .vscode/agents/ (workspace) and bundled with the extension. Returns agent IDs, descriptions, and their declared capabilities (which commands they can execute). Call this first to discover available agents before using meridian_agent_execute.",
         "inputSchema": {
           "type": "object",
           "properties": {}
@@ -318,7 +318,7 @@
       {
         "name": "meridian_git_export_json",
         "displayName": "Meridian: Export Git Analytics (JSON)",
-        "modelDescription": "Export the git analytics report data as a JSON file.",
+        "modelDescription": "Export git analytics data as a JSON file. Includes commit frequency, author stats, file churn, and trend data. Optionally specify a time period.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -345,7 +345,7 @@
       {
         "name": "meridian_git_export_csv",
         "displayName": "Meridian: Export Git Analytics (CSV)",
-        "modelDescription": "Export the git analytics report data as a CSV file.",
+        "modelDescription": "Export git analytics data as a CSV file. Includes commit frequency, author stats, file churn, and trend data. Optionally specify a time period.",
         "inputSchema": {
           "type": "object",
           "properties": {

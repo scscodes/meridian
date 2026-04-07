@@ -5,7 +5,9 @@
  *   1. request.command  — VS Code routes /slash commands here (no leading slash)
  *   2. SLASH_MAP        — explicit "/keyword" in prompt (legacy fallback)
  *   3. "run <name>"     — shorthand for workflow.run
- *   4. chat.delegate    — NL classification + dispatch via single authority
+ *
+ * Free-text input is not classified; users are nudged toward Copilot's native
+ * tool-use (which has access to all Meridian LM tools) or slash commands.
  */
 
 import * as vscode from "vscode";
@@ -14,7 +16,6 @@ import { Command, CommandContext, CommandName, GitStatus, WorkspaceScan, DeadCod
 import { Logger } from "../infrastructure/logger";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { GeneratedPR, GeneratedPRReview, ConflictResolutionProse, InboundChanges, SmartCommitBatchResult, GeneratedPRComments } from "../domains/git/types";
-import { DelegateResult } from "../domains/chat/handlers";
 import { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
 import { CleanupResult } from "../domains/hygiene/cleanup-handler";
 import { ListWorkflowsResult, RunWorkflowResult } from "../domains/workflow/types";
@@ -22,6 +23,7 @@ import { WorkflowTreeProvider } from "./tree-providers/workflow-tree-provider";
 import { GitTreeProvider } from "./tree-providers/git-tree-provider";
 import { HygieneTreeProvider } from "./tree-providers/hygiene-tree-provider";
 import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
+import { SkillOverviewResult, SkillPrReadyResult, SkillPreMergeResult } from "../domains/skill/types";
 import { UI_SETTINGS } from "../constants";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
@@ -37,6 +39,9 @@ const SLASH_MAP: Record<string, CommandName> = {
   "/briefing":  "git.sessionBriefing",
   "/conflicts": "git.resolveConflicts",
   "/impact":    "hygiene.impactAnalysis",
+  "/overview":  "skill.overview",
+  "/prready":   "skill.prReady",
+  "/premerge":  "skill.preMerge",
 };
 
 export function createChatParticipant(
@@ -85,33 +90,21 @@ export function createChatParticipant(
       return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
     }
 
-    // ── 4. NL → classify via chat.delegate, then dispatch directly ────────
+    // ── 4. Free text — nudge toward Copilot or slash commands ────────────
     if (text.length > 0) {
-      stream.progress("Figuring out what you need...");
-
-      // Phase 1: classify only (no dispatch)
-      const classifyResult = await router.dispatch(
-        { name: "chat.delegate" as CommandName, params: { task: text, classifyOnly: true } },
-        ctx
+      stream.markdown(
+        `I don't have a slash command for that, but **Copilot can use Meridian tools directly** — ` +
+        `just ask without the \`@meridian\` prefix.\n\n` +
+        `**Available slash commands:**\n` +
+        `\`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` ` +
+        `\`/overview\` \`/prready\` \`/premerge\` \`/workflows\` \`/agents\` \`/analytics\` \`/impact\`\n\n` +
+        `Or describe what you need to Copilot — it has access to all Meridian capabilities as tools.`
       );
-
-      if (classifyResult.kind !== "ok") {
-        logger.warn("chat.delegate classification failed, falling back", "ChatParticipant", classifyResult.error);
-        stream.markdown(`\`@meridian\` → \`chat.context\`\n\n`);
-        return handleDirectDispatch("chat.context", {}, router, ctx, stream, logger, trees);
-      }
-
-      const classified = classifyResult.value as DelegateResult;
-      const commandName = classified.commandName as CommandName;
-      const params = classified.classifiedParams ?? {};
-
-      // Phase 2: dispatch through handleDirectDispatch (has spinner + tree hooks)
-      stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, params, router, ctx, stream, logger, trees);
+      return;
     }
 
-    // ── 6. Empty prompt fallback ─────────────────────────────────────────────
-    stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/pr\`, \`/review\`, \`/briefing\`, \`/conflicts\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
+    // ── 5. Empty prompt fallback ─────────────────────────────────────────────
+    stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/pr\`, \`/review\`, \`/briefing\`, \`/conflicts\`, \`/overview\`, \`/prready\`, \`/premerge\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
   };
 
   const participant = vscode.chat.createChatParticipant("meridian", handler);
@@ -194,7 +187,7 @@ async function handleDirectDispatch(
   }
 }
 
-// ── Result formatting (shared by direct dispatch + chat.delegate path) ───────
+// ── Result formatting (shared by all dispatch paths) ────────────────────────
 // Add new formatters here — no need to touch dispatch logic.
 
 type ResultFormatter = (value: unknown, stream: vscode.ChatResponseStream) => void;
@@ -395,6 +388,33 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     for (const c of r.comments ?? []) {
       const loc = c.line ? `:${c.line}` : "";
       stream.markdown(`- \`${c.file}${loc}\`: ${c.comment}\n`);
+    }
+  },
+  "skill.overview": (value, stream) => {
+    const r = value as SkillOverviewResult;
+    const s = r.status;
+    stream.markdown(`**Branch:** \`${s?.branch ?? "unknown"}\` (${s?.isDirty ? "dirty" : "clean"})\n\n`);
+    stream.markdown(r.briefing);
+  },
+  "skill.prReady": (value, stream) => {
+    const r = value as SkillPrReadyResult;
+    const scan = r.scan;
+    const issues = (scan?.deadFiles?.length ?? 0) + (scan?.largeFiles?.length ?? 0) + (scan?.logFiles?.length ?? 0);
+    stream.markdown(`**Hygiene:** ${issues === 0 ? "clean" : `${issues} issue(s) found`}\n\n`);
+    stream.markdown(`**Review verdict:** ${r.review?.verdict ?? "unknown"}\n\n`);
+    if (r.review?.summary) stream.markdown(`${r.review.summary}\n\n`);
+    stream.markdown(`---\n\n${r.pr?.body ?? "No PR description generated."}\n`);
+  },
+  "skill.preMerge": (value, stream) => {
+    const r = value as SkillPreMergeResult;
+    const ib = r.inbound;
+    stream.markdown(`**Inbound:** ${ib?.totalInbound ?? 0} remote change(s), ${ib?.conflicts?.length ?? 0} conflict(s)\n\n`);
+    if (r.conflicts?.perFile?.length) {
+      for (const f of r.conflicts.perFile) {
+        stream.markdown(`- **\`${f.path}\`** \u2192 \`${f.strategy}\`: ${f.rationale}\n`);
+      }
+    } else {
+      stream.markdown("No conflicts detected.\n");
     }
   },
   "hygiene.cleanup": (value, stream) => {

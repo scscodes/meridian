@@ -51,6 +51,10 @@ export const COMMAND_CATALOG: readonly CatalogEntry[] = [
   // ── Agent ──────────────────────────────────────────────────────────────────
   { commandName: "agent.list",            lmToolName: "meridian_agent_list",            description: "list available agents"                                    },
   { commandName: "agent.execute",         lmToolName: "meridian_agent_execute",         description: "run a named agent with a target command or workflow"      },
+  // ── Skill ─────────────────────────────────────────────────────────────
+  { commandName: "skill.overview",   lmToolName: "meridian_skill_overview",    description: "morning session overview (status + briefing)" },
+  { commandName: "skill.prReady",    lmToolName: "meridian_skill_pr_ready",    description: "PR readiness check (scan + review + PR description)" },
+  { commandName: "skill.preMerge",   lmToolName: "meridian_skill_pre_merge",   description: "pre-merge check (inbound analysis + conflict resolution)" },
   // ── Chat (meta: omitted from classifier + KNOWN_COMMAND_NAMES) ─────────────
   { commandName: "chat.context",  omitFromClassifier: true, description: "gather workspace and git context"  },
   { commandName: "chat.delegate", omitFromClassifier: true, lmToolName: "meridian_chat_delegate", description: "classify and delegate a task" },

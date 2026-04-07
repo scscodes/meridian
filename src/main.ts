@@ -12,6 +12,7 @@ import { createHygieneDomain } from "./domains/hygiene/service";
 import { createChatDomain } from "./domains/chat/service";
 import { createWorkflowDomain } from "./domains/workflow/service";
 import { createAgentDomain } from "./domains/agent/service";
+import { createSkillDomain } from "./domains/skill/service";
 import {
   createObservabilityMiddleware,
   createAuditMiddleware,
@@ -94,6 +95,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   router.registerDomain(createChatDomain(gitProvider, logger, (cmd, ctx) => router.dispatch(cmd, ctx), generateProse));
   router.registerDomain(createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath));
   router.registerDomain(createAgentDomain(logger, workspaceRoot, extensionPath, (cmd, ctx) => router.dispatch(cmd, ctx)));
+  router.registerDomain(createSkillDomain(logger, (cmd, ctx) => router.dispatch(cmd, ctx)));
 
   const validationResult = await router.validateDomains();
   if (validationResult.kind === "err") {

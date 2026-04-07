@@ -112,6 +112,18 @@
           {
             "name": "impact",
             "description": "Trace the blast radius of a file or function change"
+          },
+          {
+            "name": "overview",
+            "description": "Session overview: branch state, recent commits, and session briefing"
+          },
+          {
+            "name": "prready",
+            "description": "PR readiness check: hygiene scan, code review, and PR description"
+          },
+          {
+            "name": "premerge",
+            "description": "Pre-merge check: inbound changes analysis and conflict resolution"
           }
         ]
       }
@@ -316,6 +328,33 @@
         }
       },
       {
+        "name": "meridian_skill_overview",
+        "displayName": "Meridian: Session Overview",
+        "modelDescription": "Run a composite session overview that checks git status and generates a morning briefing in one call. Combines meridian_git_status and meridian_git_session_briefing into a single operation. Ideal as a start-of-day orientation.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_skill_pr_ready",
+        "displayName": "Meridian: PR Readiness Check",
+        "modelDescription": "Run a composite PR readiness check that scans for hygiene issues, performs an AI code review, and generates a PR description — all in one call. Combines meridian_hygiene_scan, meridian_git_review_pr, and meridian_git_generate_pr. Use when preparing to open a pull request.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "meridian_skill_pre_merge",
+        "displayName": "Meridian: Pre-merge Check",
+        "modelDescription": "Run a composite pre-merge check that analyzes incoming remote changes and suggests conflict resolution strategies — all in one call. Combines meridian_git_analyze_inbound and meridian_git_resolve_conflicts. Use before merging or pulling to assess risk.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
         "name": "meridian_git_export_json",
         "displayName": "Meridian: Export Git Analytics (JSON)",
         "modelDescription": "Export the git analytics report data as a JSON file.",
@@ -514,6 +553,21 @@
         "command": "meridian.git.sessionBriefing",
         "title": "Git: Session Briefing (AI)",
         "icon": "$(notebook)",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.skill.overview",
+        "title": "Skill: Session Overview",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.skill.prReady",
+        "title": "Skill: PR Readiness Check",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.skill.preMerge",
+        "title": "Skill: Pre-merge Check",
         "category": "Meridian"
       },
       {
@@ -822,6 +876,15 @@
         {
           "command": "meridian.agent.run",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.skill.overview"
+        },
+        {
+          "command": "meridian.skill.prReady"
+        },
+        {
+          "command": "meridian.skill.preMerge"
         }
       ],
       "view/title": [

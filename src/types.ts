@@ -47,7 +47,8 @@ export type CommandName =
   | HygieneCommandName
   | ChatCommandName
   | WorkflowCommandName
-  | AgentCommandName;
+  | AgentCommandName
+  | SkillCommandName;
 
 export type GitCommandName =
   | "git.status"
@@ -67,6 +68,7 @@ export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.s
 export type ChatCommandName = "chat.context" | "chat.delegate";
 export type WorkflowCommandName = "workflow.list" | "workflow.run";
 export type AgentCommandName = "agent.list" | "agent.execute";
+export type SkillCommandName = "skill.overview" | "skill.prReady" | "skill.preMerge";
 
 // ============================================================================
 // Handler Interface (Aiogram-style Router Pattern)

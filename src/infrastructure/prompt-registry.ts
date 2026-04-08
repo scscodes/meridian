@@ -149,6 +149,9 @@ Given a task description, respond with EXACTLY ONE command ID that best handles 
 
 ${buildClassifierLines()}
 
+If the task describes running a specific pipeline, deployment, or workflow by name, prefer
+"workflow.run:<name>" using the exact name from the workspace workflow list below (if provided).
+
 Respond with ONLY the command ID (e.g. "git.status" or "workflow.run:my-workflow"). Nothing else.`,
 
   // ── hygiene/impact-analysis-handler ─────────────────────────────────

@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/scscodes/meridian/compare/v1.5.0...v1.6.0) (2026-04-08)
+
+
+### Features
+
+* **chat:** add NL → workflow routing via chat.delegate classifier ([114039d](https://github.com/scscodes/meridian/commit/114039d6d1713c7eef03ca7c508586ee78ae676f))
+
 # [1.5.0](https://github.com/scscodes/meridian/compare/v1.4.0...v1.5.0) (2026-04-07)
 
 

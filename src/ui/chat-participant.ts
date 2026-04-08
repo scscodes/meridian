@@ -25,6 +25,7 @@ import { HygieneTreeProvider } from "./tree-providers/hygiene-tree-provider";
 import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
 import { SkillOverviewResult, SkillPrReadyResult, SkillPreMergeResult } from "../domains/skill/types";
 import { UI_SETTINGS } from "../constants";
+import { DelegateResult } from "../domains/chat/handlers";
 
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
 const SLASH_MAP: Record<string, CommandName> = {
@@ -90,8 +91,27 @@ export function createChatParticipant(
       return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
     }
 
-    // ── 4. Free text — nudge toward Copilot or slash commands ────────────
+    // ── 4. NL routing — classify intent via chat.delegate ───────────────────
+    //    Requires Copilot (generateProseFn). Falls back to nudge on failure or
+    //    when the classifier cannot identify a more specific command.
     if (text.length > 0) {
+      logger.info(`NL routing: classifying "${text.slice(0, 80)}"`, "ChatParticipant");
+      const delegateResult = await router.dispatch(
+        { name: "chat.delegate", params: { task: text } },
+        ctx
+      );
+
+      if (delegateResult.kind === "ok") {
+        const dr = delegateResult.value as DelegateResult;
+        // Suppress feedback for fallback classification (chat.context = intent unrecognised)
+        if (dr.dispatched && dr.commandName !== "chat.context") {
+          stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
+          formatCommandResult(dr.commandName, dr.result, stream);
+          return;
+        }
+      }
+
+      // Fallback: nudge (no generateProseFn available, or intent unrecognised)
       stream.markdown(
         `I don't have a slash command for that, but **Copilot can use Meridian tools directly** — ` +
         `just ask without the \`@meridian\` prefix.\n\n` +

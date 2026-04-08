@@ -6,6 +6,7 @@ import {
   Handler,
   CommandContext,
   Command,
+  CommandName,
   Result,
   success,
   failure,
@@ -17,6 +18,7 @@ import {
 import { CHAT_ERROR_CODES } from "../../infrastructure/error-codes";
 import { getPrompt } from "../../infrastructure/prompt-registry";
 import { KNOWN_COMMAND_NAMES } from "../../infrastructure/command-catalog";
+import { ListWorkflowsResult } from "../../domains/workflow/types";
 
 // ============================================================================
 // Context Handler
@@ -72,7 +74,7 @@ export interface DelegateParams {
 
 export interface DelegateResult {
   dispatched: boolean;
-  commandName: string;
+  commandName: CommandName;
   result: unknown;
   classifiedParams?: Record<string, unknown>;
 }
@@ -114,20 +116,25 @@ export function createDelegateHandler(
 
       logger.info(`Classifying task: "${task}"`, "ChatDelegateHandler");
 
-      // Fetch available workflow names to augment the classifier
+      // Fetch available workflow names to augment the classifier prompt so the
+      // LLM can match user intent to workspace-specific workflow names.
       let workflowContext = "";
       try {
         const wfResult = await dispatcher(
-          { name: "workflow.list" as any, params: {} },
+          { name: "workflow.list" as CommandName, params: {} },
           ctx
         );
         if (wfResult.kind === "ok") {
-          const wfData = wfResult.value as { workflows: Array<{ name: string; description?: string }> };
+          const wfData = wfResult.value as ListWorkflowsResult;
           if (wfData.workflows.length > 0) {
-            workflowContext = "\n\nAvailable workflows:\n" +
+            workflowContext = "\n\nAvailable workspace workflows:\n" +
               wfData.workflows.map(w =>
                 `  workflow.run:${w.name}${w.description ? ` — ${w.description}` : ""}`
               ).join("\n");
+            logger.debug(
+              `Classifier augmented with ${wfData.workflows.length} workflow(s)`,
+              "ChatDelegateHandler"
+            );
           }
         }
       } catch {
@@ -147,13 +154,13 @@ export function createDelegateHandler(
       const raw = classifyResult.value.trim().split("\n")[0].trim();
 
       // Handle parameterized command: workflow.run:<name>
-      let commandName: string;
+      let commandName: CommandName;
       let dispatchParams: Record<string, unknown> = {};
       if (raw.startsWith("workflow.run:")) {
         commandName = "workflow.run";
         dispatchParams = { name: raw.slice("workflow.run:".length).trim() };
       } else {
-        commandName = KNOWN_COMMANDS.has(raw) ? raw : "chat.context";
+        commandName = KNOWN_COMMANDS.has(raw) ? raw as CommandName : "chat.context";
       }
 
       logger.info(`Classified as: "${commandName}" (raw: "${raw}")`, "ChatDelegateHandler");
@@ -167,7 +174,7 @@ export function createDelegateHandler(
         });
       }
 
-      const dispatchResult = await dispatcher({ name: commandName as any, params: dispatchParams }, ctx);
+      const dispatchResult = await dispatcher({ name: commandName, params: dispatchParams }, ctx);
 
       if (dispatchResult.kind === "err") {
         logger.warn(

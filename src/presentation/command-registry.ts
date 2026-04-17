@@ -14,6 +14,7 @@ import { presentResult, PresenterContext } from "./result-presenters";
 const PROGRESS_COMMANDS: ReadonlySet<CommandName> = new Set([
   "git.generatePR", "git.reviewPR", "git.sessionBriefing",
   "git.showAnalytics", "hygiene.scan",
+  "skill.overview", "skill.prReady", "skill.preMerge",
 ] as CommandName[]);
 
 const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
@@ -22,6 +23,9 @@ const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
   "git.sessionBriefing": "Generating session briefing...",
   "git.showAnalytics": "Loading git analytics...",
   "hygiene.scan": "Scanning workspace...",
+  "skill.overview": "Running session overview...",
+  "skill.prReady": "Checking PR readiness...",
+  "skill.preMerge": "Running pre-merge check...",
 };
 
 /**
@@ -74,6 +78,10 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   // ── Agent ─────────────────────────────────────────────────────────────────────
   { vsCodeId: "meridian.agent.list",            commandName: "agent.list",           title: "Agent: List All",                showInPalette: true  },
   { vsCodeId: "meridian.agent.execute",         commandName: "agent.execute"         /* LM tool only — not manifest-declared */                                        },
+  // ── Skill ─────────────────────────────────────────────────────────────────────
+  { vsCodeId: "meridian.skill.overview",   commandName: "skill.overview",   title: "Skill: Session Overview",    showInPalette: true,  requiresGit: true },
+  { vsCodeId: "meridian.skill.prReady",    commandName: "skill.prReady",    title: "Skill: PR Readiness Check",  showInPalette: true,  requiresGit: true },
+  { vsCodeId: "meridian.skill.preMerge",   commandName: "skill.preMerge",   title: "Skill: Pre-merge Check",     showInPalette: true,  requiresGit: true },
 ];
 
 /**

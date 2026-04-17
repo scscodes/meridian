@@ -110,6 +110,15 @@ export const AGENT_ERROR_CODES = {
 } as const;
 
 // ============================================================================
+// Skill Domain Error Codes
+// ============================================================================
+
+export const SKILL_ERROR_CODES = {
+  SKILL_EXECUTION_ERROR: "SKILL_EXECUTION_ERROR",
+  SKILL_STEP_FAILED: "SKILL_STEP_FAILED",
+} as const;
+
+// ============================================================================
 // Router Error Codes
 // ============================================================================
 
@@ -159,6 +168,7 @@ export const ERROR_CODES = {
   ...CHAT_ERROR_CODES,
   ...WORKFLOW_ERROR_CODES,
   ...AGENT_ERROR_CODES,
+  ...SKILL_ERROR_CODES,
   ...ROUTER_ERROR_CODES,
   ...INFRASTRUCTURE_ERROR_CODES,
   ...GENERIC_ERROR_CODES,

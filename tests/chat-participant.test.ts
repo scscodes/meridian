@@ -1,11 +1,11 @@
 /**
- * Chat Participant Routing Tests — covers the 4-tier routing precedence
- * documented in ui/chat-participant.ts.
+ * Chat Participant Routing Tests — covers the 3-tier routing precedence
+ * documented in ui/chat-participant.ts, plus the free-text nudge.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { CommandContext } from "../src/types";
-import { success, failure } from "../src/types";
+import { success } from "../src/types";
 import { MockLogger } from "./fixtures";
 
 // ── Mock vscode before importing the module under test ────────────────────────
@@ -102,16 +102,16 @@ describe("ChatParticipant routing", () => {
     expect(stream.markdown).toHaveBeenCalledWith(expect.stringContaining("TypeScript file"));
   });
 
-  it("tier 1: unknown slash command with non-empty prompt falls through to classifier", async () => {
-    const delegateResult = success({ dispatched: true, commandName: "git.status", result: {} });
-    router.dispatch.mockResolvedValue(delegateResult);
+  it("tier 1: unknown slash command with non-empty prompt falls through to NL tier then nudge", async () => {
+    // chat.delegate returns dispatched:false (no generateProseFn / fallback to context)
+    router.dispatch.mockResolvedValue(success({ dispatched: false, commandName: "chat.context", result: null }));
     const stream = makeStream();
-    // request.command is set but not in SLASH_MAP, prompt has text → falls to tier 4
     await chatHandler({ command: "unknownCommand", prompt: "show git status" }, {}, stream, {});
     expect(router.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "chat.delegate", params: expect.objectContaining({ classifyOnly: true }) }),
+      expect.objectContaining({ name: "chat.delegate", params: { task: "show git status" } }),
       BASE_CTX
     );
+    expect(stream.markdown).toHaveBeenCalledWith(expect.stringContaining("Copilot can use Meridian tools directly"));
   });
 
   // ── Tier 2: SLASH_MAP keyword in prompt ──────────────────────────────────────
@@ -154,47 +154,60 @@ describe("ChatParticipant routing", () => {
     );
   });
 
-  // ── Tier 4: chat.delegate (LLM classifier) ───────────────────────────────────
+  // ── Tier 4: NL routing via chat.delegate ─────────────────────────────────────
 
-  it("tier 4: classifies NL prompt via chat.delegate with classifyOnly, then dispatches directly", async () => {
-    const classifyResult = success({ dispatched: false, commandName: "git.status", result: null, classifiedParams: {} });
-    const statusResult = success({ branch: "main", isDirty: false, staged: 0, unstaged: 0, untracked: 0 });
-    router.dispatch
-      .mockResolvedValueOnce(classifyResult)   // Phase 1: classifyOnly
-      .mockResolvedValueOnce(statusResult);      // Phase 2: direct dispatch
+  it("NL tier: routes free text to classified command and formats result", async () => {
+    const statusValue = { branch: "main", isDirty: false, staged: 0, unstaged: 0, untracked: 0 };
+    router.dispatch.mockResolvedValue(success({
+      dispatched: true,
+      commandName: "git.status",
+      result: statusValue,
+    }));
     const stream = makeStream();
     await chatHandler({ command: undefined, prompt: "show me my git status please" }, {}, stream, {});
-    // Phase 1: classifyOnly call
-    expect(router.dispatch).toHaveBeenNthCalledWith(1,
-      expect.objectContaining({ name: "chat.delegate", params: { task: "show me my git status please", classifyOnly: true } }),
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "chat.delegate", params: { task: "show me my git status please" } }),
       BASE_CTX
     );
-    // Phase 2: direct dispatch
-    expect(router.dispatch).toHaveBeenNthCalledWith(2,
-      expect.objectContaining({ name: "git.status" }),
-      BASE_CTX
-    );
+    const allMarkdown = stream.markdown.mock.calls.map((c: unknown[]) => c[0]).join("");
+    expect(allMarkdown).toContain("git.status");
+    expect(allMarkdown).toContain("main");
   });
 
-  it("tier 4: falls back to chat.context when classifyOnly fails", async () => {
-    const errResult = failure({ code: "MODEL_UNAVAILABLE", message: "No model" });
-    const contextResult = success({ activeFile: "/ws/src/main.ts", gitBranch: "main" });
-    router.dispatch
-      .mockResolvedValueOnce(errResult)    // classifyOnly fails
-      .mockResolvedValueOnce(contextResult); // chat.context fallback via handleDirectDispatch
+  it("NL tier: routes free text to workflow.run and formats result", async () => {
+    const stepResults = [{ stepId: "build", success: true }];
+    router.dispatch.mockResolvedValue(success({
+      dispatched: true,
+      commandName: "workflow.run",
+      result: { workflowName: "deploy", success: true, duration: 1200, stepCount: 1, message: "ok", stepResults },
+    }));
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "deploy my app" }, {}, stream, {});
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "chat.delegate", params: { task: "deploy my app" } }),
+      BASE_CTX
+    );
+    const allMarkdown = stream.markdown.mock.calls.map((c: unknown[]) => c[0]).join("");
+    expect(allMarkdown).toContain("deploy");
+    expect(allMarkdown).toContain("build");
+  });
+
+  it("NL tier: falls back to nudge when chat.delegate is unavailable (no generateProseFn)", async () => {
+    router.dispatch.mockResolvedValue(success({ dispatched: false, commandName: "chat.context", result: null }));
     const stream = makeStream();
     await chatHandler({ command: undefined, prompt: "do something" }, {}, stream, {});
-    expect(router.dispatch).toHaveBeenCalledTimes(2);
-    // Phase 1: classifyOnly
-    expect(router.dispatch).toHaveBeenNthCalledWith(1,
-      expect.objectContaining({ name: "chat.delegate", params: expect.objectContaining({ classifyOnly: true }) }),
+    expect(router.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "chat.delegate" }),
       BASE_CTX
     );
-    // Fallback: chat.context
-    expect(router.dispatch).toHaveBeenNthCalledWith(2,
-      expect.objectContaining({ name: "chat.context" }),
-      BASE_CTX
-    );
+    expect(stream.markdown).toHaveBeenCalledWith(expect.stringContaining("Available slash commands"));
+  });
+
+  it("NL tier: falls back to nudge when chat.delegate returns an error", async () => {
+    router.dispatch.mockResolvedValue({ kind: "err", error: { code: "CHAT_DELEGATE_NO_GENERATE_FN", message: "no Copilot" } });
+    const stream = makeStream();
+    await chatHandler({ command: undefined, prompt: "show me something" }, {}, stream, {});
+    expect(stream.markdown).toHaveBeenCalledWith(expect.stringContaining("Copilot can use Meridian tools directly"));
   });
 
   // ── Edge cases ───────────────────────────────────────────────────────────────

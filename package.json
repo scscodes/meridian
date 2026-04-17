@@ -66,7 +66,7 @@
         "id": "meridian",
         "name": "meridian",
         "fullName": "Meridian",
-        "description": "Git, hygiene, workflow, and agent assistant for your workspace",
+        "description": "Git ops, hygiene, and workflow automation for your workspace",
         "isDefault": false,
         "commands": [
           {
@@ -112,6 +112,18 @@
           {
             "name": "impact",
             "description": "Trace the blast radius of a file or function change"
+          },
+          {
+            "name": "commit",
+            "description": "Smart-commit staged changes — grouped by semantic type"
+          },
+          {
+            "name": "inbound",
+            "description": "Analyze incoming remote changes for conflicts before merging"
+          },
+          {
+            "name": "cleanup",
+            "description": "Delete files flagged by the last hygiene scan (dry-run safe)"
           }
         ]
       }
@@ -120,6 +132,9 @@
       {
         "name": "meridian_git_status",
         "displayName": "Meridian: Git Status",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Check the current git branch, whether the working tree is dirty, and counts of staged, unstaged, and untracked files.",
         "inputSchema": {
           "type": "object",
@@ -129,6 +144,9 @@
       {
         "name": "meridian_git_smart_commit",
         "displayName": "Meridian: Smart Commit",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Automatically group staged file changes by semantic type, suggest commit messages, and commit all groups in batch.",
         "inputSchema": {
           "type": "object",
@@ -138,6 +156,9 @@
       {
         "name": "meridian_git_analyze_inbound",
         "displayName": "Meridian: Analyze Inbound Changes",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Fetch and analyze incoming changes from the remote branch, detecting conflicts and summarizing diffs before merging.",
         "inputSchema": {
           "type": "object",
@@ -147,6 +168,9 @@
       {
         "name": "meridian_hygiene_scan",
         "displayName": "Meridian: Hygiene Scan",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "hygiene"],
+        "icon": "$(compass)",
         "modelDescription": "Scan the workspace for hygiene issues such as unused files, dead code, and oversized log files.",
         "inputSchema": {
           "type": "object",
@@ -156,6 +180,9 @@
       {
         "name": "meridian_workflow_run",
         "displayName": "Meridian: Run Workflow",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "workflow"],
+        "icon": "$(compass)",
         "modelDescription": "Execute a named workflow from the .vscode/workflows/ directory. Use meridian_workflow_list first if you don't know the workflow name.",
         "inputSchema": {
           "type": "object",
@@ -173,6 +200,9 @@
       {
         "name": "meridian_git_show_analytics",
         "displayName": "Meridian: Git Analytics",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Generate a git analytics report covering commit frequency, code churn, author contributions, and file volatility metrics.",
         "inputSchema": {
           "type": "object",
@@ -192,6 +222,9 @@
       {
         "name": "meridian_chat_delegate",
         "displayName": "Meridian: Delegate Task",
+        "canBeReferencedInPrompt": false,
+        "tags": ["meridian", "chat"],
+        "icon": "$(compass)",
         "modelDescription": "Route a natural language task description to the appropriate Meridian command. Use when you need to analyze, review, brief, or perform a git/hygiene operation but don't know the exact command. Provide a clear task description and Meridian will classify and execute the right command.",
         "inputSchema": {
           "type": "object",
@@ -209,6 +242,9 @@
       {
         "name": "meridian_git_generate_pr",
         "displayName": "Meridian: Generate PR",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Generate a pull request description from the current branch changes, including title, summary, and change breakdown.",
         "inputSchema": {
           "type": "object",
@@ -218,6 +254,9 @@
       {
         "name": "meridian_git_review_pr",
         "displayName": "Meridian: Review PR",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Review current branch changes and return a verdict (approve/request-changes) with per-file comments and severity ratings.",
         "inputSchema": {
           "type": "object",
@@ -227,6 +266,9 @@
       {
         "name": "meridian_git_comment_pr",
         "displayName": "Meridian: Comment PR",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Generate inline code review comments for changed files in the current branch.",
         "inputSchema": {
           "type": "object",
@@ -236,6 +278,9 @@
       {
         "name": "meridian_git_resolve_conflicts",
         "displayName": "Meridian: Resolve Conflicts",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Detect git merge conflicts and suggest resolution strategies per file, including rationale for each recommendation.",
         "inputSchema": {
           "type": "object",
@@ -245,6 +290,9 @@
       {
         "name": "meridian_git_session_briefing",
         "displayName": "Meridian: Session Briefing",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Generate a session briefing covering branch state, recent commits, uncommitted work, and suggested next steps.",
         "inputSchema": {
           "type": "object",
@@ -254,6 +302,9 @@
       {
         "name": "meridian_hygiene_impact",
         "displayName": "Meridian: Impact Analysis",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "hygiene"],
+        "icon": "$(compass)",
         "modelDescription": "Trace the blast radius of a file or function change using TypeScript Compiler API. Returns importers, call sites, test coverage, and a prose summary.",
         "inputSchema": {
           "type": "object",
@@ -275,6 +326,9 @@
       {
         "name": "meridian_agent_execute",
         "displayName": "Meridian: Execute Agent",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "agent"],
+        "icon": "$(compass)",
         "modelDescription": "Execute a registered agent with a target command or workflow. Use meridian_agent_list first to discover available agents and their capabilities.",
         "inputSchema": {
           "type": "object",
@@ -300,6 +354,9 @@
       {
         "name": "meridian_workflow_list",
         "displayName": "Meridian: List Workflows",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "workflow"],
+        "icon": "$(compass)",
         "modelDescription": "List all available workflows defined in .vscode/workflows/. Returns names, descriptions, and step counts. Call this before meridian_workflow_run when you don't know the workflow name.",
         "inputSchema": {
           "type": "object",
@@ -309,6 +366,9 @@
       {
         "name": "meridian_agent_list",
         "displayName": "Meridian: List Agents",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "agent"],
+        "icon": "$(compass)",
         "modelDescription": "List all registered agents defined in .vscode/agents/. Returns agent IDs, descriptions, and capabilities. Call this before meridian_agent_execute when you don't know the agent ID.",
         "inputSchema": {
           "type": "object",
@@ -318,6 +378,9 @@
       {
         "name": "meridian_git_export_json",
         "displayName": "Meridian: Export Git Analytics (JSON)",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Export the git analytics report data as a JSON file.",
         "inputSchema": {
           "type": "object",
@@ -345,6 +408,9 @@
       {
         "name": "meridian_git_export_csv",
         "displayName": "Meridian: Export Git Analytics (CSV)",
+        "canBeReferencedInPrompt": true,
+        "tags": ["meridian", "git"],
+        "icon": "$(compass)",
         "modelDescription": "Export the git analytics report data as a CSV file.",
         "inputSchema": {
           "type": "object",

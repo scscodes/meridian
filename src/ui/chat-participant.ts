@@ -27,6 +27,12 @@ import { SkillOverviewResult, SkillPrReadyResult, SkillPreMergeResult } from "..
 import { UI_SETTINGS } from "../constants";
 import { DelegateResult } from "../domains/chat/handlers";
 
+interface FollowupMeta {
+  commandName: CommandName;
+  succeeded: boolean;
+  firstWorkflowName?: string;
+}
+
 // Declared slash commands (mirrors package.json chatParticipants.commands[].name)
 const SLASH_MAP: Record<string, CommandName> = {
   "/status":    "git.status",
@@ -43,6 +49,9 @@ const SLASH_MAP: Record<string, CommandName> = {
   "/overview":  "skill.overview",
   "/prready":   "skill.prReady",
   "/premerge":  "skill.preMerge",
+  "/commit":    "git.smartCommit",
+  "/inbound":   "git.analyzeInbound",
+  "/cleanup":   "hygiene.cleanup",
 };
 
 export function createChatParticipant(
@@ -70,7 +79,8 @@ export function createChatParticipant(
       if (commandName) {
         logger.info(`Routing via request.command: ${cmd} → ${commandName}`, "ChatParticipant");
         stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-        return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
+        const meta = await handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
+        return meta ? { metadata: meta } : {};
       }
     }
 
@@ -81,14 +91,16 @@ export function createChatParticipant(
     if (firstWord in SLASH_MAP) {
       const commandName = SLASH_MAP[firstWord];
       stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      return handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
+      const meta = await handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
+      return meta ? { metadata: meta } : {};
     }
 
     // ── 3. "run <name>" shorthand ────────────────────────────────────────────
     if (firstWord === "run" && text.length > 4) {
       const name = text.slice(4).trim();
       stream.markdown(`\`@meridian\` → \`workflow.run\`\n\n`);
-      return handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
+      const meta = await handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
+      return meta ? { metadata: meta } : {};
     }
 
     // ── 4. NL routing — classify intent via chat.delegate ───────────────────
@@ -107,7 +119,8 @@ export function createChatParticipant(
         if (dr.dispatched && dr.commandName !== "chat.context") {
           stream.markdown(`\`@meridian\` → \`${dr.commandName}\`\n\n`);
           formatCommandResult(dr.commandName, dr.result, stream);
-          return;
+          const succeeded = (dr.result as { kind: string } | null)?.kind === "ok";
+          return { metadata: { commandName: dr.commandName, succeeded } };
         }
       }
 
@@ -125,6 +138,7 @@ export function createChatParticipant(
 
     // ── 5. Empty prompt fallback ─────────────────────────────────────────────
     stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/pr\`, \`/review\`, \`/briefing\`, \`/conflicts\`, \`/overview\`, \`/prready\`, \`/premerge\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
+    return;
   };
 
   const participant = vscode.chat.createChatParticipant("meridian", handler);
@@ -133,6 +147,7 @@ export function createChatParticipant(
     "media",
     "icon.svg"
   );
+  participant.followupProvider = { provideFollowups };
   return participant;
 }
 
@@ -152,13 +167,13 @@ async function handleDirectDispatch(
   stream: vscode.ChatResponseStream,
   logger: Logger,
   trees: DispatchTrees
-): Promise<void> {
+): Promise<FollowupMeta | void> {
   const { workflowTree, gitTree, hygieneTree } = trees;
   // Auto-populate filePath for impact analysis from active editor
   if (commandName === "hygiene.impactAnalysis" && !params.filePath) {
     if (!ctx.activeFilePath) {
       stream.markdown("Open a TypeScript file first, then try `/impact` again.");
-      return;
+      return { commandName, succeeded: false };
     }
     params = { ...params, filePath: ctx.activeFilePath };
   }
@@ -201,9 +216,16 @@ async function handleDirectDispatch(
 
   if (result.kind === "ok") {
     formatCommandResult(commandName, result.value, stream);
+    const meta: FollowupMeta = { commandName, succeeded: true };
+    if (commandName === "workflow.list") {
+      const wl = result.value as ListWorkflowsResult;
+      meta.firstWorkflowName = wl.workflows?.[0]?.name;
+    }
+    return meta;
   } else {
     logger.warn(`Chat dispatch failed: ${commandName}`, "ChatParticipant", result.error);
     stream.markdown(`**Error** \`${result.error.code}\`: ${result.error.message}`);
+    return { commandName, succeeded: false };
   }
 }
 
@@ -470,4 +492,58 @@ function formatCommandResult(
   // Default: generic message from result-handler
   const msg = formatResultMessage(commandName, { kind: "ok", value });
   stream.markdown(msg.message);
+}
+
+const FOLLOWUP_MAP: Partial<Record<CommandName, readonly vscode.ChatFollowup[]>> = {
+  "git.status":            [{ label: "Generate PR", prompt: "/pr", participant: "meridian" },
+                             { label: "Smart commit staged", prompt: "/commit", participant: "meridian" },
+                             { label: "Session briefing", prompt: "/briefing", participant: "meridian" }],
+  "git.smartCommit":       [{ label: "Show status", prompt: "/status", participant: "meridian" },
+                             { label: "Generate PR", prompt: "/pr", participant: "meridian" }],
+  "git.analyzeInbound":    [{ label: "Resolve conflicts", prompt: "/conflicts", participant: "meridian" },
+                             { label: "Show status", prompt: "/status", participant: "meridian" }],
+  "git.generatePR":        [{ label: "Review the PR", prompt: "/review", participant: "meridian" },
+                             { label: "Comment on PR", prompt: "comment on the PR", participant: "meridian" }],
+  "git.reviewPR":          [{ label: "Generate inline comments", prompt: "comment on the PR", participant: "meridian" },
+                             { label: "Generate PR description", prompt: "/pr", participant: "meridian" }],
+  "git.resolveConflicts":  [{ label: "Show status", prompt: "/status", participant: "meridian" },
+                             { label: "Analyze inbound", prompt: "/inbound", participant: "meridian" }],
+  "git.sessionBriefing":   [{ label: "Show status", prompt: "/status", participant: "meridian" },
+                             { label: "Generate PR", prompt: "/pr", participant: "meridian" }],
+  "hygiene.scan":          [{ label: "Cleanup dead files", prompt: "/cleanup", participant: "meridian" },
+                             { label: "Show hygiene analytics", prompt: "show hygiene analytics", participant: "meridian" }],
+  "hygiene.cleanup":       [{ label: "Scan again", prompt: "/scan", participant: "meridian" },
+                             { label: "Show status", prompt: "/status", participant: "meridian" }],
+  "hygiene.impactAnalysis":[{ label: "Scan workspace", prompt: "/scan", participant: "meridian" },
+                             { label: "Show status", prompt: "/status", participant: "meridian" }],
+  "workflow.run":          [{ label: "Show status", prompt: "/status", participant: "meridian" },
+                             { label: "List workflows", prompt: "/workflows", participant: "meridian" }],
+  "agent.list":            [{ label: "Show status", prompt: "/status", participant: "meridian" },
+                             { label: "List workflows", prompt: "/workflows", participant: "meridian" }],
+  "skill.overview":        [{ label: "PR readiness", prompt: "/prready", participant: "meridian" },
+                             { label: "Pre-merge check", prompt: "/premerge", participant: "meridian" }],
+  "skill.prReady":         [{ label: "Generate PR", prompt: "/pr", participant: "meridian" },
+                             { label: "Session briefing", prompt: "/briefing", participant: "meridian" }],
+  "skill.preMerge":        [{ label: "Resolve conflicts", prompt: "/conflicts", participant: "meridian" },
+                             { label: "Show status", prompt: "/status", participant: "meridian" }],
+  "chat.context":          [{ label: "Show status", prompt: "/status", participant: "meridian" },
+                             { label: "Scan workspace", prompt: "/scan", participant: "meridian" },
+                             { label: "Session briefing", prompt: "/briefing", participant: "meridian" }],
+};
+
+function provideFollowups(
+  result: vscode.ChatResult,
+  _ctx: vscode.ChatContext,
+  _token: vscode.CancellationToken
+): vscode.ChatFollowup[] {
+  const meta = result.metadata as FollowupMeta | undefined;
+  if (!meta?.commandName || !meta.succeeded) return [];
+  if (meta.commandName === "workflow.list") {
+    if (!meta.firstWorkflowName) return [];
+    return [
+      { label: `Run ${meta.firstWorkflowName}`, prompt: `run ${meta.firstWorkflowName}`, participant: "meridian" },
+      { label: "List agents", prompt: "/agents", participant: "meridian" },
+    ];
+  }
+  return [...(FOLLOWUP_MAP[meta.commandName] ?? [])];
 }

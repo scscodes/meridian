@@ -391,7 +391,7 @@
         "name": "meridian_skill_overview",
         "displayName": "Meridian: Session Overview",
         "canBeReferencedInPrompt": true,
-        "tags": ["meridian", "git"],
+        "tags": ["meridian", "skill"],
         "icon": "$(compass)",
         "modelDescription": "Run a composite session overview that checks git status and generates a morning briefing in one call. Combines meridian_git_status and meridian_git_session_briefing into a single operation. Ideal as a start-of-day orientation.",
         "inputSchema": {
@@ -403,7 +403,7 @@
         "name": "meridian_skill_pr_ready",
         "displayName": "Meridian: PR Readiness Check",
         "canBeReferencedInPrompt": true,
-        "tags": ["meridian", "git"],
+        "tags": ["meridian", "skill"],
         "icon": "$(compass)",
         "modelDescription": "Run a composite PR readiness check that scans for hygiene issues, performs an AI code review, and generates a PR description — all in one call. Combines meridian_hygiene_scan, meridian_git_review_pr, and meridian_git_generate_pr. Use when preparing to open a pull request.",
         "inputSchema": {
@@ -415,7 +415,7 @@
         "name": "meridian_skill_pre_merge",
         "displayName": "Meridian: Pre-merge Check",
         "canBeReferencedInPrompt": true,
-        "tags": ["meridian", "git"],
+        "tags": ["meridian", "skill"],
         "icon": "$(compass)",
         "modelDescription": "Run a composite pre-merge check that analyzes incoming remote changes and suggests conflict resolution strategies — all in one call. Combines meridian_git_analyze_inbound and meridian_git_resolve_conflicts. Use before merging or pulling to assess risk.",
         "inputSchema": {

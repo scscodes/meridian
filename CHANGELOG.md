@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/scscodes/meridian/compare/v1.6.0...v1.7.0) (2026-04-17)
+
+
+### Features
+
+* chat integration polish — LM tool discoverability + followup chips + 3 slashes ([c462f79](https://github.com/scscodes/meridian/commit/c462f7914163baffc00efdad5b6aff3b1979fd71)), closes [#-reference](https://github.com/scscodes/meridian/issues/-reference)
+
 # [1.6.0](https://github.com/scscodes/meridian/compare/v1.5.0...v1.6.0) (2026-04-08)
 
 

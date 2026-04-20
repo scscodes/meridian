@@ -310,3 +310,22 @@ export type GenerateProseFn = (request: {
   systemPrompt: string;
   data: Record<string, unknown>;
 }) => Promise<Result<string>>;
+
+// ============================================================================
+// Dispatch Lifecycle Events (ADR 008)
+// ============================================================================
+
+export interface Disposable {
+  dispose(): void;
+}
+
+export type Event<T> = (listener: (e: T) => void) => Disposable;
+
+export interface DispatchEvent {
+  command: Command;
+  context: MiddlewareContext;
+}
+
+export interface DispatchCompleteEvent extends DispatchEvent {
+  result: Result<unknown>;
+}

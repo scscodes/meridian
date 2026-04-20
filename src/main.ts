@@ -36,6 +36,7 @@ import { setupStatusBar } from "./presentation/status-bar";
 import { setupFileWatchers } from "./presentation/file-watchers";
 import { setupTreeProviders } from "./presentation/tree-setup";
 import { registerSpecializedCommands } from "./presentation/specialized-commands";
+import { registerDispatchSignaling } from "./presentation/dispatch-signaling";
 import { createWebviewPanels } from "./presentation/webview-setup";
 
 // ============================================================================
@@ -109,6 +110,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const cmdCtx = getCommandContext(context);
 
   const trees = setupTreeProviders(context, gitProvider, logger, workspaceRoot, dispatch, cmdCtx);
+
+  context.subscriptions.push(
+    ...registerDispatchSignaling(
+      router,
+      { workflowTree: trees.workflowTree, gitTree: trees.gitTree },
+      logger
+    )
+  );
 
   const { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = createWebviewPanels(
     context, router, workspaceRoot, ctxFn, () => config.getPruneConfig()

@@ -177,3 +177,145 @@ describe('CommandRouter', () => {
     expect(error.code).toBe('MIDDLEWARE_ERROR');
   });
 });
+
+describe('CommandRouter — dispatch lifecycle events', () => {
+  it('fires onBeforeHandler after middleware and before handler', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    const order: string[] = [];
+
+    router.use(async (ctx, next) => {
+      order.push('mw');
+      await next();
+    });
+
+    router.onBeforeHandler((e) => {
+      order.push(`before:${e.command.name}`);
+    });
+
+    router.registerDomain({
+      name: 'lifecycle-before',
+      handlers: {
+        'git.status': async () => {
+          order.push('handler');
+          return { kind: 'ok' as const, value: {} };
+        },
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(order).toEqual(['mw', 'before:git.status', 'handler']);
+  });
+
+  it('fires onAfterHandler with ok result on handler success', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let captured: any = null;
+
+    router.onAfterHandler((e) => { captured = e; });
+
+    router.registerDomain({
+      name: 'lifecycle-after-ok',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: { branch: 'main' } }),
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(captured).not.toBeNull();
+    expect(captured.command.name).toBe('git.status');
+    expect(captured.result.kind).toBe('ok');
+    expect(captured.result.value.branch).toBe('main');
+  });
+
+  it('fires onAfterHandler with failure result on handler exception', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let captured: any = null;
+
+    router.onAfterHandler((e) => { captured = e; });
+
+    router.registerDomain({
+      name: 'lifecycle-after-throw',
+      handlers: {
+        'git.status': async () => { throw new Error('boom'); },
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(captured).not.toBeNull();
+    expect(captured.result.kind).toBe('err');
+    expect(captured.result.error.code).toBe('HANDLER_ERROR');
+  });
+
+  it('does NOT fire lifecycle events when middleware rejects', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let beforeCount = 0;
+    let afterCount = 0;
+
+    router.use(async () => { throw new Error('mw reject'); });
+    router.onBeforeHandler(() => { beforeCount++; });
+    router.onAfterHandler(() => { afterCount++; });
+
+    router.registerDomain({
+      name: 'lifecycle-mw-reject',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: {} }),
+      },
+    });
+
+    const result = await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(result.kind).toBe('err');
+    expect(beforeCount).toBe(0);
+    expect(afterCount).toBe(0);
+  });
+
+  it('isolates listener exceptions — other listeners still fire, dispatch still succeeds', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let secondListenerFired = false;
+
+    router.onBeforeHandler(() => { throw new Error('first listener boom'); });
+    router.onBeforeHandler(() => { secondListenerFired = true; });
+
+    router.registerDomain({
+      name: 'lifecycle-listener-isolation',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: {} }),
+      },
+    });
+
+    const result = await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(result.kind).toBe('ok');
+    expect(secondListenerFired).toBe(true);
+  });
+
+  it('Disposable from onBeforeHandler removes the listener', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let fireCount = 0;
+
+    const sub = router.onBeforeHandler(() => { fireCount++; });
+
+    router.registerDomain({
+      name: 'lifecycle-dispose',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: {} }),
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+    expect(fireCount).toBe(1);
+
+    sub.dispose();
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+    expect(fireCount).toBe(1);
+  });
+});

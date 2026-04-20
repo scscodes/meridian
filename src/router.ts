@@ -16,6 +16,9 @@ import {
   success,
   AppError,
   DomainService,
+  DispatchEvent,
+  DispatchCompleteEvent,
+  Event,
 } from "./types";
 import { Logger } from "./types";
 
@@ -24,6 +27,8 @@ export class CommandRouter {
   private middlewares: Middleware[] = [];
   private logger: Logger;
   private domains: Map<string, DomainService> = new Map();
+  private beforeListeners: Array<(e: DispatchEvent) => void> = [];
+  private afterListeners: Array<(e: DispatchCompleteEvent) => void> = [];
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -75,6 +80,52 @@ export class CommandRouter {
     this.middlewares.push(middleware);
   }
 
+  readonly onBeforeHandler: Event<DispatchEvent> = (listener) => {
+    this.beforeListeners.push(listener);
+    return {
+      dispose: () => {
+        const i = this.beforeListeners.indexOf(listener);
+        if (i !== -1) this.beforeListeners.splice(i, 1);
+      },
+    };
+  };
+
+  readonly onAfterHandler: Event<DispatchCompleteEvent> = (listener) => {
+    this.afterListeners.push(listener);
+    return {
+      dispose: () => {
+        const i = this.afterListeners.indexOf(listener);
+        if (i !== -1) this.afterListeners.splice(i, 1);
+      },
+    };
+  };
+
+  private fireBefore(event: DispatchEvent): void {
+    for (const l of this.beforeListeners) {
+      try {
+        l(event);
+      } catch (err) {
+        this.logger.warn(
+          `onBeforeHandler listener threw: ${err}`,
+          "CommandRouter.fireBefore"
+        );
+      }
+    }
+  }
+
+  private fireAfter(event: DispatchCompleteEvent): void {
+    for (const l of this.afterListeners) {
+      try {
+        l(event);
+      } catch (err) {
+        this.logger.warn(
+          `onAfterHandler listener threw: ${err}`,
+          "CommandRouter.fireAfter"
+        );
+      }
+    }
+  }
+
   /**
    * Dispatch a command through the middleware chain to its handler.
    * Returns Result monad — no exceptions thrown.
@@ -123,6 +174,8 @@ export class CommandRouter {
       return failure(err);
     }
 
+    this.fireBefore({ command, context: mwCtx });
+
     try {
       const result = await handler(context, command.params);
       const duration = Date.now() - mwCtx.startTime;
@@ -130,6 +183,7 @@ export class CommandRouter {
         `Command '${command.name}' executed in ${duration}ms`,
         "CommandRouter.dispatch"
       );
+      this.fireAfter({ command, context: mwCtx, result });
       return result;
     } catch (handlerErr) {
       const err: AppError = {
@@ -143,7 +197,9 @@ export class CommandRouter {
         "CommandRouter.dispatch",
         err
       );
-      return failure(err);
+      const failResult = failure(err);
+      this.fireAfter({ command, context: mwCtx, result: failResult });
+      return failResult;
     }
   }
 

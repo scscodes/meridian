@@ -1,3 +1,13 @@
+# [1.8.0](https://github.com/scscodes/meridian/compare/v1.7.0...v1.8.0) (2026-04-20)
+
+
+### Features
+
+* add run event log (Foundation [#1](https://github.com/scscodes/meridian/issues/1), ADR 009) ([ba8dc0e](https://github.com/scscodes/meridian/commit/ba8dc0efb2619cb36958ab6dc65a05f5e808b382))
+* LM tool result envelope (Foundation [#3](https://github.com/scscodes/meridian/issues/3), ADR 010) ([96ced61](https://github.com/scscodes/meridian/commit/96ced6159ceb0339967d04e5ee60d4f55df6de0c))
+* router dispatch lifecycle events — pre-execution signaling hook ([4e587e0](https://github.com/scscodes/meridian/commit/4e587e083f7d2c58270606711e9c0068f86c65d5)), closes [#2](https://github.com/scscodes/meridian/issues/2)
+* session briefing data aggregator (Foundation [#4](https://github.com/scscodes/meridian/issues/4), ADR 011) ([31de040](https://github.com/scscodes/meridian/commit/31de04057d11eb5963db285f5b3d1c30271ad26a))
+
 # [1.7.0](https://github.com/scscodes/meridian/compare/v1.6.0...v1.7.0) (2026-04-17)
 
 

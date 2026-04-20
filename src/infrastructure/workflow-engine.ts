@@ -5,6 +5,8 @@
 
 import { Logger, Result, failure, success, Command, CommandContext } from "../types";
 import { WorkflowCondition, WorkflowDefinition, WorkflowStep } from "../types";
+import { RunEventV1, RUN_EVENT_SCHEMA_VERSION } from "../types";
+import { createRunEventId, createRunId, RunLog } from "./run-log";
 
 /**
  * Step execution result includes output for conditional branching.
@@ -45,7 +47,8 @@ export type StepRunner = (
 export class WorkflowEngine {
   constructor(
     private logger: Logger,
-    private stepRunner: StepRunner
+    private stepRunner: StepRunner,
+    private runLog?: RunLog
   ) {}
 
   /**
@@ -56,6 +59,7 @@ export class WorkflowEngine {
     commandContext: CommandContext,
     variables: Record<string, unknown> = {}
   ): Promise<Result<WorkflowExecutionContext>> {
+    const runId = commandContext.runId ?? createRunId("workflow");
     const executionCtx: WorkflowExecutionContext = {
       workflowName: workflow.name,
       currentStepId: workflow.steps[0]?.id || "exit",
@@ -78,6 +82,23 @@ export class WorkflowEngine {
           executionCtx
         );
         executionCtx.stepResults.set(step.id, stepResult);
+        await this.emitEvents([
+          {
+            schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+            eventId: createRunEventId(),
+            runId,
+            parentRunId: commandContext.parentRunId,
+            timestampMs: Date.now(),
+            source: "workflow",
+            phase: "step",
+            workflowName: workflow.name,
+            stepId: step.id,
+            attempts: stepResult.attempts,
+            timedOut: stepResult.timedOut,
+            resultKind: stepResult.success ? "ok" : "err",
+            errorMessage: stepResult.error,
+          },
+        ]);
 
         this.logger.info(
           `Step ${step.id} completed: ${stepResult.success ? "success" : "failure"}`,
@@ -103,6 +124,20 @@ export class WorkflowEngine {
         stepIndex = nextStepIndex;
       }
 
+      await this.emitEvents([
+        {
+          schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+          eventId: createRunEventId(),
+          runId,
+          parentRunId: commandContext.parentRunId,
+          timestampMs: Date.now(),
+          source: "workflow",
+          phase: "complete",
+          workflowName: workflow.name,
+          resultKind: "ok",
+          durationMs: Date.now() - executionCtx.startTime,
+        },
+      ]);
       return success(executionCtx);
     } catch (err) {
       this.logger.error(
@@ -110,6 +145,22 @@ export class WorkflowEngine {
         "WorkflowEngine.execute",
         { error: err, currentStep: executionCtx.currentStepId } as any
       );
+      await this.emitEvents([
+        {
+          schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+          eventId: createRunEventId(),
+          runId,
+          parentRunId: commandContext.parentRunId,
+          timestampMs: Date.now(),
+          source: "workflow",
+          phase: "fail",
+          workflowName: workflow.name,
+          resultKind: "err",
+          errorCode: "WORKFLOW_EXECUTION_ERROR",
+          errorMessage: err instanceof Error ? err.message : String(err),
+          durationMs: Date.now() - executionCtx.startTime,
+        },
+      ]);
 
       return failure({
         code: "WORKFLOW_EXECUTION_ERROR",
@@ -117,6 +168,18 @@ export class WorkflowEngine {
         details: err,
         context: "WorkflowEngine.execute",
       });
+    }
+  }
+
+  private async emitEvents(events: RunEventV1[]): Promise<void> {
+    if (!this.runLog || events.length === 0) return;
+    const appendResult = await this.runLog.appendMany(events);
+    if (appendResult.kind === "err") {
+      this.logger.warn(
+        "Run log: append failed (workflow continues)",
+        "WorkflowEngine.emitEvents",
+        appendResult.error
+      );
     }
   }
 

@@ -29,6 +29,7 @@ import { createSmartCommitApprovalUI } from "./ui/smart-commit-quick-pick";
 import { registerMeridianTools } from "./ui/lm-tools";
 import { generateProse } from "./infrastructure/prose-generator";
 import { Config } from "./infrastructure/config";
+import { createRunLog } from "./infrastructure/run-log";
 
 // Presentation layer
 import { registerCommands, COMMAND_MAP } from "./presentation/command-registry";
@@ -75,28 +76,58 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const extensionPath = context.extensionUri.fsPath;
   const gitProvider = createGitProvider(workspaceRoot);
   const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);
+  const runLog = createRunLog(workspaceRoot, logger);
 
   // ── Router + middleware ─────────────────────────────────────────────
-  const router = new CommandRouter(logger);
+  const router = new CommandRouter(logger, runLog);
   router.use(createObservabilityMiddleware(logger, telemetry));
   router.use(createAuditMiddleware(logger));
 
+  const dispatchNested = (cmd: Command, ctx: CommandContext) =>
+    router.dispatch(cmd, {
+      ...ctx,
+      runId: undefined,
+      parentRunId: ctx.runId,
+    });
+
   const stepRunner: StepRunner = async (command: Command, ctx: CommandContext) => {
-    const result = await router.dispatch(command, ctx);
+    const result = await dispatchNested(command, ctx);
     if (result.kind === "ok") {
       return { kind: "ok" as const, value: (result.value as Record<string, unknown>) || {} };
     }
-    return result as any;
+    return { kind: "err" as const, error: result.error };
   };
 
   // ── Domain registration ─────────────────────────────────────────────
   const smartCommitApprovalUI = createSmartCommitApprovalUI();
   router.registerDomain(createGitDomain(gitProvider, logger, workspaceRoot, smartCommitApprovalUI, generateProse));
   router.registerDomain(createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse));
-  router.registerDomain(createChatDomain(gitProvider, logger, (cmd, ctx) => router.dispatch(cmd, ctx), generateProse));
-  router.registerDomain(createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath));
-  router.registerDomain(createAgentDomain(logger, workspaceRoot, extensionPath, (cmd, ctx) => router.dispatch(cmd, ctx)));
-  router.registerDomain(createSkillDomain(logger, (cmd, ctx) => router.dispatch(cmd, ctx)));
+  router.registerDomain(
+    createChatDomain(
+      gitProvider,
+      logger,
+      dispatchNested,
+      generateProse
+    )
+  );
+  router.registerDomain(
+    createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath, runLog)
+  );
+  router.registerDomain(
+    createAgentDomain(
+      logger,
+      workspaceRoot,
+      extensionPath,
+      dispatchNested
+    )
+  );
+  router.registerDomain(
+    createSkillDomain(
+      logger,
+      dispatchNested,
+      runLog
+    )
+  );
 
   const validationResult = await router.validateDomains();
   if (validationResult.kind === "err") {

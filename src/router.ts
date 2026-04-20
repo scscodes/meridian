@@ -3,6 +3,7 @@
  * Routes commands to handlers with middleware support.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   Command,
   CommandContext,
@@ -19,8 +20,11 @@ import {
   DispatchEvent,
   DispatchCompleteEvent,
   Event,
+  RunEventV1,
+  RUN_EVENT_SCHEMA_VERSION,
+  Logger,
 } from "./types";
-import { Logger } from "./types";
+import { createRunEventId, createRunId, RunLog } from "./infrastructure/run-log";
 
 export class CommandRouter {
   private handlers: Partial<HandlerRegistry> = {};
@@ -29,8 +33,9 @@ export class CommandRouter {
   private domains: Map<string, DomainService> = new Map();
   private beforeListeners: Array<(e: DispatchEvent) => void> = [];
   private afterListeners: Array<(e: DispatchCompleteEvent) => void> = [];
+  private readonly runScope = new AsyncLocalStorage<{ runId: string }>();
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, private readonly runLog?: RunLog) {
     this.logger = logger;
   }
 
@@ -134,6 +139,8 @@ export class CommandRouter {
     command: Command,
     context: CommandContext
   ): Promise<Result<unknown>> {
+    const parentRunId = context.parentRunId ?? this.runScope.getStore()?.runId;
+    const runId = context.runId ?? createRunId();
     const handler = this.handlers[command.name];
 
     if (!handler) {
@@ -154,52 +161,127 @@ export class CommandRouter {
       commandName: command.name,
       startTime: Date.now(),
       permissions: [],
+      runId,
+      parentRunId,
     };
 
-    try {
-      // Execute middleware chain
-      await this.executeMiddlewares(mwCtx, 0);
-    } catch (mwErr) {
-      const err: AppError = {
-        code: "MIDDLEWARE_ERROR",
-        message: `Middleware execution failed for '${command.name}'`,
-        details: mwErr,
-        context: "CommandRouter.dispatch",
-      };
-      this.logger.error(
-        `Middleware failed: ${command.name}`,
-        "CommandRouter.dispatch",
-        err
-      );
-      return failure(err);
-    }
+    const enrichedContext: CommandContext = {
+      ...context,
+      runId,
+      parentRunId,
+    };
 
-    this.fireBefore({ command, context: mwCtx });
+    return this.runScope.run({ runId }, async () => {
+      try {
+        // Execute middleware chain
+        await this.executeMiddlewares(mwCtx, 0);
+      } catch (mwErr) {
+        const err: AppError = {
+          code: "MIDDLEWARE_ERROR",
+          message: `Middleware execution failed for '${command.name}'`,
+          details: mwErr,
+          context: "CommandRouter.dispatch",
+        };
+        this.logger.error(
+          `Middleware failed: ${command.name}`,
+          "CommandRouter.dispatch",
+          err
+        );
+        return failure(err);
+      }
 
-    try {
-      const result = await handler(context, command.params);
-      const duration = Date.now() - mwCtx.startTime;
-      this.logger.info(
-        `Command '${command.name}' executed in ${duration}ms`,
-        "CommandRouter.dispatch"
+      this.fireBefore({ command, context: mwCtx });
+      await this.emitRunEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: createRunEventId(),
+        runId,
+        parentRunId,
+        timestampMs: Date.now(),
+        source: "router",
+        phase: "start",
+        commandName: command.name,
+      });
+
+      try {
+        const result = await handler(enrichedContext, command.params);
+        const duration = Date.now() - mwCtx.startTime;
+        this.logger.info(
+          `Command '${command.name}' executed in ${duration}ms`,
+          "CommandRouter.dispatch"
+        );
+        this.fireAfter({ command, context: mwCtx, result });
+        if (result.kind === "ok") {
+          await this.emitRunEvent({
+            schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+            eventId: createRunEventId(),
+            runId,
+            parentRunId,
+            timestampMs: Date.now(),
+            source: "router",
+            phase: "complete",
+            commandName: command.name,
+            resultKind: "ok",
+            durationMs: duration,
+          });
+        } else {
+          await this.emitRunEvent({
+            schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+            eventId: createRunEventId(),
+            runId,
+            parentRunId,
+            timestampMs: Date.now(),
+            source: "router",
+            phase: "fail",
+            commandName: command.name,
+            resultKind: "err",
+            durationMs: duration,
+            errorCode: result.error.code,
+            errorMessage: result.error.message,
+          });
+        }
+        return result;
+      } catch (handlerErr) {
+        const err: AppError = {
+          code: "HANDLER_ERROR",
+          message: `Handler for '${command.name}' threw an exception`,
+          details: handlerErr,
+          context: command.name,
+        };
+        this.logger.error(
+          `Handler error: ${command.name}`,
+          "CommandRouter.dispatch",
+          err
+        );
+        const failResult = failure(err);
+        this.fireAfter({ command, context: mwCtx, result: failResult });
+        await this.emitRunEvent({
+          schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+          eventId: createRunEventId(),
+          runId,
+          parentRunId,
+          timestampMs: Date.now(),
+          source: "router",
+          phase: "fail",
+          commandName: command.name,
+          resultKind: "err",
+          durationMs: Date.now() - mwCtx.startTime,
+          errorCode: err.code,
+          errorMessage: err.message,
+        });
+        return failResult;
+      }
+    });
+  }
+
+  private async emitRunEvent(event: RunEventV1): Promise<void> {
+    if (!this.runLog) return;
+    const appendResult = await this.runLog.append(event);
+    if (appendResult.kind === "err") {
+      this.logger.warn(
+        "Run log: append failed (command continues)",
+        "CommandRouter.emitRunEvent",
+        appendResult.error
       );
-      this.fireAfter({ command, context: mwCtx, result });
-      return result;
-    } catch (handlerErr) {
-      const err: AppError = {
-        code: "HANDLER_ERROR",
-        message: `Handler for '${command.name}' threw an exception`,
-        details: handlerErr,
-        context: command.name,
-      };
-      this.logger.error(
-        `Handler error: ${command.name}`,
-        "CommandRouter.dispatch",
-        err
-      );
-      const failResult = failure(err);
-      this.fireAfter({ command, context: mwCtx, result: failResult });
-      return failResult;
     }
   }
 

@@ -34,6 +34,8 @@ export interface CommandContext {
   extensionPath: string;
   workspaceFolders: string[];
   activeFilePath?: string;
+  runId?: string;
+  parentRunId?: string;
 }
 
 export interface Command<P = unknown> {
@@ -242,6 +244,8 @@ export interface MiddlewareContext {
   userId?: string;
   startTime: number;
   permissions: Permission[];
+  runId: string;
+  parentRunId?: string;
 }
 
 export type Middleware = (
@@ -328,4 +332,67 @@ export interface DispatchEvent {
 
 export interface DispatchCompleteEvent extends DispatchEvent {
   result: Result<unknown>;
+}
+
+// ============================================================================
+// Run Log Events (Foundation #1)
+// ============================================================================
+
+export const RUN_EVENT_SCHEMA_VERSION = 1 as const;
+export type RunEventSchemaVersion = typeof RUN_EVENT_SCHEMA_VERSION;
+
+export type RunEventPhase = "start" | "step" | "complete" | "fail";
+export type RunEventSource = "router" | "workflow" | "skill";
+
+export interface RunEventBase {
+  schemaVersion: RunEventSchemaVersion;
+  eventId: string;
+  runId: string;
+  parentRunId?: string;
+  timestampMs: number;
+  source: RunEventSource;
+  phase: RunEventPhase;
+  commandName?: CommandName;
+  workflowName?: string;
+  skillName?: string;
+  stepId?: string;
+  attempts?: number;
+  timedOut?: boolean;
+}
+
+export interface RunStartEvent extends RunEventBase {
+  phase: "start";
+}
+
+export interface RunStepEvent extends RunEventBase {
+  phase: "step";
+  stepId: string;
+  resultKind: Result<unknown>["kind"];
+  errorMessage?: string;
+}
+
+export interface RunCompleteEvent extends RunEventBase {
+  phase: "complete";
+  resultKind: "ok";
+  durationMs?: number;
+}
+
+export interface RunFailEvent extends RunEventBase {
+  phase: "fail";
+  resultKind: "err";
+  errorCode: string;
+  errorMessage: string;
+  durationMs?: number;
+}
+
+export type RunEventV1 =
+  | RunStartEvent
+  | RunStepEvent
+  | RunCompleteEvent
+  | RunFailEvent;
+
+export function isSupportedRunEventVersion(
+  version: number
+): version is RunEventSchemaVersion {
+  return version === RUN_EVENT_SCHEMA_VERSION;
 }

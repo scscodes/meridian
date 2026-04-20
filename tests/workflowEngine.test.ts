@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { WorkflowEngine, StepRunner } from '../src/infrastructure/workflow-engine';
+import { RunLog } from '../src/infrastructure/run-log';
+import { RunEventV1 } from '../src/types';
 import {
   MockLogger,
   createMockContext,
@@ -16,6 +18,26 @@ import {
 } from './fixtures';
 
 describe('WorkflowEngine', () => {
+  function createMemoryRunLog(): { runLog: RunLog; events: RunEventV1[] } {
+    const events: RunEventV1[] = [];
+    const runLog: RunLog = {
+      append: async (event) => {
+        events.push(event);
+        return { kind: 'ok', value: undefined };
+      },
+      appendMany: async (incoming) => {
+        events.push(...incoming);
+        return { kind: 'ok', value: undefined };
+      },
+      readByRunId: async (runId) => ({
+        kind: 'ok',
+        value: events.filter((event) => event.runId === runId),
+      }),
+      readLatest: async (limit) => ({ kind: 'ok', value: events.slice(-limit) }),
+    };
+    return { runLog, events };
+  }
+
   // Test 1: execute() runs all steps in order
   it('should execute all steps in order', async () => {
     const logger = new MockLogger();
@@ -598,5 +620,43 @@ describe('WorkflowEngine', () => {
 
     await engine.execute(workflow, createMockContext(), { env: 'prod' });
     expect(executed).toEqual(['git.status', 'git.commit']);
+  });
+
+  it('emits workflow step events with attempts and timedOut markers', async () => {
+    const logger = new MockLogger();
+    const { runLog, events } = createMemoryRunLog();
+    let calls = 0;
+    const stepRunner: StepRunner = async () => {
+      calls++;
+      if (calls === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return { kind: 'ok' as const, value: {} };
+    };
+    const engine = new WorkflowEngine(logger, stepRunner, runLog);
+    const workflow = {
+      name: 'wf-runlog-timeout-retry',
+      steps: [
+        {
+          id: 's1',
+          command: 'git.pull' as const,
+          params: {},
+          onSuccess: 'exit',
+          onFailure: 'exit',
+          timeout: 10,
+          retry: { maxAttempts: 2, delayMs: 0 },
+        },
+      ],
+    };
+
+    await engine.execute(workflow, { ...createMockContext(), runId: 'run-main' });
+
+    const step = events.find((event) => event.phase === 'step');
+    expect(step).toBeTruthy();
+    expect(step?.source).toBe('workflow');
+    expect(step?.runId).toBe('run-main');
+    expect(step?.stepId).toBe('s1');
+    expect(step?.attempts).toBe(2);
+    expect(step?.resultKind).toBe('ok');
   });
 });

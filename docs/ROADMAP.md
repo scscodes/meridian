@@ -10,11 +10,7 @@ See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 
 These are the substrate. Content layers below depend on them; building content first forces rework.
 
-1. **Run event log — persistence for workflow + skill executions**
-   - Single append-only store keyed by runId; records start/step/complete/fail with typed payloads.
-   - Consumers: workflow run history, session briefing, skill observability, future remote telemetry sink.
-   - Primary files: new `src/infrastructure/run-log.ts`; hooks in `src/infrastructure/workflow-engine.ts`, `src/domains/skill/service.ts`, `src/router.ts`.
-   - Gate: schema stable and versioned before any UI reads from it.
+1. ~~**Run event log — persistence for workflow + skill executions**~~ — **DELIVERED 2026-04-20** (ADR 009). Versioned append-only store keyed by `runId`, with `start/step/complete/fail` events emitted from router, workflow engine, and skill service.
 
 2. ~~**Pre-execution signaling hook in router/middleware**~~ — **DELIVERED 2026-04-20** (ADR 008). Router exposes `onBeforeHandler`/`onAfterHandler`; `src/presentation/dispatch-signaling.ts` wires tree spinners. Chat-delegated `workflow.run` spinner now works.
 
@@ -24,7 +20,7 @@ These are the substrate. Content layers below depend on them; building content f
    - Primary files: `src/ui/lm-tools.ts`, `src/infrastructure/result-handler.ts`, `src/types.ts`.
 
 4. **Session briefing data aggregator**
-   - Pure function over run-log + git analytics + hygiene scan state → `SessionBriefing` record.
+   - Pure function over run log + git analytics + hygiene scan state → `SessionBriefing` record.
    - Decouples data from the webview so the same aggregate can feed chat, LM tool, and UI surfaces.
    - Primary files: `src/domains/git/session-handler.ts`, new `src/domains/git/session-aggregator.ts`.
    - Depends on #1.

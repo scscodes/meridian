@@ -8,6 +8,7 @@ import {
   Handler,
   Logger,
   WorkspaceProvider,
+  WorkspaceScan,
   Result,
   success,
   failure,
@@ -43,6 +44,11 @@ export class HygieneDomainService implements DomainService {
   private scanIntervalMs: number = HYGIENE_SETTINGS.SCAN_INTERVAL_MINUTES * 60 * 1000;
   private _timer: ReturnType<typeof setInterval> | undefined;
   private readonly workspaceRoot: string | undefined;
+  private lastScan?: { scan: WorkspaceScan; scannedAt: string };
+
+  getLastScan(): { scan: WorkspaceScan; scannedAt: string } | undefined {
+    return this.lastScan;
+  }
 
   constructor(
     workspaceProvider: WorkspaceProvider,
@@ -57,7 +63,9 @@ export class HygieneDomainService implements DomainService {
 
     // Initialize handlers
     this.handlers = {
-      "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer),
+      "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer, (scan, scannedAt) => {
+        this.lastScan = { scan, scannedAt };
+      }),
       "hygiene.cleanup": createCleanupHandler(workspaceProvider, logger),
       "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, this.deadCodeAnalyzer, logger),
       "hygiene.impactAnalysis": createImpactAnalysisHandler(logger, generateProseFn),

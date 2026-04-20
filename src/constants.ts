@@ -262,6 +262,30 @@ export const ANALYTICS_SETTINGS = {
 export const DEAD_CODE_DIAGNOSTIC_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205]);
 
 // ============================================================================
+// Session Briefing
+// ============================================================================
+
+export const SESSION_BRIEFING = {
+  /** Number of most-recent run-log entries fetched for the briefing */
+  RECENT_RUN_LIMIT: 10,
+
+  /** Analytics period passed to GitAnalyzer */
+  ANALYTICS_PERIOD: "3mo" as const,
+
+  /** Uncommitted file count above which a flag is raised */
+  UNCOMMITTED_FILES_FLAG_THRESHOLD: 10,
+
+  /** Dead-file count at or above which a hygiene flag is raised */
+  DEAD_FILE_FLAG_THRESHOLD: 5,
+
+  /** Large-file count at or above which a hygiene flag is raised */
+  LARGE_FILE_FLAG_THRESHOLD: 3,
+
+  /** Minimum number of failed runs that triggers a flag */
+  FAILED_RUNS_FLAG_THRESHOLD: 1,
+} as const;
+
+// ============================================================================
 // UI Settings
 // ============================================================================
 

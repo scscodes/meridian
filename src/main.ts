@@ -100,8 +100,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Domain registration ─────────────────────────────────────────────
   const smartCommitApprovalUI = createSmartCommitApprovalUI();
-  router.registerDomain(createGitDomain(gitProvider, logger, workspaceRoot, smartCommitApprovalUI, generateProse));
-  router.registerDomain(createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse));
+  const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse);
+  router.registerDomain(createGitDomain(
+    gitProvider, logger, workspaceRoot, smartCommitApprovalUI, generateProse,
+    runLog, () => hygieneDomain.getLastScan()
+  ));
+  router.registerDomain(hygieneDomain);
   router.registerDomain(
     createChatDomain(
       gitProvider,

@@ -73,7 +73,8 @@ function isExcluded(filePath: string, patterns: string[]): boolean {
 export function createScanHandler(
   workspaceProvider: WorkspaceProvider,
   logger: Logger,
-  deadCodeAnalyzer: DeadCodeAnalyzer
+  deadCodeAnalyzer: DeadCodeAnalyzer,
+  onScanSuccess?: (scan: WorkspaceScan, scannedAt: string) => void
 ): Handler<Record<string, never>, WorkspaceScan> {
   return async (ctx: CommandContext) => {
     try {
@@ -175,6 +176,7 @@ export function createScanHandler(
         "HygieneScanHandler"
       );
 
+      onScanSuccess?.(scan, new Date().toISOString());
       return success(scan);
     } catch (err) {
       return failure({

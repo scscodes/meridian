@@ -44,7 +44,7 @@ Generate inline PR comments on specific files or lines. Parses the branch diff a
 Analyze merge conflicts in the current branch and suggest resolution strategies (ours, theirs, manual with step-by-step guidance) for each conflicted file. Output includes per-file rationale and suggested resolution steps.
 
 ### **git.sessionBriefing**
-Generate a prose summary of Git activity during the current session (commits, branches, pulls, pushes, conflicts). Useful for standup notes, commit logs, or context switching. Copied to clipboard.
+Generate a prose summary of current workspace state for session orientation. Aggregates git working-tree status, recent commits, run-log activity (`recentRuns`), git analytics (`activityWindow`), and hygiene scan state (`hygieneSnapshot`) into a `SessionBriefing` record, then layers AI prose on top. Optional slices degrade gracefully when data is unavailable. Useful for standup notes, context switching, or morning orientation.
 
 ---
 

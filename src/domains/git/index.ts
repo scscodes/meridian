@@ -26,6 +26,7 @@ export {
   GenerateProseFn,
 } from "./pr-handlers";
 export { createSessionBriefingHandler } from "./session-handler";
+export { aggregateSessionBriefing, SessionBriefingSources, HygieneScanGetter } from "./session-aggregator";
 export {
   createShowAnalyticsHandler,
   createExportJsonHandler,
@@ -56,6 +57,11 @@ export {
   InlineComment,
   ConflictResolutionProse,
   ConflictResolution,
+  SessionBriefing,
+  SessionBriefingReport,
+  RecentRunEntry,
+  ActivityWindow,
+  HygieneSnapshot,
 } from "./types";
 export {
   AnalyticsPeriod,

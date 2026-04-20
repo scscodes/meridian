@@ -16,11 +16,7 @@ These are the substrate. Content layers below depend on them; building content f
 
 3. ~~**LM tool result envelope — typed contract across all tools**~~ — **DELIVERED 2026-04-20** (ADR 010). Uniform `{summary, data, followups, renderHint}` contract now returned by LM tools via centralized normalization in `src/infrastructure/lm-envelope.ts`, with mapping coverage enforced for all `LM_TOOL_DEFS`.
 
-4. **Session briefing data aggregator**
-   - Pure function over run log + git analytics + hygiene scan state → `SessionBriefing` record.
-   - Decouples data from the webview so the same aggregate can feed chat, LM tool, and UI surfaces.
-   - Primary files: `src/domains/git/session-handler.ts`, new `src/domains/git/session-aggregator.ts`.
-   - Depends on #1.
+4. ~~**Session briefing data aggregator**~~ — **DELIVERED 2026-04-20** (ADR 011). Framework-free `aggregateSessionBriefing()` in `src/domains/git/session-aggregator.ts` combines git state + run-log slice + git analytics + hygiene snapshot into `SessionBriefing`. Handler refactored to thin prose consumer. Fail-soft peripheral sources; optional `recentRuns`, `activityWindow`, `hygieneSnapshot` fields added to `SessionBriefingReport` (backwards compatible). Hygiene service gains `getLastScan()` cache via `onScanSuccess` hook.
 
 ---
 

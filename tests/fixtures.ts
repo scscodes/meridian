@@ -14,11 +14,13 @@ import {
   GitFileChange,
   RecentCommit,
   DeadCodeScan,
+  RunEventV1,
   Result,
   success,
   failure,
   AppError,
 } from '../src/types';
+import type { RunLog } from '../src/infrastructure/run-log';
 
 // ============================================================================
 // Mock Logger
@@ -175,6 +177,44 @@ export class MockGitProvider implements GitProvider {
 
   async getUntrackedFiles(): Promise<Result<string[]>> {
     return success([]);
+  }
+}
+
+// ============================================================================
+// Mock RunLog
+// ============================================================================
+
+export class MockRunLog implements RunLog {
+  private events: RunEventV1[] = [];
+  private forceError: AppError | undefined;
+
+  setEvents(events: RunEventV1[]): void {
+    this.events = events;
+  }
+
+  forceReadError(error: AppError): void {
+    this.forceError = error;
+  }
+
+  async append(event: RunEventV1): Promise<Result<void>> {
+    this.events.push(event);
+    return success(void 0);
+  }
+
+  async appendMany(events: RunEventV1[]): Promise<Result<void>> {
+    this.events.push(...events);
+    return success(void 0);
+  }
+
+  async readByRunId(runId: string): Promise<Result<RunEventV1[]>> {
+    if (this.forceError) return failure(this.forceError);
+    return success(this.events.filter((e) => e.runId === runId));
+  }
+
+  async readLatest(limit: number): Promise<Result<RunEventV1[]>> {
+    if (this.forceError) return failure(this.forceError);
+    const safe = Math.max(0, Math.trunc(limit));
+    return success(safe === 0 ? [] : this.events.slice(-safe));
   }
 }
 

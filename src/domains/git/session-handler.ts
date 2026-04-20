@@ -1,7 +1,7 @@
 /**
- * Session Briefing Handler — Morning-briefing prose consumer.
- * Gathers current branch state, recent commits, and uncommitted changes,
- * then generates a concise session briefing via the prose pipeline.
+ * Session Briefing Handler — thin prose consumer over the session aggregator.
+ * Delegates data aggregation to aggregateSessionBriefing(), then layers AI
+ * prose on top to produce the final SessionBriefingReport.
  */
 
 import {
@@ -9,74 +9,48 @@ import {
   CommandContext,
   GenerateProseFn,
   success,
-  Logger,
-  GitProvider,
 } from "../../types";
 import { getPrompt } from "../../infrastructure/prompt-registry";
 import { SessionBriefingReport } from "./types";
+import { SessionBriefingSources, aggregateSessionBriefing } from "./session-aggregator";
 
 /**
- * git.sessionBriefing — Generate a session briefing from current workspace state.
+ * git.sessionBriefing — Aggregate current workspace state and generate a
+ * session briefing via the prose pipeline.
  */
 export function createSessionBriefingHandler(
-  gitProvider: GitProvider,
-  logger: Logger,
+  sources: SessionBriefingSources,
   generateProseFn: GenerateProseFn
 ): Handler<Record<string, never>, SessionBriefingReport> {
   return async (_ctx: CommandContext) => {
-    const [statusResult, commitsResult, changesResult] = await Promise.all([
-      gitProvider.status(),
-      gitProvider.getRecentCommits(10),
-      gitProvider.getAllChanges(),
-    ]);
-    if (statusResult.kind === "err") return statusResult;
-    if (commitsResult.kind === "err") return commitsResult;
-    if (changesResult.kind === "err") return changesResult;
-    const status = statusResult.value;
+    const aggResult = await aggregateSessionBriefing(sources);
+    if (aggResult.kind === "err") return aggResult;
 
-    const uncommitted = changesResult.value;
-
-    // Flags: surface anything worth highlighting
-    const flags: string[] = [];
-    if (uncommitted.length > 10) {
-      flags.push(`Large number of uncommitted files (${uncommitted.length})`);
-    }
-    if (status.branch === "HEAD") {
-      flags.push("Detached HEAD — not on a named branch");
-    }
-
-    const uncommittedFiles = uncommitted.map((f) => ({ path: f.path, status: f.status }));
+    const agg = aggResult.value;
+    const { logger } = sources;
 
     const proseResult = await generateProseFn({
       domain: "git",
       systemPrompt: getPrompt("SESSION_BRIEFING"),
       data: {
-        branch: status.branch,
-        isDirty: status.isDirty,
-        staged: status.staged,
-        unstaged: status.unstaged,
-        untracked: status.untracked,
-        recentCommits: commitsResult.value,
-        uncommittedFiles,
-        flags,
+        branch: agg.branch,
+        isDirty: agg.isDirty,
+        staged: agg.staged,
+        unstaged: agg.unstaged,
+        untracked: agg.untracked,
+        recentCommits: agg.recentCommits,
+        uncommittedFiles: agg.uncommittedFiles,
+        flags: agg.flags,
+        recentRuns: agg.recentRuns,
+        activityWindow: agg.activityWindow,
+        hygieneSnapshot: agg.hygieneSnapshot,
       },
     });
 
     if (proseResult.kind === "err") return proseResult;
 
-    logger.info(`Session briefing generated for branch '${status.branch}'`, "git.sessionBriefing");
+    logger.info(`Session briefing generated for branch '${agg.branch}'`, "git.sessionBriefing");
 
-    return success({
-      generatedAt: new Date().toISOString(),
-      branch: status.branch,
-      isDirty: status.isDirty,
-      staged: status.staged,
-      unstaged: status.unstaged,
-      untracked: status.untracked,
-      recentCommits: commitsResult.value,
-      uncommittedFiles,
-      flags,
-      summary: proseResult.value,
-    });
+    return success({ ...agg, summary: proseResult.value });
   };
 }

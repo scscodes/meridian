@@ -3,18 +3,38 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MockGitProvider, MockLogger, createMockContext, createMockChange } from './fixtures';
+import { MockGitProvider, MockLogger, MockRunLog, createMockContext, createMockChange } from './fixtures';
 import { createSessionBriefingHandler } from '../src/domains/git/session-handler';
+import { SessionBriefingSources } from '../src/domains/git/session-aggregator';
 import { success, failure } from '../src/types';
+import { GitAnalyzer } from '../src/domains/git/analytics-service';
+
+function makeSources(
+  git: MockGitProvider,
+  logger: MockLogger,
+  runLog: MockRunLog,
+  overrides: Partial<SessionBriefingSources> = {}
+): SessionBriefingSources {
+  return {
+    gitProvider: git as any,
+    runLog,
+    gitAnalyzer: { analyze: vi.fn().mockRejectedValue(new Error('no git')) } as unknown as GitAnalyzer,
+    getHygieneScan: () => undefined,
+    logger,
+    ...overrides,
+  };
+}
 
 describe('git.sessionBriefing', () => {
   let git: MockGitProvider;
   let logger: MockLogger;
+  let runLog: MockRunLog;
   let generateProseFn: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     git = new MockGitProvider();
     logger = new MockLogger();
+    runLog = new MockRunLog();
     generateProseFn = vi.fn();
 
     // Default happy-path stubs
@@ -27,7 +47,7 @@ describe('git.sessionBriefing', () => {
   });
 
   it('returns prose text on happy path', async () => {
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     const result = await handler(createMockContext(), {} as any);
 
     expect(result.kind).toBe('ok');
@@ -46,7 +66,7 @@ describe('git.sessionBriefing', () => {
       failure({ code: 'GIT_STATUS_ERROR', message: 'git not found' })
     );
 
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     const result = await handler(createMockContext(), {} as any);
 
     expect(result.kind).toBe('err');
@@ -61,7 +81,7 @@ describe('git.sessionBriefing', () => {
       failure({ code: 'GIT_STATUS_ERROR', message: 'log failed' })
     );
 
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     const result = await handler(createMockContext(), {} as any);
 
     expect(result.kind).toBe('err');
@@ -76,7 +96,7 @@ describe('git.sessionBriefing', () => {
       failure({ code: 'GET_CHANGES_FAILED', message: 'diff error' })
     );
 
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     const result = await handler(createMockContext(), {} as any);
 
     expect(result.kind).toBe('err');
@@ -92,7 +112,7 @@ describe('git.sessionBriefing', () => {
     );
     git.setAllChanges(manyChanges);
 
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     await handler(createMockContext(), {} as any);
 
     expect(generateProseFn).toHaveBeenCalledWith(
@@ -107,7 +127,7 @@ describe('git.sessionBriefing', () => {
   it('flags detached HEAD when branch is "HEAD"', async () => {
     git.setStatus({ branch: 'HEAD', isDirty: false, staged: 0, unstaged: 0, untracked: 0 });
 
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     await handler(createMockContext(), {} as any);
 
     expect(generateProseFn).toHaveBeenCalledWith(
@@ -124,12 +144,38 @@ describe('git.sessionBriefing', () => {
       failure({ code: 'MODEL_UNAVAILABLE', message: 'no language model' })
     );
 
-    const handler = createSessionBriefingHandler(git, logger, generateProseFn);
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     const result = await handler(createMockContext(), {} as any);
 
     expect(result.kind).toBe('err');
     if (result.kind === 'err') {
       expect(result.error.code).toBe('MODEL_UNAVAILABLE');
+    }
+  });
+
+  it('surfaces optional aggregate fields in the returned report', async () => {
+    const mockScan = {
+      scan: {
+        deadFiles: ['tmp/foo.tmp'],
+        largeFiles: [],
+        logFiles: [],
+        markdownFiles: [],
+        deadCode: { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 },
+      },
+      scannedAt: '2026-04-20T00:00:00.000Z',
+    };
+    const sources = makeSources(git, logger, runLog, {
+      getHygieneScan: () => mockScan,
+    });
+
+    const handler = createSessionBriefingHandler(sources, generateProseFn);
+    const result = await handler(createMockContext(), {} as any);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.hygieneSnapshot).toBeDefined();
+      expect(result.value.hygieneSnapshot?.deadFileCount).toBe(1);
+      expect(result.value.summary).toBeTruthy();
     }
   });
 });

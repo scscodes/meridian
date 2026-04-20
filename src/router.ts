@@ -3,6 +3,7 @@
  * Routes commands to handlers with middleware support.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   Command,
   CommandContext,
@@ -16,16 +17,25 @@ import {
   success,
   AppError,
   DomainService,
+  DispatchEvent,
+  DispatchCompleteEvent,
+  Event,
+  RunEventV1,
+  RUN_EVENT_SCHEMA_VERSION,
+  Logger,
 } from "./types";
-import { Logger } from "./types";
+import { createRunEventId, createRunId, RunLog } from "./infrastructure/run-log";
 
 export class CommandRouter {
   private handlers: Partial<HandlerRegistry> = {};
   private middlewares: Middleware[] = [];
   private logger: Logger;
   private domains: Map<string, DomainService> = new Map();
+  private beforeListeners: Array<(e: DispatchEvent) => void> = [];
+  private afterListeners: Array<(e: DispatchCompleteEvent) => void> = [];
+  private readonly runScope = new AsyncLocalStorage<{ runId: string }>();
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, private readonly runLog?: RunLog) {
     this.logger = logger;
   }
 
@@ -75,6 +85,52 @@ export class CommandRouter {
     this.middlewares.push(middleware);
   }
 
+  readonly onBeforeHandler: Event<DispatchEvent> = (listener) => {
+    this.beforeListeners.push(listener);
+    return {
+      dispose: () => {
+        const i = this.beforeListeners.indexOf(listener);
+        if (i !== -1) this.beforeListeners.splice(i, 1);
+      },
+    };
+  };
+
+  readonly onAfterHandler: Event<DispatchCompleteEvent> = (listener) => {
+    this.afterListeners.push(listener);
+    return {
+      dispose: () => {
+        const i = this.afterListeners.indexOf(listener);
+        if (i !== -1) this.afterListeners.splice(i, 1);
+      },
+    };
+  };
+
+  private fireBefore(event: DispatchEvent): void {
+    for (const l of this.beforeListeners) {
+      try {
+        l(event);
+      } catch (err) {
+        this.logger.warn(
+          `onBeforeHandler listener threw: ${err}`,
+          "CommandRouter.fireBefore"
+        );
+      }
+    }
+  }
+
+  private fireAfter(event: DispatchCompleteEvent): void {
+    for (const l of this.afterListeners) {
+      try {
+        l(event);
+      } catch (err) {
+        this.logger.warn(
+          `onAfterHandler listener threw: ${err}`,
+          "CommandRouter.fireAfter"
+        );
+      }
+    }
+  }
+
   /**
    * Dispatch a command through the middleware chain to its handler.
    * Returns Result monad — no exceptions thrown.
@@ -83,6 +139,8 @@ export class CommandRouter {
     command: Command,
     context: CommandContext
   ): Promise<Result<unknown>> {
+    const parentRunId = context.parentRunId ?? this.runScope.getStore()?.runId;
+    const runId = context.runId ?? createRunId();
     const handler = this.handlers[command.name];
 
     if (!handler) {
@@ -103,47 +161,127 @@ export class CommandRouter {
       commandName: command.name,
       startTime: Date.now(),
       permissions: [],
+      runId,
+      parentRunId,
     };
 
-    try {
-      // Execute middleware chain
-      await this.executeMiddlewares(mwCtx, 0);
-    } catch (mwErr) {
-      const err: AppError = {
-        code: "MIDDLEWARE_ERROR",
-        message: `Middleware execution failed for '${command.name}'`,
-        details: mwErr,
-        context: "CommandRouter.dispatch",
-      };
-      this.logger.error(
-        `Middleware failed: ${command.name}`,
-        "CommandRouter.dispatch",
-        err
-      );
-      return failure(err);
-    }
+    const enrichedContext: CommandContext = {
+      ...context,
+      runId,
+      parentRunId,
+    };
 
-    try {
-      const result = await handler(context, command.params);
-      const duration = Date.now() - mwCtx.startTime;
-      this.logger.info(
-        `Command '${command.name}' executed in ${duration}ms`,
-        "CommandRouter.dispatch"
+    return this.runScope.run({ runId }, async () => {
+      try {
+        // Execute middleware chain
+        await this.executeMiddlewares(mwCtx, 0);
+      } catch (mwErr) {
+        const err: AppError = {
+          code: "MIDDLEWARE_ERROR",
+          message: `Middleware execution failed for '${command.name}'`,
+          details: mwErr,
+          context: "CommandRouter.dispatch",
+        };
+        this.logger.error(
+          `Middleware failed: ${command.name}`,
+          "CommandRouter.dispatch",
+          err
+        );
+        return failure(err);
+      }
+
+      this.fireBefore({ command, context: mwCtx });
+      await this.emitRunEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: createRunEventId(),
+        runId,
+        parentRunId,
+        timestampMs: Date.now(),
+        source: "router",
+        phase: "start",
+        commandName: command.name,
+      });
+
+      try {
+        const result = await handler(enrichedContext, command.params);
+        const duration = Date.now() - mwCtx.startTime;
+        this.logger.info(
+          `Command '${command.name}' executed in ${duration}ms`,
+          "CommandRouter.dispatch"
+        );
+        this.fireAfter({ command, context: mwCtx, result });
+        if (result.kind === "ok") {
+          await this.emitRunEvent({
+            schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+            eventId: createRunEventId(),
+            runId,
+            parentRunId,
+            timestampMs: Date.now(),
+            source: "router",
+            phase: "complete",
+            commandName: command.name,
+            resultKind: "ok",
+            durationMs: duration,
+          });
+        } else {
+          await this.emitRunEvent({
+            schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+            eventId: createRunEventId(),
+            runId,
+            parentRunId,
+            timestampMs: Date.now(),
+            source: "router",
+            phase: "fail",
+            commandName: command.name,
+            resultKind: "err",
+            durationMs: duration,
+            errorCode: result.error.code,
+            errorMessage: result.error.message,
+          });
+        }
+        return result;
+      } catch (handlerErr) {
+        const err: AppError = {
+          code: "HANDLER_ERROR",
+          message: `Handler for '${command.name}' threw an exception`,
+          details: handlerErr,
+          context: command.name,
+        };
+        this.logger.error(
+          `Handler error: ${command.name}`,
+          "CommandRouter.dispatch",
+          err
+        );
+        const failResult = failure(err);
+        this.fireAfter({ command, context: mwCtx, result: failResult });
+        await this.emitRunEvent({
+          schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+          eventId: createRunEventId(),
+          runId,
+          parentRunId,
+          timestampMs: Date.now(),
+          source: "router",
+          phase: "fail",
+          commandName: command.name,
+          resultKind: "err",
+          durationMs: Date.now() - mwCtx.startTime,
+          errorCode: err.code,
+          errorMessage: err.message,
+        });
+        return failResult;
+      }
+    });
+  }
+
+  private async emitRunEvent(event: RunEventV1): Promise<void> {
+    if (!this.runLog) return;
+    const appendResult = await this.runLog.append(event);
+    if (appendResult.kind === "err") {
+      this.logger.warn(
+        "Run log: append failed (command continues)",
+        "CommandRouter.emitRunEvent",
+        appendResult.error
       );
-      return result;
-    } catch (handlerErr) {
-      const err: AppError = {
-        code: "HANDLER_ERROR",
-        message: `Handler for '${command.name}' threw an exception`,
-        details: handlerErr,
-        context: command.name,
-      };
-      this.logger.error(
-        `Handler error: ${command.name}`,
-        "CommandRouter.dispatch",
-        err
-      );
-      return failure(err);
     }
   }
 

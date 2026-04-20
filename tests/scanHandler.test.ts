@@ -253,4 +253,29 @@ describe("hygiene.scan (createScanHandler)", () => {
 
     expect(scan.largeFiles).toEqual([]);
   });
+
+  // -----------------------------------------------------------------------
+  // 12. onScanSuccess callback
+  // -----------------------------------------------------------------------
+  it("invokes onScanSuccess with scan and ISO timestamp on success", async () => {
+    workspace.setFiles({ "src/foo.tmp": "temp" });
+    const onSuccess = vi.fn();
+    const handler = createScanHandler(workspace, logger, deadCode, onSuccess);
+    await handler(ctx, {});
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    const [scan, scannedAt] = onSuccess.mock.calls[0] as [any, string];
+    expect(scan.deadFiles).toContain("src/foo.tmp");
+    expect(new Date(scannedAt).toISOString()).toBe(scannedAt);
+  });
+
+  it("does not invoke onScanSuccess when scan fails", async () => {
+    const broken = new MockWorkspaceProvider();
+    broken.findFiles = () => { throw new Error("disk error"); };
+    const onSuccess = vi.fn();
+    const handler = createScanHandler(broken, logger, deadCode, onSuccess);
+    await handler(ctx, {});
+
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
 });

@@ -25,6 +25,7 @@ import {
 import { WorkflowEngine, StepRunner } from "../../infrastructure/workflow-engine";
 import { validateWorkflowDefinition } from "./validation";
 import { WORKFLOW_ERROR_CODES } from "../../infrastructure/error-codes";
+import { RunLog } from "../../infrastructure/run-log";
 
 /**
  * Workflow domain commands.
@@ -44,17 +45,20 @@ export class WorkflowDomainService implements DomainService {
   private stepRunner: StepRunner | null = null;
   private workspaceRoot?: string;
   private extensionPath?: string;
+  private runLog?: RunLog;
 
   constructor(
     logger: Logger,
     stepRunner?: StepRunner,
     workspaceRoot?: string,
-    extensionPath?: string
+    extensionPath?: string,
+    runLog?: RunLog
   ) {
     this.logger = logger;
     this.stepRunner = stepRunner || this.createDefaultStepRunner();
     this.workspaceRoot = workspaceRoot;
     this.extensionPath = extensionPath;
+    this.runLog = runLog;
 
     // Initialize handlers
     this.handlers = {
@@ -171,7 +175,8 @@ export class WorkflowDomainService implements DomainService {
     if (!this.workflowEngine) {
       this.workflowEngine = new WorkflowEngine(
         this.logger,
-        this.stepRunner || this.createDefaultStepRunner()
+        this.stepRunner || this.createDefaultStepRunner(),
+        this.runLog
       );
     }
     return this.workflowEngine;
@@ -199,7 +204,14 @@ export function createWorkflowDomain(
   logger: Logger,
   stepRunner?: StepRunner,
   workspaceRoot?: string,
-  extensionPath?: string
+  extensionPath?: string,
+  runLog?: RunLog
 ): WorkflowDomainService {
-  return new WorkflowDomainService(logger, stepRunner, workspaceRoot, extensionPath);
+  return new WorkflowDomainService(
+    logger,
+    stepRunner,
+    workspaceRoot,
+    extensionPath,
+    runLog
+  );
 }

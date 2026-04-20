@@ -18,6 +18,7 @@ import {
   failure,
   success,
 } from "../../types";
+import { RunLog } from "../../infrastructure/run-log";
 import {
   createStatusHandler,
   createPullHandler,
@@ -33,6 +34,7 @@ import {
 } from "./pr-handlers";
 import { GenerateProseFn } from "../../types";
 import { createSessionBriefingHandler } from "./session-handler";
+import { SessionBriefingSources, HygieneScanGetter } from "./session-aggregator";
 import {
   createShowAnalyticsHandler,
   createExportJsonHandler,
@@ -78,9 +80,22 @@ export class GitDomainService implements DomainService {
   // Analytics component
   public analyzer: GitAnalyzer;
 
-  constructor(gitProvider: GitProvider, logger: Logger, workspaceRoot: string = process.cwd(), approvalUI?: ApprovalUI, generateProseFn?: GenerateProseFn) {
+  private readonly runLog: RunLog | undefined;
+  private readonly getHygieneScan: HygieneScanGetter | undefined;
+
+  constructor(
+    gitProvider: GitProvider,
+    logger: Logger,
+    workspaceRoot: string = process.cwd(),
+    approvalUI?: ApprovalUI,
+    generateProseFn?: GenerateProseFn,
+    runLog?: RunLog,
+    getHygieneScan?: HygieneScanGetter
+  ) {
     this.gitProvider = gitProvider;
     this.logger = logger;
+    this.runLog = runLog;
+    this.getHygieneScan = getHygieneScan;
 
     // Initialize smart commit components
     this.changeGrouper = new ChangeGrouper();
@@ -129,7 +144,16 @@ export class GitDomainService implements DomainService {
             "git.reviewPR": createReviewPRHandler(gitProvider, logger, generateProseFn),
             "git.commentPR": createCommentPRHandler(gitProvider, logger, generateProseFn),
             "git.resolveConflicts": createResolveConflictsHandler(gitProvider, logger, this.inboundAnalyzer, generateProseFn),
-            "git.sessionBriefing": createSessionBriefingHandler(gitProvider, logger, generateProseFn),
+            "git.sessionBriefing": createSessionBriefingHandler(
+              {
+                gitProvider,
+                runLog: this.runLog,
+                gitAnalyzer: this.analyzer,
+                getHygieneScan: this.getHygieneScan,
+                logger,
+              } satisfies SessionBriefingSources,
+              generateProseFn
+            ),
           }
         : {}),
     };
@@ -187,7 +211,9 @@ export function createGitDomain(
   logger: Logger,
   workspaceRoot: string = process.cwd(),
   approvalUI?: ApprovalUI,
-  generateProseFn?: GenerateProseFn
+  generateProseFn?: GenerateProseFn,
+  runLog?: RunLog,
+  getHygieneScan?: HygieneScanGetter
 ): GitDomainService {
-  return new GitDomainService(gitProvider, logger, workspaceRoot, approvalUI, generateProseFn);
+  return new GitDomainService(gitProvider, logger, workspaceRoot, approvalUI, generateProseFn, runLog, getHygieneScan);
 }

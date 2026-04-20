@@ -2,7 +2,8 @@
  * Git Domain Types — Smart Commit Grouping, Batch Commits & Inbound Analysis
  */
 
-import { RecentCommit } from "../../types";
+import { RecentCommit, CommandName } from "../../types";
+import { AnalyticsPeriod } from "./analytics-types";
 
 /**
  * File change metadata extracted from git status/diff
@@ -91,7 +92,33 @@ export type ApprovalUI = (groups: ChangeGroup[]) => Promise<ApprovalItem[] | nul
 // Session Briefing Types
 // ============================================================================
 
-export interface SessionBriefingReport {
+export interface RecentRunEntry {
+  runId: string;
+  commandName?: CommandName;
+  workflowName?: string;
+  skillName?: string;
+  phase: "complete" | "fail";
+  durationMs?: number;
+  errorCode?: string;
+  timestampMs: number;
+}
+
+export interface ActivityWindow {
+  period: AnalyticsPeriod;
+  commitsInWindow: number;
+  filesTouched: number;
+  topContributors: Array<{ name: string; commits: number }>;
+}
+
+export interface HygieneSnapshot {
+  scannedAt: string;
+  deadFileCount: number;
+  largeFileCount: number;
+  logFileCount: number;
+  deadCodeItemCount: number;
+}
+
+export interface SessionBriefing {
   generatedAt: string;
   branch: string;
   isDirty: boolean;
@@ -99,13 +126,14 @@ export interface SessionBriefingReport {
   unstaged: number;
   untracked: number;
   recentCommits: RecentCommit[];
-  uncommittedFiles: Array<{
-    path: string;
-    status: "A" | "M" | "D" | "R";
-  }>;
+  uncommittedFiles: Array<{ path: string; status: "A" | "M" | "D" | "R" }>;
   flags: string[];
-  summary: string;
+  recentRuns?: RecentRunEntry[];
+  activityWindow?: ActivityWindow;
+  hygieneSnapshot?: HygieneSnapshot;
 }
+
+export type SessionBriefingReport = SessionBriefing & { summary: string };
 
 // ============================================================================
 // PR Generation Types

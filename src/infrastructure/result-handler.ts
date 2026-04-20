@@ -4,11 +4,10 @@
  * suitable for OutputChannel and vscode.window notifications.
  */
 
-import { Result } from "../types";
-import { CommandName } from "../types";
+import { CommandName, Result } from "../types";
 import { AgentExecutionResult } from "../domains/agent/types";
 
-const ERROR_MESSAGES: Partial<Record<string, string>> = {
+export const ERROR_MESSAGES: Partial<Record<string, string>> = {
   // Git — core
   GIT_UNAVAILABLE:           "Git is not available in this workspace.",
   GIT_INIT_ERROR:            "Git initialization failed.",
@@ -108,12 +107,16 @@ export interface UserMessage {
   message: string;
 }
 
+export function getFriendlyErrorMessage(error: { code: string; message: string }): string {
+  return ERROR_MESSAGES[error.code] ?? error.message;
+}
+
 export function formatResultMessage(
   commandName: string,
   result: Result<unknown>
 ): UserMessage {
   if (result.kind === "err") {
-    const msg = ERROR_MESSAGES[result.error.code] ?? result.error.message;
+    const msg = getFriendlyErrorMessage(result.error);
     return { level: "error", message: `[${commandName}] ${msg}` };
   }
 

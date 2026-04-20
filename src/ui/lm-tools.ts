@@ -1,17 +1,11 @@
-/**
- * LM Tools — registers Meridian commands as VS Code Language Model Tools.
- *
- * Enables autonomous tool invocation by GitHub Copilot and the @meridian
- * chat participant. Each tool wraps a CommandRouter dispatch call and returns
- * a formatted text result the LLM can reason over.
- */
+/** Registers Meridian commands as VS Code Language Model Tools (Copilot agent mode). */
 
 import * as vscode from "vscode";
 import { CommandRouter } from "../router";
 import { CommandContext } from "../types";
 import { Logger } from "../infrastructure/logger";
-import { formatResultMessage } from "../infrastructure/result-handler";
 import { LM_TOOL_DEFS } from "../infrastructure/command-catalog";
+import { buildLmToolEnvelope } from "../infrastructure/lm-envelope";
 
 export function registerMeridianTools(
   router: CommandRouter,
@@ -28,10 +22,10 @@ export function registerMeridianTools(
         logger.info(`LM tool invoked: ${name}`, "LMTools");
 
         const result = await router.dispatch({ name: commandName, params }, ctx);
-        const { message } = formatResultMessage(commandName, result);
+        const envelope = buildLmToolEnvelope(commandName, result);
 
         return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart(message),
+          new vscode.LanguageModelTextPart(JSON.stringify(envelope)),
         ]);
       },
     })

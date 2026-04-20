@@ -13,6 +13,8 @@ import {
   createMockMiddleware,
 } from './fixtures';
 import { DomainService, Handler } from '../src/types';
+import { RunLog } from '../src/infrastructure/run-log';
+import { RunEventV1 } from '../src/types';
 
 describe('CommandRouter', () => {
   // Test 1: registerDomain() adds handlers
@@ -175,5 +177,259 @@ describe('CommandRouter', () => {
 
     const error = assertFailure(result);
     expect(error.code).toBe('MIDDLEWARE_ERROR');
+  });
+});
+
+describe('CommandRouter — dispatch lifecycle events', () => {
+  it('fires onBeforeHandler after middleware and before handler', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    const order: string[] = [];
+
+    router.use(async (ctx, next) => {
+      order.push('mw');
+      await next();
+    });
+
+    router.onBeforeHandler((e) => {
+      order.push(`before:${e.command.name}`);
+    });
+
+    router.registerDomain({
+      name: 'lifecycle-before',
+      handlers: {
+        'git.status': async () => {
+          order.push('handler');
+          return { kind: 'ok' as const, value: {} };
+        },
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(order).toEqual(['mw', 'before:git.status', 'handler']);
+  });
+
+  it('fires onAfterHandler with ok result on handler success', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let captured: any = null;
+
+    router.onAfterHandler((e) => { captured = e; });
+
+    router.registerDomain({
+      name: 'lifecycle-after-ok',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: { branch: 'main' } }),
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(captured).not.toBeNull();
+    expect(captured.command.name).toBe('git.status');
+    expect(captured.result.kind).toBe('ok');
+    expect(captured.result.value.branch).toBe('main');
+  });
+
+  it('fires onAfterHandler with failure result on handler exception', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let captured: any = null;
+
+    router.onAfterHandler((e) => { captured = e; });
+
+    router.registerDomain({
+      name: 'lifecycle-after-throw',
+      handlers: {
+        'git.status': async () => { throw new Error('boom'); },
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(captured).not.toBeNull();
+    expect(captured.result.kind).toBe('err');
+    expect(captured.result.error.code).toBe('HANDLER_ERROR');
+  });
+
+  it('does NOT fire lifecycle events when middleware rejects', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let beforeCount = 0;
+    let afterCount = 0;
+
+    router.use(async () => { throw new Error('mw reject'); });
+    router.onBeforeHandler(() => { beforeCount++; });
+    router.onAfterHandler(() => { afterCount++; });
+
+    router.registerDomain({
+      name: 'lifecycle-mw-reject',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: {} }),
+      },
+    });
+
+    const result = await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(result.kind).toBe('err');
+    expect(beforeCount).toBe(0);
+    expect(afterCount).toBe(0);
+  });
+
+  it('isolates listener exceptions — other listeners still fire, dispatch still succeeds', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let secondListenerFired = false;
+
+    router.onBeforeHandler(() => { throw new Error('first listener boom'); });
+    router.onBeforeHandler(() => { secondListenerFired = true; });
+
+    router.registerDomain({
+      name: 'lifecycle-listener-isolation',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: {} }),
+      },
+    });
+
+    const result = await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+
+    expect(result.kind).toBe('ok');
+    expect(secondListenerFired).toBe(true);
+  });
+
+  it('Disposable from onBeforeHandler removes the listener', async () => {
+    const logger = new MockLogger();
+    const router = new CommandRouter(logger);
+    let fireCount = 0;
+
+    const sub = router.onBeforeHandler(() => { fireCount++; });
+
+    router.registerDomain({
+      name: 'lifecycle-dispose',
+      handlers: {
+        'git.status': async () => ({ kind: 'ok' as const, value: {} }),
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+    expect(fireCount).toBe(1);
+
+    sub.dispose();
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+    expect(fireCount).toBe(1);
+  });
+});
+
+describe('CommandRouter — run log correlation', () => {
+  function createMemoryRunLog(): { runLog: RunLog; events: RunEventV1[] } {
+    const events: RunEventV1[] = [];
+    const runLog: RunLog = {
+      append: async (event) => {
+        events.push(event);
+        return { kind: 'ok', value: undefined };
+      },
+      appendMany: async (incoming) => {
+        events.push(...incoming);
+        return { kind: 'ok', value: undefined };
+      },
+      readByRunId: async (runId) => ({
+        kind: 'ok',
+        value: events.filter((event) => event.runId === runId),
+      }),
+      readLatest: async (limit) => ({
+        kind: 'ok',
+        value: events.slice(-limit),
+      }),
+    };
+    return { runLog, events };
+  }
+
+  it('assigns runId, enriches handler context, and emits start+complete', async () => {
+    const logger = new MockLogger();
+    const { runLog, events } = createMemoryRunLog();
+    const router = new CommandRouter(logger, runLog);
+    let seenRunId: string | undefined;
+
+    router.registerDomain({
+      name: 'run-log-ok',
+      handlers: {
+        'git.status': async (ctx) => {
+          seenRunId = ctx.runId;
+          return { kind: 'ok' as const, value: { ok: true } };
+        },
+      },
+    });
+
+    const result = await router.dispatch(
+      { name: 'git.status', params: {} },
+      createMockContext()
+    );
+    expect(result.kind).toBe('ok');
+    expect(seenRunId).toBeTruthy();
+    expect(events).toHaveLength(2);
+    expect(events[0].phase).toBe('start');
+    expect(events[1].phase).toBe('complete');
+    expect(events[0].runId).toBe(events[1].runId);
+    expect(events[0].source).toBe('router');
+  });
+
+  it('emits fail terminal event when handler returns err', async () => {
+    const logger = new MockLogger();
+    const { runLog, events } = createMemoryRunLog();
+    const router = new CommandRouter(logger, runLog);
+
+    router.registerDomain({
+      name: 'run-log-fail',
+      handlers: {
+        'git.status': async () => ({
+          kind: 'err' as const,
+          error: { code: 'FAIL', message: 'failed' },
+        }),
+      },
+    });
+
+    const result = await router.dispatch(
+      { name: 'git.status', params: {} },
+      createMockContext()
+    );
+    expect(result.kind).toBe('err');
+    expect(events).toHaveLength(2);
+    expect(events[1].phase).toBe('fail');
+    expect(events[1].errorCode).toBe('FAIL');
+  });
+
+  it('propagates parentRunId for nested dispatches', async () => {
+    const logger = new MockLogger();
+    const { runLog, events } = createMemoryRunLog();
+    const router = new CommandRouter(logger, runLog);
+
+    router.registerDomain({
+      name: 'run-log-nested',
+      handlers: {
+        'chat.delegate': async (ctx) => {
+          return router.dispatch(
+            { name: 'workflow.run', params: { name: 'x' } },
+            { ...ctx, runId: undefined, parentRunId: ctx.runId }
+          );
+        },
+        'workflow.run': async () => ({ kind: 'ok' as const, value: { success: true } }),
+      },
+    });
+
+    const result = await router.dispatch(
+      { name: 'chat.delegate', params: {} },
+      createMockContext()
+    );
+    expect(result.kind).toBe('ok');
+
+    const startEvents = events.filter((event) => event.phase === 'start');
+    expect(startEvents).toHaveLength(2);
+    const parent = startEvents.find((event) => event.commandName === 'chat.delegate');
+    const child = startEvents.find((event) => event.commandName === 'workflow.run');
+    expect(parent).toBeTruthy();
+    expect(child).toBeTruthy();
+    expect(child?.parentRunId).toBe(parent?.runId);
   });
 });

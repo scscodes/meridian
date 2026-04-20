@@ -2,40 +2,52 @@
 
 See [FEATURES.md](./FEATURES.md) for the complete feature inventory.
 
+**Thesis:** Meridian is the structured, inspectable agent layer Copilot invokes. Typed commands + Result monad + skill/workflow composition give Copilot deterministic capabilities most extensions can't expose. Every roadmap item either deepens that surface or gets deferred.
+
+---
+
+## Foundations (sequence-critical, build first)
+
+These are the substrate. Content layers below depend on them; building content first forces rework.
+
+1. ~~**Run event log — persistence for workflow + skill executions**~~ — **DELIVERED 2026-04-20** (ADR 009). Versioned append-only store keyed by `runId`, with `start/step/complete/fail` events emitted from router, workflow engine, and skill service.
+
+2. ~~**Pre-execution signaling hook in router/middleware**~~ — **DELIVERED 2026-04-20** (ADR 008). Router exposes `onBeforeHandler`/`onAfterHandler`; `src/presentation/dispatch-signaling.ts` wires tree spinners. Chat-delegated `workflow.run` spinner now works.
+
+3. ~~**LM tool result envelope — typed contract across all tools**~~ — **DELIVERED 2026-04-20** (ADR 010). Uniform `{summary, data, followups, renderHint}` contract now returned by LM tools via centralized normalization in `src/infrastructure/lm-envelope.ts`, with mapping coverage enforced for all `LM_TOOL_DEFS`.
+
+4. ~~**Session briefing data aggregator**~~ — **DELIVERED 2026-04-20** (ADR 011). Framework-free `aggregateSessionBriefing()` in `src/domains/git/session-aggregator.ts` combines git state + run-log slice + git analytics + hygiene snapshot into `SessionBriefing`. Handler refactored to thin prose consumer. Fail-soft peripheral sources; optional `recentRuns`, `activityWindow`, `hygieneSnapshot` fields added to `SessionBriefingReport` (backwards compatible). Hygiene service gains `getLastScan()` cache via `onScanSuccess` hook.
+
+---
+
+## Content Expansion (after foundations land)
+
+Topical, easy to tweak, safe to iterate on once the substrate is stable.
+
+5. **Workflow run history webview**
+   - Multi-run timeline, per-step drill-down, re-run action. Reads #1 directly; no new data plumbing.
+   - Primary files: new `src/domains/workflow/run-history-ui/`, `src/presentation/webview-setup.ts`.
+
+6. **Skill library expansion**
+   - Additional built-in recipes: post-merge cleanup, dependency triage, release prep, branch cleanup, stale-PR sweep.
+   - Each skill is thin composition over existing engine + #3 envelope — purely additive, no engine changes.
+   - Primary files: `src/domains/skill/handlers.ts`, `src/domains/skill/service.ts`.
+
+7. **Session briefing UI deepening**
+   - Richer presentation over #4 aggregate: actionable cards, inline skill triggers, quick filters.
+   - Primary files: `src/domains/git/session-briefing-ui/`.
+
+8. **Skill discoverability surface**
+   - Tree view or quick-pick catalog of available skills with descriptions, last-run status (from #1).
+   - Only meaningful once #6 has produced a library worth browsing.
+
 ---
 
 ## Deferred
 
-- Remote telemetry sink — no destination exists yet
-- Additional analytics chart types — diminishing returns on existing webviews
-- Webview message typed generics — `BaseWebviewProvider<T, M extends WebviewMessage>` parameterization
-- **Workflow run history webview panel** — multi-run timeline with per-step history; tree expansion covers the single-run case; blocked on webview infrastructure investment
-- **`workflow.run` spinner for `chat.delegate` path** — `setRunning` requires a pre-execution hook; the delegate handler completes the run before returning the result; deferred until a broader pre-execution signaling pattern is designed
-- **`git.resolveConflicts` tree migration** — structured per-file data maps to tree expansion per ADR 006; medium priority, no immediate user impact
-- **ADR 006 compliance backlog** — `hygiene.reviewFile` (streams LLM to output channel with no richer surface; violates "last resort" rule) and `hygiene.impactAnalysis` (error path missing "Show Output" button); pre-existing, low user impact
-
----
-
-## Next Focus Areas
-
-- **Unified UI/UX rendering strategy — COMPLETE** (ADR 006 + ADR 007)
-  - Decision matrix formalized in `docs/adr/006-rendering-surface-decision-matrix.md`
-  - `workflow.run` pilot: tree step expansion, chat formatter, error path standardization, dead code removed
-  - All four surfaces now carry the correct data for `workflow.run`; new commands have a policy to follow
-
-- **Chat NL → workflow routing (medium criticality)**
-  - The `chat.delegate` classifier knows the `workflow.run:<name>` dispatch format but has no knowledge of available workspace workflow names at classification time. Users saying "run my deploy pipeline" may get intent mismatches if the workflow name doesn't match.
-  - Fix: before delegating NL input, fetch available workflows via `workflow.list` and inject names+descriptions into the classifier prompt context.
-  - Primary files: `src/ui/chat-participant.ts`, `src/domains/chat/handlers.ts`, `src/infrastructure/prompt-registry.ts`.
-
-- **Integration & E2E coverage (medium criticality)**
-  - Add integration tests for webview adapters (analytics panels), exercising `src/infrastructure/webview-provider.ts` and `src/presentation/webview-setup.ts` end-to-end.
-
-- **Workflow engine robustness (medium criticality)**
-  - Implement support for `WorkflowStep.conditions` and explicit retry/timeout semantics using `TIMEOUTS.WORKFLOW_STEP` and `WORKFLOW_ERROR_CODES` (e.g., `STEP_TIMEOUT`, `STEP_EXECUTION_ERROR`), rather than single-shot execution.
-  - Ensure integration tests (e.g., `tests/integration.test.ts`) assert the intended behaviour for `retries` and failure paths instead of relying on comments only.
-  - Primary files: `src/infrastructure/workflow-engine.ts`, `src/types.ts`, `src/infrastructure/error-codes.ts`, `tests/integration.test.ts`.
-
-- **Telemetry wiring (medium criticality, low immediate operational risk)**
-  - Wire `TelemetryTracker` into the structured logger and command/router boundaries so command start/completion/failure and domain-level errors emit `TelemetryEvent` records.
-  - Primary files: `src/infrastructure/telemetry.ts`, `src/infrastructure/logger.ts`, `src/router.ts`, domain services in `src/domains/*/service.ts`.
+- **Remote telemetry sink** — no destination exists; #1 is the prerequisite.
+- **Additional analytics chart types** — diminishing returns on existing webviews.
+- **Webview message typed generics** — `BaseWebviewProvider<T, M extends WebviewMessage>`; ergonomic, not load-bearing.
+- **`git.resolveConflicts` tree migration** — ADR 006 alignment; medium priority, no immediate user impact.
+- **ADR 006 compliance backlog** — `hygiene.reviewFile` (streams to output channel, no richer surface), `hygiene.impactAnalysis` (error path missing "Show Output"); pre-existing, low user impact.
+- **Integration & E2E coverage for webview adapters** — valuable, not a differentiator; schedule opportunistically.

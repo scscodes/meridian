@@ -114,7 +114,7 @@ describe("LM tool invocation", () => {
     return (call[1] as { invoke: (opts: Record<string, unknown>, token: unknown) => Promise<unknown> }).invoke;
   }
 
-  it("git.status tool dispatches git.status command and returns formatted text", async () => {
+  it("git.status tool dispatches git.status command and returns envelope json", async () => {
     const statusResult = success({ branch: "main", isDirty: false, staged: 0, unstaged: 0, untracked: 0 });
     router = makeRouter(statusResult);
     registerMeridianTools(router as any, BASE_CTX, logger);
@@ -126,7 +126,10 @@ describe("LM tool invocation", () => {
       expect.objectContaining({ name: "git.status" }),
       BASE_CTX
     );
-    expect(result.parts[0].value).toContain("main");
+    const envelope = JSON.parse(result.parts[0].value) as { summary: string; renderHint: string; followups: unknown[] };
+    expect(envelope.summary).toContain("main");
+    expect(envelope.renderHint).toBe("status");
+    expect(Array.isArray(envelope.followups)).toBe(true);
   });
 
   it("hygiene.scan tool dispatches hygiene.scan command", async () => {
@@ -156,7 +159,7 @@ describe("LM tool invocation", () => {
     );
   });
 
-  it("error result returns readable error text (not raw object)", async () => {
+  it("error result returns envelope with structured error data", async () => {
     const errResult = failure({ code: "GIT_UNAVAILABLE", message: "Git not found" });
     router = makeRouter(errResult);
     registerMeridianTools(router as any, BASE_CTX, logger);
@@ -164,8 +167,14 @@ describe("LM tool invocation", () => {
     const invoke = getToolInvoke("meridian_git_status");
     const result = await invoke({ input: {} }, {}) as { parts: { value: string }[] };
 
-    expect(result.parts[0].value).toContain("Git");
-    expect(result.parts[0].value).not.toBe("[object Object]");
+    const envelope = JSON.parse(result.parts[0].value) as {
+      summary: string;
+      data: { code: string; message: string };
+      renderHint: string;
+    };
+    expect(envelope.summary).toContain("Git");
+    expect(envelope.data.code).toBe("GIT_UNAVAILABLE");
+    expect(envelope.renderHint).toBe("status");
   });
 
   it("successful result returns LanguageModelToolResult", async () => {

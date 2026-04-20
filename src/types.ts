@@ -334,6 +334,29 @@ export interface DispatchCompleteEvent extends DispatchEvent {
   result: Result<unknown>;
 }
 
+// LM tool envelope (ADR 010) — stable JSON shape for Copilot tool results
+
+export type LmToolRenderHint =
+  | "status"
+  | "chat_markdown"
+  | "output_channel"
+  | "tree_view"
+  | "webview";
+
+export interface LmToolEnvelope<TData = unknown> {
+  summary: string;
+  data: TData;
+  followups: string[];
+  renderHint: LmToolRenderHint;
+}
+
+export interface LmToolErrorData {
+  code: string;
+  message: string;
+  details?: unknown;
+  context?: string;
+}
+
 // ============================================================================
 // Run Log Events (Foundation #1)
 // ============================================================================

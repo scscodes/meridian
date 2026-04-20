@@ -14,10 +14,7 @@ These are the substrate. Content layers below depend on them; building content f
 
 2. ~~**Pre-execution signaling hook in router/middleware**~~ — **DELIVERED 2026-04-20** (ADR 008). Router exposes `onBeforeHandler`/`onAfterHandler`; `src/presentation/dispatch-signaling.ts` wires tree spinners. Chat-delegated `workflow.run` spinner now works.
 
-3. **LM tool result envelope — typed contract across all tools**
-   - Uniform shape `{summary, data, followups, renderHint}` so Copilot receives consistent, structured output whether the tool is git, hygiene, workflow, or skill.
-   - Collapses per-tool formatter drift; makes adding a new skill a schema exercise, not a rendering one.
-   - Primary files: `src/ui/lm-tools.ts`, `src/infrastructure/result-handler.ts`, `src/types.ts`.
+3. ~~**LM tool result envelope — typed contract across all tools**~~ — **DELIVERED 2026-04-20** (ADR 010). Uniform `{summary, data, followups, renderHint}` contract now returned by LM tools via centralized normalization in `src/infrastructure/lm-envelope.ts`, with mapping coverage enforced for all `LM_TOOL_DEFS`.
 
 4. **Session briefing data aggregator**
    - Pure function over run log + git analytics + hygiene scan state → `SessionBriefing` record.

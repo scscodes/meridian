@@ -113,14 +113,15 @@ JSON-defined agents in `.vscode/agents/`. Capability validation before execution
 | `webview-provider.ts` | `WebviewViewProvider` for analytics panels |
 | `workflow-engine.ts` | Step execution engine with branching and output passing |
 | `agent-registry.ts` | Agent discovery, schema validation, capability queries |
-| `result-handler.ts` | `Result<T>` → VS Code notification + OutputChannel |
+| `result-handler.ts` | Friendly message normalization for `Result<T>` errors + legacy summaries |
+| `lm-envelope.ts` | Canonical LM envelope builder (`summary`, `data`, `followups`, `renderHint`) |
 | `model-selector.ts` | Reads `meridian.model.*` settings to select LLM per domain |
 | `error-codes.ts` | Centralized error codes, telemetry event enum, timeouts |
 
 ### 4. UI (`src/ui/`)
 
 - `chat-participant.ts` — `@meridian` participant; multi-tier routing: slash commands → LLM classifier → fallback
-- `lm-tools.ts` — registers commands as VS Code LM tools for Copilot agent mode
+- `lm-tools.ts` — registers commands as VS Code LM tools; returns serialized LM envelope contract
 - `smart-commit-quick-pick.ts` — QuickPick group selection + InputBox per group
 - `tree-providers/` — sidebar views (git, hygiene, workflow, agent)
 
@@ -151,6 +152,8 @@ The output channel is a last resort. All commands whose happy path writes to the
 
 **`RESULT_FORMATTERS` pattern** — `src/ui/chat-participant.ts` maintains a `Partial<Record<CommandName, ResultFormatter>>` map. Adding chat output for a new command requires only a new entry in this map; no changes to dispatch logic. This decouples display strategy from routing.
 
+**LM tool envelope** (ADR 010) — `lm-envelope.ts` maps each `LM_TOOL_DEFS` command to `LmToolEnvelope`; `lm-tools.ts` returns `JSON.stringify` of that shape only.
+
 **WorkflowTreeProvider step expansion** (ADR 007) — after `workflow.run` completes, `WorkflowTreeProvider` stores `stepResults: StepResult[]` per workflow in `lastRuns`. Items become `TreeItemCollapsibleState.Collapsed`; `getChildren` returns `WorkflowStepTreeItem` children with `pass`/`error` ThemeIcons. The provider is wired to both the panel path (`specialized-commands.ts`) and the chat path (`chat-participant.ts`) via `setRunning`/`setLastRun` callbacks.
 
 ---
@@ -167,7 +170,7 @@ All errors use `AppError { code, message, details?, context? }`. Error codes are
 - **New middleware**: implement `Middleware` interface, add to `router.use()` chain in `main.ts`
 - **New workflow**: drop `.vscode/workflows/<name>.json`; available immediately via `workflow.list`/`workflow.run`
 - **New agent**: drop `.vscode/agents/<id>.json`; available immediately via `agent.list`/`agent.execute`
-- **New LM tool**: add to `TOOL_DEFS` in `lm-tools.ts` and `contributes.languageModelTools` in `package.json`
+- **New LM tool**: add `lmToolName` in `COMMAND_CATALOG` and `contributes.languageModelTools` in `package.json`; add/update envelope mapping in `src/infrastructure/lm-envelope.ts`
 
 ---
 

@@ -26,6 +26,7 @@ import { ListAgentsResult, AgentExecutionResult } from "../domains/agent/types";
 import { SkillOverviewResult, SkillPrReadyResult, SkillPreMergeResult } from "../domains/skill/types";
 import { UI_SETTINGS } from "../constants";
 import { DelegateResult } from "../domains/chat/handlers";
+import { isSensitiveLoggingEnabled, sanitizeForLogs } from "../security/operation-policy";
 
 interface FollowupMeta {
   commandName: CommandName;
@@ -56,18 +57,24 @@ const SLASH_MAP: Record<string, CommandName> = {
 
 export function createChatParticipant(
   router: CommandRouter,
-  ctx: CommandContext,
+  contextOrGetter: CommandContext | (() => CommandContext),
   logger: Logger,
   workflowTree?: WorkflowTreeProvider,
   gitTree?: GitTreeProvider,
   hygieneTree?: HygieneTreeProvider
 ): vscode.Disposable {
+  const getContext = typeof contextOrGetter === "function"
+    ? contextOrGetter
+    : () => contextOrGetter;
   const trees: DispatchTrees = { workflowTree, gitTree, hygieneTree };
 
   const handler: vscode.ChatRequestHandler = async (request, _chatCtx, stream, _token) => {
     // Debug: log incoming request shape so issues can be diagnosed
+    const promptLog = isSensitiveLoggingEnabled()
+      ? JSON.stringify(request.prompt)
+      : sanitizeForLogs(request.prompt ?? "");
     logger.info(
-      `Chat request — command: ${JSON.stringify(request.command)}, prompt: ${JSON.stringify(request.prompt)}`,
+      `Chat request — command: ${JSON.stringify(request.command)}, prompt: ${promptLog}`,
       "ChatParticipant"
     );
 
@@ -79,7 +86,7 @@ export function createChatParticipant(
       if (commandName) {
         logger.info(`Routing via request.command: ${cmd} → ${commandName}`, "ChatParticipant");
         stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-        const meta = await handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
+        const meta = await handleDirectDispatch(commandName, {}, router, getContext, stream, logger, trees);
         return meta ? { metadata: meta } : {};
       }
     }
@@ -91,7 +98,7 @@ export function createChatParticipant(
     if (firstWord in SLASH_MAP) {
       const commandName = SLASH_MAP[firstWord];
       stream.markdown(`\`@meridian\` → \`${commandName}\`\n\n`);
-      const meta = await handleDirectDispatch(commandName, {}, router, ctx, stream, logger, trees);
+      const meta = await handleDirectDispatch(commandName, {}, router, getContext, stream, logger, trees);
       return meta ? { metadata: meta } : {};
     }
 
@@ -99,7 +106,7 @@ export function createChatParticipant(
     if (firstWord === "run" && text.length > 4) {
       const name = text.slice(4).trim();
       stream.markdown(`\`@meridian\` → \`workflow.run\`\n\n`);
-      const meta = await handleDirectDispatch("workflow.run", { name }, router, ctx, stream, logger, trees);
+      const meta = await handleDirectDispatch("workflow.run", { name }, router, getContext, stream, logger, trees);
       return meta ? { metadata: meta } : {};
     }
 
@@ -110,7 +117,7 @@ export function createChatParticipant(
       logger.info(`NL routing: classifying "${text.slice(0, 80)}"`, "ChatParticipant");
       const delegateResult = await router.dispatch(
         { name: "chat.delegate", params: { task: text } },
-        ctx
+        getContext()
       );
 
       if (delegateResult.kind === "ok") {
@@ -142,8 +149,9 @@ export function createChatParticipant(
   };
 
   const participant = vscode.chat.createChatParticipant("meridian", handler);
+  const iconContext = getContext();
   participant.iconPath = vscode.Uri.joinPath(
-    vscode.Uri.file(ctx.extensionPath),
+    vscode.Uri.file(iconContext.extensionPath),
     "media",
     "icon.svg"
   );
@@ -163,12 +171,13 @@ async function handleDirectDispatch(
   commandName: CommandName,
   params: Record<string, unknown>,
   router: CommandRouter,
-  ctx: CommandContext,
+  getContext: () => CommandContext,
   stream: vscode.ChatResponseStream,
   logger: Logger,
   trees: DispatchTrees
 ): Promise<FollowupMeta | void> {
   const { workflowTree, gitTree, hygieneTree } = trees;
+  const ctx = getContext();
   // Auto-populate filePath for impact analysis from active editor
   if (commandName === "hygiene.impactAnalysis" && !params.filePath) {
     if (!ctx.activeFilePath) {
@@ -384,7 +393,10 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
       stream.markdown(`**Error:** ${r.error}\n\n`);
     }
     if (r.output && Object.keys(r.output).length > 0) {
-      stream.markdown("**Output:**\n```json\n" + JSON.stringify(r.output, null, 2) + "\n```\n");
+      const payload = isSensitiveLoggingEnabled()
+        ? JSON.stringify(r.output, null, 2)
+        : sanitizeForLogs(r.output);
+      stream.markdown("**Output:**\n```json\n" + payload + "\n```\n");
     }
   },
   "git.analyzeInbound": (value, stream) => {

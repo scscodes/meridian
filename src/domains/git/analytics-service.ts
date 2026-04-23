@@ -2,7 +2,7 @@
  * Git Analytics Service — Parse git history and generate telemetry
  */
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import micromatch from "micromatch";
 import {
   AnalyticsPeriod,
@@ -117,14 +117,24 @@ export class GitAnalyzer {
       const sinceStr = since.toISOString().split("T")[0];
       const untilStr = until.toISOString().split("T")[0];
 
-      let cmd = `git log --since="${sinceStr}" --until="${untilStr}" --pretty=format:"%H%x00%an%x00%ai%x00%s" --numstat`;
+      const args = [
+        "log",
+        `--since=${sinceStr}`,
+        `--until=${untilStr}`,
+        "--pretty=format:%H%x00%an%x00%ai%x00%s",
+        "--numstat",
+      ];
 
       // Filter by author if specified
       if (opts.author) {
-        cmd += ` --author="${opts.author}"`;
+        args.push(`--author=${this.escapeGitRegexLiteral(opts.author)}`);
       }
 
-      const output = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"], cwd: this.workspaceRoot });
+      const output = execFileSync("git", args, {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "ignore"],
+        cwd: this.workspaceRoot,
+      });
 
       const commits: CommitMetric[] = [];
       let currentCommit: Partial<CommitMetric> | null = null;
@@ -187,6 +197,10 @@ export class GitAnalyzer {
       // Return empty if git command fails (e.g., no commits in range)
       return [];
     }
+  }
+
+  private escapeGitRegexLiteral(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   /**

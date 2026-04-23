@@ -5,6 +5,7 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
+import * as vscode from "vscode";
 import {
   GitProvider,
   GitStatus,
@@ -17,6 +18,7 @@ import {
   failure,
   AppError,
 } from "../types";
+import { getAllowedGitHosts, getGitNetworkMode } from "../security/operation-policy";
 
 const execFileAsync = promisify(execFile);
 
@@ -94,6 +96,72 @@ function parseCommitLog(raw: string): RecentCommit[] {
 class RealGitProvider implements GitProvider {
   constructor(private readonly workspaceRoot: string) {}
 
+  private async getPullRemoteName(): Promise<string> {
+    const branchResult = await this.getCurrentBranch();
+    if (branchResult.kind === "err") return "origin";
+    const branch = branchResult.value.trim();
+    if (!branch) return "origin";
+    const remoteResult = await git(["config", `branch.${branch}.remote`], this.workspaceRoot);
+    if (remoteResult.kind === "ok" && remoteResult.value.trim()) {
+      return remoteResult.value.trim();
+    }
+    return "origin";
+  }
+
+  private async canRunNetworkGitOperation(
+    operation: "pull" | "fetch",
+    remote: string
+  ): Promise<Result<void>> {
+    const mode = getGitNetworkMode();
+    if (mode === "deny") {
+      return failure({
+        code: "GIT_POLICY_DENIED",
+        message: `Blocked by policy: git ${operation} is disabled`,
+        context: "GitProvider",
+      });
+    }
+
+    const remoteUrlResult = await this.getRemoteUrl(remote);
+    if (remoteUrlResult.kind === "err") {
+      if (getAllowedGitHosts().length > 0 || mode !== "allow") {
+        return failure({
+          code: "GIT_POLICY_DENIED",
+          message: `Blocked by policy: unable to resolve remote URL for '${remote}'`,
+          context: "GitProvider",
+        });
+      }
+    }
+    const remoteUrl = remoteUrlResult.kind === "ok" ? remoteUrlResult.value : "";
+    const host = extractGitRemoteHost(remoteUrl);
+    const allowedHosts = getAllowedGitHosts();
+    if (allowedHosts.length > 0 && (!host || !allowedHosts.includes(host.toLowerCase()))) {
+      return failure({
+        code: "GIT_POLICY_DENIED",
+        message: host
+          ? `Blocked by policy: remote host '${host}' is not allowed`
+          : "Blocked by policy: remote host could not be determined",
+        context: "GitProvider",
+      });
+    }
+
+    if (mode === "prompt") {
+      const decision = await vscode.window.showWarningMessage(
+        `Meridian is about to run git ${operation} against remote '${remote}'${host ? ` (${host})` : ""}. Continue?`,
+        { modal: true },
+        "Continue"
+      );
+      if (decision !== "Continue") {
+        return failure({
+          code: "GIT_POLICY_DENIED",
+          message: `Cancelled: git ${operation} was not approved`,
+          context: "GitProvider",
+        });
+      }
+    }
+
+    return success(undefined);
+  }
+
   async status(_branch?: string): Promise<Result<GitStatus>> {
     const branchResult = await this.getCurrentBranch();
     if (branchResult.kind === "err") return branchResult;
@@ -134,6 +202,9 @@ class RealGitProvider implements GitProvider {
 
   async pull(branch?: string): Promise<Result<GitPullResult>> {
     const targetBranch = branch ?? "HEAD";
+    const remoteName = await this.getPullRemoteName();
+    const gate = await this.canRunNetworkGitOperation("pull", remoteName);
+    if (gate.kind === "err") return gate;
     const result = await git(["pull"], this.workspaceRoot);
     if (result.kind === "err") return result;
 
@@ -296,7 +367,10 @@ class RealGitProvider implements GitProvider {
   }
 
   async fetch(remote?: string): Promise<Result<void>> {
-    const args = ["fetch", remote ?? "origin"];
+    const remoteName = remote ?? "origin";
+    const gate = await this.canRunNetworkGitOperation("fetch", remoteName);
+    if (gate.kind === "err") return gate;
+    const args = ["fetch", remoteName];
     const result = await git(args, this.workspaceRoot);
     if (result.kind === "err") return result;
     return success(undefined);
@@ -365,4 +439,15 @@ class RealGitProvider implements GitProvider {
  */
 export function createGitProvider(workspaceRoot: string): GitProvider {
   return new RealGitProvider(workspaceRoot);
+}
+
+function extractGitRemoteHost(remoteUrl: string): string | undefined {
+  if (!remoteUrl) return undefined;
+  const sshMatch = remoteUrl.match(/^[^@]+@([^:]+):/);
+  if (sshMatch?.[1]) return sshMatch[1];
+  try {
+    return new URL(remoteUrl).hostname;
+  } catch {
+    return undefined;
+  }
 }

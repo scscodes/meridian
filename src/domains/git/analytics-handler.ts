@@ -12,6 +12,7 @@ import {
 import { GIT_ERROR_CODES } from "../../infrastructure/error-codes";
 import { AnalyticsOptions, GitAnalyticsReport } from "./analytics-types";
 import { GitAnalyzer } from "./analytics-service";
+import { validateAnalyticsOptions } from "./analytics-validation";
 
 /**
  * Create the analytics handler
@@ -25,21 +26,17 @@ export function createShowAnalyticsHandler(
     params: Partial<AnalyticsOptions> = {}
   ) => {
     try {
-      // Default period to 3 months
-      const period = params.period || "3mo";
-      if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
+      const validation = validateAnalyticsOptions(params);
+      if (!validation.ok) {
         return failure({
-          code: GIT_ERROR_CODES.INVALID_PERIOD,
-          message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
+          code: validation.error.code === "INVALID_PERIOD"
+            ? GIT_ERROR_CODES.INVALID_PERIOD
+            : GIT_ERROR_CODES.ANALYTICS_ERROR,
+          message: validation.error.message,
           context: "ShowAnalyticsHandler",
         });
       }
-
-      const options: AnalyticsOptions = {
-        period,
-        author: params.author,
-        pathPattern: params.pathPattern,
-      };
+      const options = validation.value;
 
       logger.info(
         `Running analytics for period: ${options.period}`,
@@ -83,19 +80,17 @@ export function createExportJsonHandler(
     params: Partial<AnalyticsOptions> = {}
   ) => {
     try {
-      const period = params.period || "3mo";
-      if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
+      const validation = validateAnalyticsOptions(params);
+      if (!validation.ok) {
         return failure({
-          code: GIT_ERROR_CODES.INVALID_PERIOD,
-          message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
+          code: validation.error.code === "INVALID_PERIOD"
+            ? GIT_ERROR_CODES.INVALID_PERIOD
+            : GIT_ERROR_CODES.EXPORT_ERROR,
+          message: validation.error.message,
           context: "ExportJsonHandler",
         });
       }
-      const options: AnalyticsOptions = {
-        period,
-        author: params.author,
-        pathPattern: params.pathPattern,
-      };
+      const options = validation.value;
 
       const report = await analyzer.analyze(options);
       const json = analyzer.exportToJSON(report);
@@ -124,19 +119,17 @@ export function createExportCsvHandler(
     params: Partial<AnalyticsOptions> = {}
   ) => {
     try {
-      const period = params.period || "3mo";
-      if (period !== "3mo" && period !== "6mo" && period !== "12mo") {
+      const validation = validateAnalyticsOptions(params);
+      if (!validation.ok) {
         return failure({
-          code: GIT_ERROR_CODES.INVALID_PERIOD,
-          message: `Invalid period: ${period}. Must be 3mo, 6mo, or 12mo`,
+          code: validation.error.code === "INVALID_PERIOD"
+            ? GIT_ERROR_CODES.INVALID_PERIOD
+            : GIT_ERROR_CODES.EXPORT_ERROR,
+          message: validation.error.message,
           context: "ExportCsvHandler",
         });
       }
-      const options: AnalyticsOptions = {
-        period,
-        author: params.author,
-        pathPattern: params.pathPattern,
-      };
+      const options = validation.value;
 
       const report = await analyzer.analyze(options);
       const csv = analyzer.exportToCSV(report);

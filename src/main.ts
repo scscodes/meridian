@@ -171,17 +171,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     trees.agentTree.refresh();
   });
 
-  setupFileWatchers(context, workspaceRoot, {
-    gitRefresh: () => trees.gitTree.refresh(),
-    hygieneRefresh: () => trees.hygieneTree.refresh(),
-    definitionsRefresh: () => { trees.workflowTree.refresh(); trees.agentTree.refresh(); },
-    statusBarUpdate: () => statusBar.update(),
-  });
+  const startupConfig = vscode.workspace.getConfiguration("meridian.startup");
+  const enableFileWatchers = startupConfig.get<boolean>("enableFileWatchers", true);
+  const enableChatSurface = startupConfig.get<boolean>("enableChatSurface", true);
+
+  if (!enableFileWatchers) {
+    logger.info("Startup: file watchers disabled by config", "activate");
+  } else {
+    setupFileWatchers(context, workspaceRoot, {
+      gitRefresh: () => trees.gitTree.refresh(),
+      hygieneRefresh: () => trees.hygieneTree.refresh(),
+      definitionsRefresh: () => { trees.workflowTree.refresh(); trees.agentTree.refresh(); },
+      statusBarUpdate: () => statusBar.update(),
+    });
+  }
 
   // ── Chat + LM tools ────────────────────────────────────────────────
-  context.subscriptions.push(createChatParticipant(router, cmdCtx, logger, trees.workflowTree, trees.gitTree, trees.hygieneTree));
-  context.subscriptions.push(...registerMeridianTools(router, cmdCtx, logger));
-
+  if (enableChatSurface) {
+    context.subscriptions.push(createChatParticipant(router, ctxFn, logger, trees.workflowTree, trees.gitTree, trees.hygieneTree));
+    context.subscriptions.push(...registerMeridianTools(router, ctxFn, logger));
+  } else {
+    logger.info("Startup: chat participant and LM tools disabled by config", "activate");
+  }
   // ── Finalize ────────────────────────────────────────────────────────
   statusBar.update();
 

@@ -742,6 +742,48 @@
           "default": "",
           "description": "Language model family for @meridian chat participant direct LLM calls. Empty = inherits meridian.model.default."
         },
+        "meridian.security.lmEgress.mode": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "prompt",
+            "deny"
+          ],
+          "default": "prompt",
+          "description": "Controls LM egress behavior for Meridian AI features. allow = always send, prompt = require user confirmation, deny = block all LM sends."
+        },
+        "meridian.security.gitNetwork.mode": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "prompt",
+            "deny"
+          ],
+          "default": "prompt",
+          "description": "Controls git network operations initiated by Meridian. allow = run automatically, prompt = require confirmation, deny = block fetch/pull."
+        },
+        "meridian.security.gitNetwork.allowedHosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Optional allowlist of git remote hosts for Meridian network operations (e.g. github.com). Empty means no host restriction."
+        },
+        "meridian.security.clipboard.autoCopy": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically copy generated output to clipboard when available."
+        },
+        "meridian.security.logging.sensitive": {
+          "type": "string",
+          "enum": [
+            "redact",
+            "allow"
+          ],
+          "default": "redact",
+          "description": "Controls whether Meridian logs raw sensitive content or redacted output."
+        },
         "meridian.hygiene.prune.minAgeDays": {
           "type": "number",
           "default": 30,
@@ -819,6 +861,16 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically open a Session Briefing panel when the extension activates."
+        },
+        "meridian.startup.enableFileWatchers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable startup registration of file watchers for automatic tree/status refresh."
+        },
+        "meridian.startup.enableChatSurface": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable startup registration of @meridian chat participant and LM tool surface."
         },
         "meridian.log.level": {
           "type": "string",
@@ -1130,7 +1182,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run bundle",
-    "copy-assets": "cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && rm -rf out/domains/git/session-briefing-ui && cp -r src/domains/git/session-briefing-ui out/domains/git/session-briefing-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui",
+    "copy-assets": "cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && cp node_modules/chart.js/dist/chart.umd.js out/domains/git/analytics-ui/chart.umd.js && rm -rf out/domains/git/session-briefing-ui && cp -r src/domains/git/session-briefing-ui out/domains/git/session-briefing-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui && cp node_modules/chart.js/dist/chart.umd.js out/domains/hygiene/analytics-ui/chart.umd.js",
     "bundle": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --external:typescript --format=cjs --platform=node --target=node20 && npm run copy-assets",
     "compile": "tsc -p ./ && npm run copy-assets",
     "watch": "tsc -watch -p ./",
@@ -1139,7 +1191,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
-    "lint": "npx vitest run tests/manifest.test.ts",
+    "lint": "npx vitest run tests/manifest.test.ts tests/webview-security.test.ts",
     "release": "semantic-release"
   },
   "dependencies": {

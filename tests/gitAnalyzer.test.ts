@@ -4,16 +4,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
-import { createTestGitLog } from './fixtures';
 
-// Mock the execSync function
+// Mock the execFileSync function
 vi.mock('child_process', () => ({
-  execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
-const mockedExecSync = vi.mocked(execSync);
+const mockedExecFileSync = vi.mocked(execFileSync);
 
 describe('GitAnalyzer', () => {
   let analyzer: GitAnalyzer;
@@ -21,7 +20,7 @@ describe('GitAnalyzer', () => {
   beforeEach(() => {
     analyzer = new GitAnalyzer();
     analyzer.clearCache();
-    mockedExecSync.mockClear();
+    mockedExecFileSync.mockClear();
   });
 
   // Test 1: parseGitLog() with valid output
@@ -34,7 +33,7 @@ describe('GitAnalyzer', () => {
       '5\t3\tsrc/core/service.ts',
       '2\t1\tsrc/core/types.ts',
     ].join('\n');
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     const report = await analyzer.analyze({ period: '3mo' });
 
@@ -43,9 +42,17 @@ describe('GitAnalyzer', () => {
     expect(report.summary.totalLinesAdded).toBeGreaterThan(0);
   });
 
+  it("escapes author filter before passing to git --author", async () => {
+    mockedExecFileSync.mockReturnValue("");
+    await analyzer.analyze({ period: "3mo", author: "alice.*(admin)" });
+
+    const args = mockedExecFileSync.mock.calls[0]?.[1] as string[];
+    expect(args.some((arg) => arg.includes("--author=alice\\.\\*\\(admin\\)"))).toBe(true);
+  });
+
   // Test 2: parseGitLog() with malformed input (graceful)
   it('should gracefully handle malformed input', async () => {
-    mockedExecSync.mockReturnValue('notvalid\ngarbage\n\x00\x00\x00');
+    mockedExecFileSync.mockReturnValue('notvalid\ngarbage\n\x00\x00\x00');
 
     const report = await analyzer.analyze({ period: '3mo' });
 
@@ -138,14 +145,14 @@ describe('GitAnalyzer', () => {
       'abc1234\x00Alice\x002026-02-20T10:30:00Z\x00feat: add feature',
       '10\t2\tsrc/feature.ts',
     ].join('\n');
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     // First call — populates cache
     await analyzer.analyze({ period: '3mo' });
-    // Second call — should hit cache, not call execSync again
+    // Second call — should hit cache, not call process execution again
     await analyzer.analyze({ period: '3mo' });
 
-    expect(mockedExecSync).toHaveBeenCalledTimes(1);
+    expect(mockedExecFileSync).toHaveBeenCalledTimes(1);
   });
 
   // Test 6: cache invalidation on new input
@@ -154,7 +161,7 @@ describe('GitAnalyzer', () => {
       'abc1234\x00Alice\x002026-02-20T10:30:00Z\x00feat: initial',
       '5\t1\tsrc/file.ts',
     ].join('\n');
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     // First call
     await analyzer.analyze({ period: '3mo' });
@@ -162,15 +169,15 @@ describe('GitAnalyzer', () => {
     // Invalidate cache
     analyzer.clearCache();
 
-    // Second call — cache cleared, execSync called again
+    // Second call — cache cleared, process call again
     await analyzer.analyze({ period: '3mo' });
 
-    expect(mockedExecSync).toHaveBeenCalledTimes(2);
+    expect(mockedExecFileSync).toHaveBeenCalledTimes(2);
   });
 
   // Test 7: handles empty git log
   it('should handle empty git log gracefully', async () => {
-    mockedExecSync.mockReturnValue('');
+    mockedExecFileSync.mockReturnValue('');
 
     const report = await analyzer.analyze({ period: '3mo' });
 
@@ -191,7 +198,7 @@ describe('GitAnalyzer', () => {
       '15\t5\tdocs/GUIDE.md',
     ].join('\n');
 
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     // Pattern matching src/api/** → only commit aaa111
     const apiReport = await analyzer.analyze({ period: '3mo', pathPattern: 'src/api/**' });
@@ -199,7 +206,7 @@ describe('GitAnalyzer', () => {
     expect(apiReport.commits[0].hash).toBe('aaa111');
 
     analyzer.clearCache();
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     // Pattern matching **/*.md → only commit bbb222
     const docsReport = await analyzer.analyze({ period: '3mo', pathPattern: '**/*.md' });
@@ -207,7 +214,7 @@ describe('GitAnalyzer', () => {
     expect(docsReport.commits[0].hash).toBe('bbb222');
 
     analyzer.clearCache();
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     // No pattern → both commits
     const allReport = await analyzer.analyze({ period: '3mo' });
@@ -221,7 +228,7 @@ describe('GitAnalyzer', () => {
       '40\t15\tsrc/api/handler.ts',
     ].join('\n');
 
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     const report = await analyzer.analyze({ period: '3mo', pathPattern: 'nonexistent/**' });
     expect(report.commits).toHaveLength(0);
@@ -236,7 +243,7 @@ describe('GitAnalyzer', () => {
       '20\t5\tdocs/README.md',
     ].join('\n');
 
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
 
     const report = await analyzer.analyze({ period: '3mo', pathPattern: 'src/api/**' });
 
@@ -266,7 +273,7 @@ describe('GitAnalyzer', () => {
       'o003\x00Alice\x002025-07-01T10:00:00Z\x00feat: F', '5\t2\tsrc/a.ts',
     ].join('\n');
 
-    mockedExecSync.mockReturnValue(recentBurstLog);
+    mockedExecFileSync.mockReturnValue(recentBurstLog);
     const upReport = await analyzer.analyze({ period: '3mo' });
     expect(upReport.trends.commitTrend.direction).toBe('up');
 
@@ -287,14 +294,14 @@ describe('GitAnalyzer', () => {
       'o003\x00Alice\x002025-12-01T10:00:00Z\x00feat: F', '5\t2\tsrc/a.ts',
     ].join('\n');
 
-    mockedExecSync.mockReturnValue(oldBurstLog);
+    mockedExecFileSync.mockReturnValue(oldBurstLog);
     const downReport = await analyzer.analyze({ period: '3mo' });
     expect(downReport.trends.commitTrend.direction).toBe('down');
 
     analyzer.clearCache();
 
     // Setup C: empty log → no commits → stable
-    mockedExecSync.mockReturnValue('');
+    mockedExecFileSync.mockReturnValue('');
     const emptyReport = await analyzer.analyze({ period: '3mo' });
     expect(emptyReport.trends.commitTrend.direction).toBe('stable');
   });
@@ -310,7 +317,7 @@ describe('GitAnalyzer', () => {
       'w002\x00Alice\x002026-01-05T00:30:00Z\x00feat: first day of W02', '5\t2\tsrc/a.ts',
     ].join('\n');
 
-    mockedExecSync.mockReturnValue(gitLog);
+    mockedExecFileSync.mockReturnValue(gitLog);
     const report = await analyzer.analyze({ period: '3mo' });
 
     expect(report.commitFrequency.labels).toHaveLength(2);

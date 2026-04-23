@@ -13,6 +13,7 @@ import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider, SessionBriefingWebviewProvider } from "../infrastructure/webview-provider";
 import { GeneratedPR, GeneratedPRReview, GeneratedPRComments, SessionBriefingReport } from "../domains/git/types";
 import { UI_SETTINGS } from "../constants";
+import { copyWithPolicy } from "../security/operation-policy";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -62,8 +63,12 @@ export async function presentResult(
       outputChannel.appendLine(HR);
       outputChannel.appendLine(pr.body);
       outputChannel.appendLine("");
-      await vscode.env.clipboard.writeText(pr.body);
-      vscode.window.showInformationMessage(`PR description copied to clipboard (${pr.branch})`);
+      const copied = await copyWithPolicy(pr.body, `PR description for ${pr.branch}`);
+      vscode.window.showInformationMessage(
+        copied
+          ? `PR description copied to clipboard (${pr.branch})`
+          : `PR description ready (${pr.branch})`
+      );
       return true;
     }
 
@@ -79,8 +84,12 @@ export async function presentResult(
       }
       outputChannel.appendLine("");
       const text = `${rv.summary}\n\n${(rv.comments ?? []).map((c) => `[${c.severity}] ${c.file}: ${c.comment}`).join("\n")}`;
-      await vscode.env.clipboard.writeText(text);
-      vscode.window.showInformationMessage(`PR review copied to clipboard (${rv.branch}: ${rv.verdict})`);
+      const copied = await copyWithPolicy(text, `PR review for ${rv.branch}`);
+      vscode.window.showInformationMessage(
+        copied
+          ? `PR review copied to clipboard (${rv.branch}: ${rv.verdict})`
+          : `PR review ready (${rv.branch}: ${rv.verdict})`
+      );
       return true;
     }
 
@@ -96,8 +105,12 @@ export async function presentResult(
       }
       outputChannel.appendLine("");
       const cmText = (cm.comments ?? []).map((c) => `${c.file}${c.line ? `:${c.line}` : ""}: ${c.comment}`).join("\n");
-      await vscode.env.clipboard.writeText(cmText);
-      vscode.window.showInformationMessage(`${cm.comments?.length ?? 0} PR comment(s) copied to clipboard`);
+      const copied = await copyWithPolicy(cmText, `${cm.comments?.length ?? 0} PR comment(s)`);
+      vscode.window.showInformationMessage(
+        copied
+          ? `${cm.comments?.length ?? 0} PR comment(s) copied to clipboard`
+          : `${cm.comments?.length ?? 0} PR comment(s) ready`
+      );
       return true;
     }
 
@@ -105,8 +118,12 @@ export async function presentResult(
       const report = result.value as SessionBriefingReport;
       await sessionBriefingPanel.openPanel(report);
       outputChannel.appendLine(`[${ts()}] Session briefing panel opened`);
-      await vscode.env.clipboard.writeText(report.summary);
-      vscode.window.showInformationMessage("Session briefing opened — summary copied to clipboard");
+      const copied = await copyWithPolicy(report.summary, "Session briefing summary");
+      vscode.window.showInformationMessage(
+        copied
+          ? "Session briefing opened — summary copied to clipboard"
+          : "Session briefing opened"
+      );
       return true;
     }
 

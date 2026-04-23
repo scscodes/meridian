@@ -7,6 +7,7 @@ import { GitAnalyticsReport, AnalyticsOptions } from "../domains/git/analytics-t
 import { gitReportToCsv } from "../domains/git/analytics-service";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { SessionBriefingReport } from "../domains/git/types";
+import { resolveWorkspacePath } from "../security/path-guard";
 
 // ============================================================================
 // Base Class
@@ -122,10 +123,12 @@ export abstract class BaseWebviewProvider<TReport> {
 
     const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDirUri, "styles.css"));
     const jsUri  = webview.asWebviewUri(vscode.Uri.joinPath(uiDirUri, "script.js"));
+    const chartUri = webview.asWebviewUri(vscode.Uri.joinPath(uiDirUri, "chart.umd.js"));
 
     html = html.replace(/\{\{NONCE\}\}/g, nonce);
     html = html.replace(/\{\{WEBVIEW_CSP_SOURCE\}\}/g, cspSource);
     html = html.replace(/href="styles\.css"/g, `href="${cssUri}"`);
+    html = html.replace(/src="chart\.umd\.js"/g, `src="${chartUri}"`);
     html = html.replace(/src="script\.js"/g, `src="${jsUri}"`);
 
     return html;
@@ -148,6 +151,15 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
     super(extensionUri);
     this.workspaceRoot = workspaceRoot;
     this.onFilter = onFilter;
+  }
+
+  private openWorkspaceFile(candidatePath: string): void {
+    try {
+      const abs = resolveWorkspacePath(this.workspaceRoot, candidatePath);
+      void vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+    } catch {
+      vscode.window.showErrorMessage("Blocked file open outside workspace.");
+    }
   }
 
   protected getViewId(): string { return "meridian.analytics"; }
@@ -176,8 +188,7 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
         this.handleError("Git analytics refresh failed", e);
       }
     } else if (msg.type === "openFile") {
-      const abs = path.join(this.workspaceRoot, msg.payload as string);
-      vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+      this.openWorkspaceFile(String(msg.payload ?? ""));
     }
   }
 }
@@ -187,6 +198,15 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
 // ============================================================================
 
 export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<HygieneAnalyticsReport> {
+  private resolveWorkspaceFile(candidatePath: string): string | null {
+    try {
+      return resolveWorkspacePath(this.workspaceRoot, candidatePath);
+    } catch {
+      vscode.window.showErrorMessage("Blocked file operation outside workspace.");
+      return null;
+    }
+  }
+
   private workspaceRoot = "";
   private readonly onRefresh: () => Promise<HygieneAnalyticsReport>;
 
@@ -240,11 +260,15 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
         this.handleError("Hygiene analytics refresh failed", e);
       }
     } else if (msg.type === "openFile") {
-      const abs = path.join(this.workspaceRoot, msg.path as string);
-      vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+      const abs = this.resolveWorkspaceFile(String(msg.path ?? ""));
+      if (abs) {
+        void vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+      }
     } else if (msg.type === "revealFile") {
-      const abs = path.join(this.workspaceRoot, msg.path as string);
-      vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(abs));
+      const abs = this.resolveWorkspaceFile(String(msg.path ?? ""));
+      if (abs) {
+        void vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(abs));
+      }
     }
   }
 }
@@ -254,6 +278,15 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
 // ============================================================================
 
 export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionBriefingReport> {
+  private openWorkspaceFile(candidatePath: string): void {
+    try {
+      const abs = resolveWorkspacePath(this.workspaceRoot, candidatePath);
+      void vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+    } catch {
+      vscode.window.showErrorMessage("Blocked file open outside workspace.");
+    }
+  }
+
   private readonly workspaceRoot: string;
   private readonly onRefresh: () => Promise<SessionBriefingReport>;
 
@@ -310,8 +343,7 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
         this.handleError("Session briefing refresh failed", e);
       }
     } else if (msg.type === "openFile") {
-      const abs = path.join(this.workspaceRoot, msg.payload as string);
-      vscode.commands.executeCommand("vscode.open", vscode.Uri.file(abs));
+      this.openWorkspaceFile(String(msg.payload ?? ""));
     }
   }
 }

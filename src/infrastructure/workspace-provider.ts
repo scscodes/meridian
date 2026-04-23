@@ -14,6 +14,7 @@ import {
   AppError,
   Logger,
 } from "../types";
+import { resolveWorkspacePath } from "../security/path-guard";
 
 function fsError(code: string, op: string, filePath: string, err: unknown): AppError {
   return {
@@ -92,9 +93,12 @@ class RealWorkspaceProvider implements WorkspaceProvider {
   }
 
   async readFile(filePath: string): Promise<Result<string>> {
-    const resolved = path.isAbsolute(filePath)
-      ? filePath
-      : path.join(this.workspaceRoot, filePath);
+    let resolved: string;
+    try {
+      resolved = resolveWorkspacePath(this.workspaceRoot, filePath);
+    } catch (err) {
+      return failure(fsError("FILE_READ_ERROR", "readFile", filePath, err));
+    }
     try {
       const content = await fs.readFile(resolved, "utf8");
       return success(content);
@@ -104,9 +108,12 @@ class RealWorkspaceProvider implements WorkspaceProvider {
   }
 
   async deleteFile(filePath: string): Promise<Result<void>> {
-    const resolved = path.isAbsolute(filePath)
-      ? filePath
-      : path.join(this.workspaceRoot, filePath);
+    let resolved: string;
+    try {
+      resolved = resolveWorkspacePath(this.workspaceRoot, filePath);
+    } catch (err) {
+      return failure(fsError("FILE_DELETE_ERROR", "deleteFile", filePath, err));
+    }
     try {
       await fs.unlink(resolved);
       return success(undefined);

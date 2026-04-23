@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net {{WEBVIEW_CSP_SOURCE}} 'nonce-{{NONCE}}'; style-src {{WEBVIEW_CSP_SOURCE}} 'unsafe-inline'; img-src {{WEBVIEW_CSP_SOURCE}} https: data:; connect-src https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {{WEBVIEW_CSP_SOURCE}} 'nonce-{{NONCE}}'; style-src {{WEBVIEW_CSP_SOURCE}} 'unsafe-inline'; img-src {{WEBVIEW_CSP_SOURCE}} https: data:; connect-src 'none';">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hygiene Analytics</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="chart.umd.js" nonce="{{NONCE}}"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>

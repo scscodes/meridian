@@ -9,9 +9,12 @@ import { buildLmToolEnvelope } from "../infrastructure/lm-envelope";
 
 export function registerMeridianTools(
   router: CommandRouter,
-  ctx: CommandContext,
+  contextOrGetter: CommandContext | (() => CommandContext),
   logger: Logger
 ): vscode.Disposable[] {
+  const getContext = typeof contextOrGetter === "function"
+    ? contextOrGetter
+    : () => contextOrGetter;
   return LM_TOOL_DEFS.map(({ name, commandName }) =>
     vscode.lm.registerTool(name, {
       async invoke(
@@ -21,7 +24,7 @@ export function registerMeridianTools(
         const params = (options.input ?? {}) as Record<string, unknown>;
         logger.info(`LM tool invoked: ${name}`, "LMTools");
 
-        const result = await router.dispatch({ name: commandName, params }, ctx);
+        const result = await router.dispatch({ name: commandName, params }, getContext());
         const envelope = buildLmToolEnvelope(commandName, result);
 
         return new vscode.LanguageModelToolResult([

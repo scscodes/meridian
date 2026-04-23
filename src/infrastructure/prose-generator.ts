@@ -7,6 +7,7 @@
 import * as vscode from "vscode";
 import { selectModel, ModelDomain } from "./model-selector";
 import { Result, success, failure } from "../types";
+import { enforceLmEgressPolicy, sanitizeLmPayload } from "../security/lm-policy";
 
 export interface ProseRequest {
   domain: ModelDomain;
@@ -30,8 +31,17 @@ export async function generateProse(request: ProseRequest): Promise<Result<strin
       ? request.formatData(request.data)
       : JSON.stringify(request.data, null, 2);
 
+    const permitted = await enforceLmEgressPolicy(request.domain);
+    if (!permitted) {
+      return failure({
+        code: "LM_EGRESS_BLOCKED",
+        message: "LM egress blocked by security policy.",
+        context: "generateProse",
+      });
+    }
+
     const messages = [
-      vscode.LanguageModelChatMessage.User(`${request.systemPrompt}\n\n---\n\n${dataStr}`),
+      vscode.LanguageModelChatMessage.User(`${request.systemPrompt}\n\n---\n\n${sanitizeLmPayload(dataStr)}`),
     ];
 
     const cts = new vscode.CancellationTokenSource();
@@ -70,8 +80,17 @@ export async function streamProse(
       ? request.formatData(request.data)
       : JSON.stringify(request.data, null, 2);
 
+    const permitted = await enforceLmEgressPolicy(request.domain);
+    if (!permitted) {
+      return failure({
+        code: "LM_EGRESS_BLOCKED",
+        message: "LM egress blocked by security policy.",
+        context: "streamProse",
+      });
+    }
+
     const messages = [
-      vscode.LanguageModelChatMessage.User(`${request.systemPrompt}\n\n---\n\n${dataStr}`),
+      vscode.LanguageModelChatMessage.User(`${request.systemPrompt}\n\n---\n\n${sanitizeLmPayload(dataStr)}`),
     ];
 
     const cts = new vscode.CancellationTokenSource();

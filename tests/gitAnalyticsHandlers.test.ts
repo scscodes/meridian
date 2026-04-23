@@ -72,6 +72,18 @@ describe("git analytics handlers", () => {
       expect(err.context).toBe("ShowAnalyticsHandler");
     });
 
+    it("rejects unsafe author filters", async () => {
+      const logger = new MockLogger();
+      const analyzer = new GitAnalyzer();
+      const handler = createShowAnalyticsHandler(analyzer, logger);
+
+      const result = await handler(ctx, { period: "3mo", author: 'alice"; rm -rf /' });
+      const err = assertFailure(result);
+
+      expect(err.code).toBe("ANALYTICS_ERROR");
+      expect(err.message).toContain("Invalid author filter");
+    });
+
     it("wraps analyzer errors with ANALYTICS_ERROR", async () => {
       const logger = new MockLogger();
       const analyzer = new GitAnalyzer();

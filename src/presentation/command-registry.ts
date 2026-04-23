@@ -96,7 +96,12 @@ export function registerCommands(
   readPruneConfig: () => PruneConfig,
   presenterCtx: PresenterContext
 ): void {
-  for (const { vsCodeId, commandName } of COMMAND_MAP) {
+  for (const { vsCodeId, commandName, title } of COMMAND_MAP) {
+    if (!title) {
+      // Internal/LM-tool-only commands are intentionally not registered
+      // as VS Code executable commands.
+      continue;
+    }
     const disposable = vscode.commands.registerCommand(
       vsCodeId,
       async (params: Record<string, unknown> = {}) => {

@@ -19,6 +19,8 @@ import { AgentExecutionResult } from "../domains/agent/types";
 import { WorkflowTreeProvider } from "../ui/tree-providers/workflow-tree-provider";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 import { GitTreeProvider } from "../ui/tree-providers/git-tree-provider";
+import { enforceLmEgressPolicy, sanitizeLmPayload } from "../security/lm-policy";
+import { copyWithPolicy, isSensitiveLoggingEnabled, sanitizeForLogs } from "../security/operation-policy";
 
 const HR = "─".repeat(UI_SETTINGS.OUTPUT_HR_LENGTH);
 
@@ -165,6 +167,12 @@ export function registerSpecializedCommands(
         return;
       }
 
+      const permitted = await enforceLmEgressPolicy("hygiene.markdownReview");
+      if (!permitted) {
+        vscode.window.showWarningMessage("Review cancelled: LM egress is blocked by security policy.");
+        return;
+      }
+
       const filename = nodePath.basename(filePath);
       outputChannel.show(true);
       outputChannel.appendLine(`\n${HR}`);
@@ -173,7 +181,7 @@ export function registerSpecializedCommands(
 
       const messages = [
         vscode.LanguageModelChatMessage.User(
-          `You are a critical technical reviewer. Analyze this Markdown document and provide concise, actionable feedback on:\n1. Content accuracy and factual correctness\n2. Clarity and readability\n3. Completeness (gaps or missing context)\n4. Effectiveness (does it achieve its purpose?)\n5. Top 3 specific improvements\n\nDocument: ${filename}\n\`\`\`markdown\n${content}\n\`\`\``
+          sanitizeLmPayload(`You are a critical technical reviewer. Analyze this Markdown document and provide concise, actionable feedback on:\n1. Content accuracy and factual correctness\n2. Clarity and readability\n3. Completeness (gaps or missing context)\n4. Effectiveness (does it achieve its purpose?)\n5. Top 3 specific improvements\n\nDocument: ${filename}\n\`\`\`markdown\n${content}\n\`\`\``)
         ),
       ];
 
@@ -237,9 +245,13 @@ export function registerSpecializedCommands(
         outputChannel.appendLine(HR);
         outputChannel.appendLine(val.summary ?? "No summary available.");
         outputChannel.appendLine("");
-        await vscode.env.clipboard.writeText(val.summary ?? "");
+        const copied = await copyWithPolicy(val.summary ?? "", "Impact analysis summary");
         hygieneTree.setImpactResult(val);
-        vscode.window.showInformationMessage("Impact analysis copied to clipboard — expand in Hygiene view.");
+        vscode.window.showInformationMessage(
+          copied
+            ? "Impact analysis copied to clipboard — expand in Hygiene view."
+            : "Impact analysis ready — expand in Hygiene view."
+        );
       } else {
         outputChannel.appendLine(`\n${HR}`);
         outputChannel.appendLine(`[${new Date().toISOString()}] Impact Analysis — FAILED`);
@@ -284,9 +296,11 @@ export function registerSpecializedCommands(
         }
         outputChannel.appendLine("");
         gitTree.setLastConflictRun(cr);
-        await vscode.env.clipboard.writeText(cr.overview);
+        const copied = await copyWithPolicy(cr.overview, "Conflict resolution overview");
         vscode.window.showInformationMessage(
-          `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — expand in Git view`
+          copied
+            ? `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — copied to clipboard`
+            : `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — expand in Git view`
         );
       } else {
         gitTree.setLastConflictRun(null);
@@ -374,7 +388,10 @@ export function registerSpecializedCommands(
           outputChannel.appendLine(`  ✗ ${r.error}`);
         }
         if (r.output && Object.keys(r.output).length > 0) {
-          outputChannel.appendLine(`  Output: ${JSON.stringify(r.output)}`);
+          const payload = isSensitiveLoggingEnabled()
+            ? JSON.stringify(r.output)
+            : sanitizeForLogs(r.output);
+          outputChannel.appendLine(`  Output: ${payload}`);
         }
         outputChannel.appendLine("");
 

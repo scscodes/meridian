@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/scscodes/meridian/compare/v1.8.0...v1.8.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **distribution:** announce Open VSX support ([6d9b7f7](https://github.com/scscodes/meridian/commit/6d9b7f79c355199cba048ec1048193e2f4396ef6))
+
 # [1.8.0](https://github.com/scscodes/meridian/compare/v1.7.0...v1.8.0) (2026-04-20)
 
 

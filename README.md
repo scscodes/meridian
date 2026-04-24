@@ -10,7 +10,7 @@ Whether you work from the command palette, the sidebar, or `@meridian` in Copilo
 
 Smart Commit collects all your uncommitted changes — staged and unstaged — and clusters them into groups by structural proximity: shared directory, file type, and change type. Each group gets a deterministic commit message based on what actually changed, not an LLM guess. You pick which groups to commit, edit any message you want, and confirm. Each approved group becomes a separate commit. One command replaces the manual stage-message-commit cycle.
 
-Smart Commit
+![Smart Commit](media/feat-smart-commit.png)
 
 ## Pull Requests
 
@@ -22,7 +22,7 @@ Session Briefing gives you immediate context: branch state, recent commits, unco
 
 Git Analytics visualizes churn, volatility, and authorship in one dashboard, with JSON and CSV export for reporting or downstream analysis.
 
-Git Analytics
+![Git Analytics](media/feat-git-analytics.png)
 
 ## Code Health
 
@@ -30,7 +30,7 @@ Hygiene Scan surfaces dead files, large files, stale logs, markdown bloat, and d
 
 Impact Analysis traces importers, call sites, and test-file coverage for a given symbol so you can estimate blast radius before touching critical code.
 
-Hygiene Analytics
+![Hygiene Analytics](media/feat-hygiene-analytics.png)
 
 ---
 

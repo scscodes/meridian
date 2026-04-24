@@ -45,6 +45,7 @@ Define JSON workflows with retries, timeouts, and conditional step routing for r
 - [Feature Reference](docs/FEATURES.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Publishing (VS Marketplace & Open VSX / Cursor)](docs/EXTENSION_DISTRIBUTION.md)
 
 ## Requirements
 

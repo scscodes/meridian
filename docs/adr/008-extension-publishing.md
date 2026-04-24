@@ -36,6 +36,7 @@ Microsoft and Eclipse use **separate** accounts, tokens, and CLIs. There is no s
 ## Consequences
 
 - **Secrets live in GitHub** (`Settings → Secrets and variables → Actions`); not in the repo.
+- **Open VSX support** makes Meridian available to Cursor, VSCodium, Gitpod, Theia, and other VS Code-compatible editor distributions.
 - **Same version** and `.vsix` are used for both marketplaces on a given release, avoiding drift between stores.
 - Optional **Cursor “verified” publisher** steps remain policy on Cursor’s side (website + Open VSX `homepage` + forum); not encoded here.
 - Deeper registries/CLI material stays in the official links above; this ADR is the project’s “where and how we ship.”

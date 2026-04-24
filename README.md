@@ -4,13 +4,15 @@ Meridian turns your uncommitted changes into clean, grouped commits, generates y
 
 Whether you work from the command palette, the sidebar, or `@meridian` in Copilot Chat, the goal is the same: less manual overhead between local changes and review-ready output.
 
+Published on the VS Marketplace and Open VSX for VS Code, Cursor, VSCodium, and compatible editors.
+
 ---
 
 ## Smart Commit
 
 Smart Commit collects all your uncommitted changes — staged and unstaged — and clusters them into groups by structural proximity: shared directory, file type, and change type. Each group gets a deterministic commit message based on what actually changed, not an LLM guess. You pick which groups to commit, edit any message you want, and confirm. Each approved group becomes a separate commit. One command replaces the manual stage-message-commit cycle.
 
-![Smart Commit](media/feat-smart-commit.png)
+![Smart Commit](https://raw.githubusercontent.com/scscodes/meridian/main/media/feat-smart-commit.png)
 
 ## Pull Requests
 
@@ -22,7 +24,7 @@ Session Briefing gives you immediate context: branch state, recent commits, unco
 
 Git Analytics visualizes churn, volatility, and authorship in one dashboard, with JSON and CSV export for reporting or downstream analysis.
 
-![Git Analytics](media/feat-git-analytics.png)
+![Git Analytics](https://raw.githubusercontent.com/scscodes/meridian/main/media/feat-git-analytics.png)
 
 ## Code Health
 
@@ -30,7 +32,7 @@ Hygiene Scan surfaces dead files, large files, stale logs, markdown bloat, and d
 
 Impact Analysis traces importers, call sites, and test-file coverage for a given symbol so you can estimate blast radius before touching critical code.
 
-![Hygiene Analytics](media/feat-hygiene-analytics.png)
+![Hygiene Analytics](https://raw.githubusercontent.com/scscodes/meridian/main/media/feat-hygiene-analytics.png)
 
 ---
 
@@ -38,7 +40,7 @@ Impact Analysis traces importers, call sites, and test-file coverage for a given
 
 Define JSON workflows with retries, timeouts, and conditional step routing for repeatable multi-step automation. Agents add reusable execution profiles that can run approved commands and workflow targets. This is the power-user layer for teams that want consistent automation inside VS Code.
 
-**Commands and settings** — use the Command Palette (search for `Meridian`) and VS Code **Settings** → `meridian.`*.
+**Commands and settings** — use the Command Palette (search for `Meridian`) and VS Code **Settings** → `meridian.*`.
 
 ## Requirements
 

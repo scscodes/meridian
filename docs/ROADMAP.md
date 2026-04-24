@@ -46,7 +46,6 @@ Topical, easy to tweak, safe to iterate on once the substrate is stable.
 ## Deferred
 
 - **Remote telemetry sink** — no destination exists; #1 is the prerequisite.
-- **Additional analytics chart types** — diminishing returns on existing webviews.
 - **Webview message typed generics** — `BaseWebviewProvider<T, M extends WebviewMessage>`; ergonomic, not load-bearing.
 - **`git.resolveConflicts` tree migration** — ADR 006 alignment; medium priority, no immediate user impact.
 - **ADR 006 compliance backlog** — `hygiene.reviewFile` (streams to output channel, no richer surface), `hygiene.impactAnalysis` (error path missing "Show Output"); pre-existing, low user impact.

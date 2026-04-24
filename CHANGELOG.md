@@ -1,3 +1,10 @@
+## [1.8.2](https://github.com/scscodes/meridian/compare/v1.8.1...v1.8.2) (2026-04-24)
+
+
+### Bug Fixes
+
+* **readme:** restore marketplace screenshots ([886521f](https://github.com/scscodes/meridian/commit/886521fa200a3c8d9b098db6fc90965401fe9838))
+
 ## [1.8.1](https://github.com/scscodes/meridian/compare/v1.8.0...v1.8.1) (2026-04-24)
 
 

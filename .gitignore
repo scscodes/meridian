@@ -26,6 +26,9 @@ coverage/
 *.lcov
 .vitest/
 
+# Local agent state (Claude Code / worktrees)
+.claude/
+
 # IDE and editors
 .idea/
 .vscode/*

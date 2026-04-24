@@ -38,19 +38,11 @@ Impact Analysis traces importers, call sites, and test-file coverage for a given
 
 Define JSON workflows with retries, timeouts, and conditional step routing for repeatable multi-step automation. Agents add reusable execution profiles that can run approved commands and workflow targets. This is the power-user layer for teams that want consistent automation inside VS Code.
 
----
-
-## Documentation
-
-- [Feature Reference](docs/FEATURES.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Publishing (VS Marketplace & Open VSX / Cursor)](docs/EXTENSION_DISTRIBUTION.md)
+**Commands and settings** — use the Command Palette (search for `Meridian`) and VS Code **Settings** → `meridian.*`.
 
 ## Requirements
 
-- VS Code 1.91+
-- Node.js 22+
+- **VS Code** 1.91+
 
 ## License
 

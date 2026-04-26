@@ -1,3 +1,10 @@
+## [1.8.3](https://github.com/scscodes/meridian/compare/v1.8.2...v1.8.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **chat:** align in-app help and docs with declared slash commands ([d3171ad](https://github.com/scscodes/meridian/commit/d3171ad2be0e6b50aa1ead3b06a702c4debe649b))
+
 ## [1.8.2](https://github.com/scscodes/meridian/compare/v1.8.1...v1.8.2) (2026-04-24)
 
 

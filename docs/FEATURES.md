@@ -109,7 +109,7 @@ Gather workspace context for Copilot: active file path, current Git branch, Git 
 Classify a free-form task description using an LLM and dispatch it to the matching Meridian command. This is the single classification authority — the `@meridian` chat participant, LM tools, and workflows all route through it rather than maintaining their own classifiers.
 
 ### **@meridian chat participant**
-Use `@meridian` in Copilot Chat to interact with Meridian. Natural language is the primary interface — describe what you want and Meridian routes it via LLM intent classification (e.g., "show uncommitted changes", "what's the blast radius of createStatusHandler?", "run the morning sync workflow"). Slash commands (`/pr`, `/review`, `/briefing`, `/scan`, `/status`, `/workflows`, `/agents`, `/analytics`, `/conflicts`, `/context`, `/impact`) are accelerator shortcuts for common operations.
+Use `@meridian` in Copilot Chat to interact with Meridian. Natural language is the primary interface — describe what you want and Meridian routes it via LLM intent classification (e.g., "show uncommitted changes", "what's the blast radius of createStatusHandler?", "run the morning sync workflow"). Slash commands (`/status`, `/scan`, `/workflows`, `/agents`, `/analytics`, `/context`, `/pr`, `/review`, `/briefing`, `/conflicts`, `/impact`, `/overview`, `/prready`, `/premerge`, `/commit`, `/inbound`, `/cleanup`) are accelerator shortcuts for common operations and mirror the set declared in `package.json`.
 
 ### **Meridian LM Tools**
 All major commands across Git, Hygiene, Workflow, and Agent domains are exposed as LM tools, allowing Copilot to autonomously discover and invoke Meridian features during agentic workflows — including export commands (`git.exportJson`, `git.exportCsv`).
@@ -141,9 +141,9 @@ All features respect workspace settings under the `meridian.*` namespace:
 
 - `meridian.git.autofetch` — Auto-fetch on open (boolean, default: false)
 - `meridian.hygiene.enabled` — Enable scans and analytics (boolean, default: true)
-- `meridian.hygiene.prune.minAgeDays` — Minimum age for log files (number, default: 7)
-- `meridian.hygiene.prune.maxSizeMB` — Maximum file size before flagging (number, default: 10)
-- `meridian.hygiene.prune.minLineCount` — Minimum line count to consider "dead code" (number, default: 50)
+- `meridian.hygiene.prune.minAgeDays` — Minimum file age (days) before a file is eligible as a prune candidate (number, default: 30)
+- `meridian.hygiene.prune.maxSizeMB` — Files larger than this size (MB) are flagged when also older than `minAgeDays` (number, default: 1)
+- `meridian.hygiene.prune.minLineCount` — Files with this many lines or more are flagged when also older than `minAgeDays`. Set to 0 to disable (number, default: 0)
 - `meridian.log.level` — Logger verbosity: debug, info, warn, error (default: info)
 
 ---

@@ -5,7 +5,6 @@
  */
 
 import { CommandName, Result } from "../types";
-import { AgentExecutionResult } from "../domains/agent/types";
 
 export const ERROR_MESSAGES: Partial<Record<string, string>> = {
   // Git — core
@@ -16,32 +15,10 @@ export const ERROR_MESSAGES: Partial<Record<string, string>> = {
   GIT_COMMIT_ERROR:          "Commit failed.",
   GIT_FETCH_ERROR:           "Fetch failed.",
   GIT_RESET_ERROR:           "Git reset failed.",
-  // Git — changes & staging
-  GET_CHANGES_FAILED:        "Failed to retrieve file changes.",
-  PARSE_CHANGES_FAILED:      "Failed to parse file changes.",
-  STAGE_FAILED:              "Staging files failed.",
-  // Git — batch commit
-  COMMIT_FAILED:             "Commit failed.",
-  BATCH_COMMIT_ERROR:        "One or more commits failed.",
-  ROLLBACK_FAILED:           "Rollback after failed commit could not complete.",
-  // Git — inbound analysis
-  INBOUND_ANALYSIS_ERROR:    "Inbound change analysis failed.",
-  INBOUND_DIFF_PARSE_ERROR:  "Failed to parse inbound diff.",
-  CONFLICT_DETECTION_ERROR:  "Conflict detection failed.",
   // Git — analytics
   ANALYTICS_ERROR:           "Git analytics generation failed.",
   EXPORT_ERROR:              "Analytics export failed.",
   INVALID_PERIOD:            "Invalid time period for analytics.",
-  // Git — smart commit & validation
-  SMART_COMMIT_ERROR:        "Smart commit failed.",
-  NO_CHANGES:                "No changes to commit.",
-  NO_GROUPS_APPROVED:        "No commit groups were approved.",
-  COMMIT_CANCELLED:          "Smart commit cancelled.",
-  // Git — PR & conflicts
-  PR_GENERATION_ERROR:       "PR description generation failed.",
-  PR_REVIEW_ERROR:           "PR review generation failed.",
-  PR_COMMENT_ERROR:          "PR comment generation failed.",
-  CONFLICT_RESOLUTION_ERROR: "Conflict resolution failed.",
   // Hygiene
   HYGIENE_INIT_ERROR:        "Hygiene service initialization failed.",
   HYGIENE_SCAN_ERROR:        "Workspace scan failed.",
@@ -52,31 +29,6 @@ export const ERROR_MESSAGES: Partial<Record<string, string>> = {
   HYGIENE_CLEANUP_NO_FILES:  "No files matched for cleanup.",
   HYGIENE_ANALYTICS_ERROR:   "Hygiene analytics failed.",
   DEAD_CODE_SCAN_ERROR:      "Dead code scan failed.",
-  // Chat
-  CHAT_INIT_ERROR:           "Chat initialization failed.",
-  CHAT_CONTEXT_ERROR:        "Failed to gather chat context.",
-  CHAT_DELEGATE_ERROR:       "Failed to delegate chat action.",
-  CHAT_DELEGATE_NO_GENERATE_FN: "Language model generate function unavailable.",
-  // Workflow
-  WORKFLOW_INIT_ERROR:       "Workflow engine initialization failed.",
-  STEP_RUNNER_NOT_AVAILABLE: "Step runner is not available.",
-  WORKFLOW_EXECUTION_ERROR:  "Workflow execution encountered an error.",
-  INVALID_NEXT_STEP:         "Invalid next step in workflow.",
-  STEP_EXECUTION_ERROR:      "Workflow step failed.",
-  STEP_TIMEOUT:              "Workflow step timed out.",
-  INTERPOLATION_ERROR:       "Workflow variable interpolation failed.",
-  INVALID_WORKFLOW:          "Workflow definition is invalid.",
-  WORKFLOW_LIST_ERROR:       "Failed to list workflows.",
-  WORKFLOW_NOT_FOUND:        "Workflow not found.",
-  WORKFLOW_EXECUTION_FAILED: "Workflow execution failed.",
-  WORKFLOW_RUN_ERROR:        "Failed to run workflow.",
-  // Agent
-  AGENT_INIT_ERROR:          "Agent registry initialization failed.",
-  AGENT_LIST_ERROR:          "Failed to list agents.",
-  AGENT_NOT_FOUND:           "Agent not found.",
-  MISSING_CAPABILITY:        "Agent does not have the requested capability.",
-  EXECUTION_FAILED:          "Agent execution failed.",
-  INVALID_WORKFLOW_REFERENCE: "Agent references an invalid workflow.",
   // Router
   HANDLER_NOT_FOUND:         "Command not recognized.",
   HANDLER_CONFLICT:          "Duplicate handler registered for this command.",
@@ -130,32 +82,8 @@ export function formatResultMessage(
     }
     case "git.pull":
       return { level: "info", message: `Pulled: ${(v as { message?: string }).message ?? "up to date"}` };
-    case "git.analyzeInbound": {
-      const ic = v as { branch?: string; totalInbound?: number; conflicts?: unknown[] };
-      return { level: "info", message: `Inbound: ${ic.totalInbound ?? 0} remote change(s) on "${ic.branch ?? "unknown"}", ${ic.conflicts?.length ?? 0} conflict(s)` };
-    }
     case "git.commit":
       return { level: "info", message: `Committed: ${v}` };
-    case "git.smartCommit": {
-      const sc = v as { totalGroups: number; totalFiles: number };
-      return { level: "info", message: `Smart commit: ${sc.totalGroups} group(s), ${sc.totalFiles} file(s)` };
-    }
-    case "git.generatePR": {
-      const pr = v as { branch: string };
-      return { level: "info", message: `PR description generated for "${pr.branch}" — copied to clipboard` };
-    }
-    case "git.reviewPR": {
-      const rv = v as { branch: string; verdict: string; comments?: unknown[] };
-      return { level: "info", message: `PR review for "${rv.branch}": ${rv.verdict} — ${rv.comments?.length ?? 0} comment(s)` };
-    }
-    case "git.commentPR": {
-      const cm = v as { branch: string; comments?: unknown[] };
-      return { level: "info", message: `${cm.comments?.length ?? 0} inline comment(s) generated for "${cm.branch}"` };
-    }
-    case "git.resolveConflicts": {
-      const cr = v as { perFile?: unknown[] };
-      return { level: "info", message: `Conflict resolution for ${cr.perFile?.length ?? 0} file(s) — see Output` };
-    }
     case "git.sessionBriefing":
       return { level: "info", message: "Session briefing generated — see Output" };
     case "hygiene.scan": {
@@ -166,29 +94,6 @@ export function formatResultMessage(
     }
     case "hygiene.cleanup":
       return { level: "info", message: "Cleanup complete." };
-    case "workflow.list":
-      return { level: "info", message: `Found ${v.count ?? 0} workflow(s)` };
-    case "workflow.run": {
-      const r = v as { workflowName?: string; duration?: number; stepCount?: number };
-      const dur = r.duration ? ` in ${(r.duration / 1000).toFixed(1)}s` : "";
-      return { level: "info", message: `Workflow "${r.workflowName}" — ${r.stepCount ?? "?"} step(s)${dur}` };
-    }
-    case "agent.list":
-      return { level: "info", message: `Found ${v.count ?? 0} agent(s)` };
-    case "agent.execute": {
-      const ar = v as unknown as AgentExecutionResult;
-      const what = ar.executedCommand ?? ar.executedWorkflow ?? "unknown";
-      if (!ar.success) {
-        return { level: "error", message: `Agent "${ar.agentId}" ran "${what}" — failed: ${ar.error ?? "unknown error"}` };
-      }
-      return { level: "info", message: `Agent "${ar.agentId}" ran "${what}" — done in ${ar.durationMs}ms` };
-    }
-    case "chat.context":
-      return { level: "info", message: "Chat context gathered." };
-    case "chat.delegate": {
-      const dr = v as { commandName?: string };
-      return { level: "info", message: `Delegated → ${dr.commandName ?? "unknown"}` };
-    }
     default:
       return { level: "info", message: `[${commandName}] OK` };
   }

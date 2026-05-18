@@ -1,7 +1,7 @@
 # ADR 007 — Workflow Tree Step Expansion
 
 **Date**: 2026-03-09
-**Status**: Accepted
+**Status**: Superseded by [ADR 012](./012-product-reanchor.md) (2026-05-18) — `WorkflowTreeProvider` and the workflow domain were removed in the 2.0 re-anchor.
 
 ---
 

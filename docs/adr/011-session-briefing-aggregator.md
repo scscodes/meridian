@@ -1,7 +1,9 @@
 # ADR 011 — Session Briefing Aggregator: Cross-Domain Reader Pattern
 
 **Date:** 2026-04-20
-**Status:** Accepted
+**Status:** Accepted (promoted)
+
+> **Revised by [ADR 012](./012-product-reanchor.md) (2026-05-18):** the aggregator is promoted to the product's connective tissue and forward headline. The "feeds chat participant and LM tools" framing is void — surviving consumers are the session-briefing webview and command. `RecentRunEntry.workflowName/skillName` are now always undefined but retained for schema/back-compat.
 **Depends on:** ADR 009 (run log), ADR 008 (dispatch signaling)
 
 ## Context

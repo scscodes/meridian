@@ -1,7 +1,7 @@
 {
   "name": "meridian",
   "displayName": "Meridian",
-  "description": "Git and hygiene analytics/reporting. More awareness and transparency, with less toil.",
+  "description": "Repository insights that are deterministic and inspectable: start with a session briefing, or review git analytics, workspace hygiene, and surface problems early with dead-code and blast-radius metrics. No model required, but allows for AI summarization when one is available.",
   "version": "1.8.3",
   "publisher": "scscodes",
   "license": "MIT",
@@ -11,16 +11,18 @@
     "url": "https://github.com/scscodes/meridian"
   },
   "categories": [
-    "Productivity",
-    "Software Engineering"
+    "Software Engineering",
+    "Visualization",
+    "Productivity"
   ],
   "keywords": [
-    "productivity",
     "git",
-    "hygiene",
     "analytics",
-    "workflow",
-    "toil"
+    "hygiene",
+    "dead-code",
+    "impact-analysis",
+    "code-health",
+    "insights"
   ],
   "engines": {
     "node": ">=22.22.0",
@@ -49,503 +51,9 @@
         {
           "id": "meridian.hygiene.view",
           "name": "Hygiene"
-        },
-        {
-          "id": "meridian.workflow.view",
-          "name": "Workflows"
-        },
-        {
-          "id": "meridian.agent.view",
-          "name": "Agents"
         }
       ]
     },
-    "chatParticipants": [
-      {
-        "id": "meridian",
-        "name": "meridian",
-        "fullName": "Meridian",
-        "description": "Git, hygiene, workflow, and agent assistant for your workspace",
-        "isDefault": false,
-        "commands": [
-          {
-            "name": "status",
-            "description": "Show current git branch and file change counts"
-          },
-          {
-            "name": "scan",
-            "description": "Scan workspace for hygiene issues (large files, dead files, logs)"
-          },
-          {
-            "name": "workflows",
-            "description": "List all available Meridian workflows"
-          },
-          {
-            "name": "agents",
-            "description": "List all available Meridian agents and their capabilities"
-          },
-          {
-            "name": "analytics",
-            "description": "Open the Git Analytics report"
-          },
-          {
-            "name": "context",
-            "description": "Show workspace context: branch, active file, and available commands"
-          },
-          {
-            "name": "pr",
-            "description": "Generate a pull request description for the current branch"
-          },
-          {
-            "name": "review",
-            "description": "Review current branch changes — verdict and per-file comments"
-          },
-          {
-            "name": "briefing",
-            "description": "Generate a session briefing: branch state, recent commits, uncommitted work"
-          },
-          {
-            "name": "conflicts",
-            "description": "Suggest resolution strategies for detected git conflicts"
-          },
-          {
-            "name": "impact",
-            "description": "Trace the blast radius of a file or function change"
-          },
-          {
-            "name": "overview",
-            "description": "Session overview: branch state, recent commits, and session briefing"
-          },
-          {
-            "name": "prready",
-            "description": "PR readiness check: hygiene scan, code review, and PR description"
-          },
-          {
-            "name": "premerge",
-            "description": "Pre-merge check: inbound changes analysis and conflict resolution"
-          },
-          {
-            "name": "commit",
-            "description": "Smart-commit staged changes — grouped by semantic type"
-          },
-          {
-            "name": "inbound",
-            "description": "Analyze incoming remote changes for conflicts before merging"
-          },
-          {
-            "name": "cleanup",
-            "description": "Delete files flagged by the last hygiene scan (dry-run safe)"
-          }
-        ]
-      }
-    ],
-    "languageModelTools": [
-      {
-        "name": "meridian_git_status",
-        "displayName": "Meridian: Git Status",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Returns branch name, dirty/clean state, and counts of staged, unstaged, and untracked files. Good starting point to understand the current workspace state before other operations.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_smart_commit",
-        "displayName": "Meridian: Smart Commit",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Requires uncommitted changes (staged or unstaged) in the workspace. Analyzes diffs to group related changes and generates descriptive commit messages for each group. Interactive — presents groups for user approval before committing.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_analyze_inbound",
-        "displayName": "Meridian: Analyze Inbound Changes",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Fetches from the remote and analyzes what would change on merge. Returns counts of remote vs local changes, detected conflicts with severity, and recommendations. Call this before merging or pulling to understand risk. Pairs well with meridian_git_resolve_conflicts for conflict handling.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_hygiene_scan",
-        "displayName": "Meridian: Hygiene Scan",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "hygiene"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Scan the workspace for hygiene issues: dead/orphaned files not referenced by any import, large files exceeding size thresholds, log/temp files that may be stale, and dead code (unused exports, unreferenced functions). Returns categorized counts and highlighted examples.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_workflow_run",
-        "displayName": "Meridian: Run Workflow",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "workflow"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Execute a named workflow by running its steps sequentially through the command router. Returns per-step success/failure status, duration, and any errors. Use meridian_workflow_list first if you don't know the workflow name.",
-        "inputSchema": {
-          "type": "object",
-          "required": [
-            "name"
-          ],
-          "properties": {
-            "name": {
-              "type": "string",
-              "description": "The exact name of the workflow to run"
-            }
-          }
-        }
-      },
-      {
-        "name": "meridian_git_show_analytics",
-        "displayName": "Meridian: Git Analytics",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Generate a comprehensive git analytics report covering commit frequency, code churn, author contributions, file volatility, and trend analysis. Opens an interactive webview panel with charts and tables. Optionally specify a time period.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "period": {
-              "type": "string",
-              "enum": [
-                "3mo",
-                "6mo",
-                "12mo"
-              ],
-              "description": "Time period for the analytics report. Defaults to 3mo."
-            }
-          }
-        }
-      },
-      {
-        "name": "meridian_chat_delegate",
-        "displayName": "Meridian: Delegate Task",
-        "canBeReferencedInPrompt": false,
-        "tags": [
-          "meridian",
-          "chat"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Programmatic task router — classifies a natural language task description into a Meridian command and executes it. Intended for automated pipelines, workflows, and agent orchestration. For interactive use, prefer asking Copilot directly — it can invoke Meridian tools natively with better parameter handling.",
-        "inputSchema": {
-          "type": "object",
-          "required": [
-            "task"
-          ],
-          "properties": {
-            "task": {
-              "type": "string",
-              "description": "Natural language description of what you want to do (e.g. 'generate a PR description', 'review my changes', 'session briefing')"
-            }
-          }
-        }
-      },
-      {
-        "name": "meridian_git_generate_pr",
-        "displayName": "Meridian: Generate PR",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Generate a pull request description from the current branch's changes relative to the default branch. Analyzes commits, changed files, and diffs to produce a title, summary, change breakdown, and test plan in markdown. Returns structured PR content ready for review.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_review_pr",
-        "displayName": "Meridian: Review PR",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Perform an AI code review of the current branch's changes. Returns a verdict (approve, request-changes, or comment) with per-file comments categorized by severity (critical, suggestion, nit). Use before opening a PR for self-review, or to review others' branches.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_comment_pr",
-        "displayName": "Meridian: Comment PR",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Generate granular inline code review comments for changed files in the current branch. More detailed than meridian_git_review_pr — produces file-level and line-level feedback. Use when you need specific, actionable comments rather than an overall verdict.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_resolve_conflicts",
-        "displayName": "Meridian: Resolve Conflicts",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Analyze detected git merge conflicts and suggest resolution strategies per file. Returns keep-ours, keep-theirs, manual-merge, or review-needed with rationale for each. Call meridian_git_analyze_inbound first to detect conflicts, then use this tool for resolution guidance.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_session_briefing",
-        "displayName": "Meridian: Session Briefing",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Generate a comprehensive morning session briefing covering current branch state, recent commit history, uncommitted changes, and any flags that need attention. Uses AI to produce a scannable markdown summary. Ideal as a start-of-day orientation.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_hygiene_impact",
-        "displayName": "Meridian: Impact Analysis",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "hygiene"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Trace the blast radius of changing a specific file or function using the TypeScript Compiler API. Returns importers, call sites, test file coverage, dependent file count, and a prose summary assessing risk. Essential before refactoring shared code.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "filePath": {
-              "type": "string",
-              "description": "Absolute or relative path to the TypeScript file to analyze"
-            },
-            "functionName": {
-              "type": "string",
-              "description": "Optional function or symbol name to trace call sites for"
-            }
-          },
-          "required": [
-            "filePath"
-          ]
-        }
-      },
-      {
-        "name": "meridian_agent_execute",
-        "displayName": "Meridian: Execute Agent",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "agent"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Execute a registered agent with a target command or workflow. The agent must have the target in its capabilities list. Use meridian_agent_list first to discover available agents and verify their capabilities before calling this tool.",
-        "inputSchema": {
-          "type": "object",
-          "required": [
-            "agentId"
-          ],
-          "properties": {
-            "agentId": {
-              "type": "string",
-              "description": "The ID of the agent to execute"
-            },
-            "targetCommand": {
-              "type": "string",
-              "description": "The command to execute (must be in agent's capabilities list)"
-            },
-            "targetWorkflow": {
-              "type": "string",
-              "description": "The workflow to execute (alternative to targetCommand)"
-            }
-          }
-        }
-      },
-      {
-        "name": "meridian_workflow_list",
-        "displayName": "Meridian: List Workflows",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "workflow"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "List all available workflows defined in .vscode/workflows/ (workspace) and bundled with the extension. Returns names, descriptions, and step counts for each workflow. Call this first to discover available workflow names before using meridian_workflow_run.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_agent_list",
-        "displayName": "Meridian: List Agents",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "agent"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "List all registered agents defined in .vscode/agents/ (workspace) and bundled with the extension. Returns agent IDs, descriptions, and their declared capabilities (which commands they can execute). Call this first to discover available agents before using meridian_agent_execute.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_skill_overview",
-        "displayName": "Meridian: Session Overview",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "skill"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Run a composite session overview that checks git status and generates a morning briefing in one call. Combines meridian_git_status and meridian_git_session_briefing into a single operation. Ideal as a start-of-day orientation.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_skill_pr_ready",
-        "displayName": "Meridian: PR Readiness Check",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "skill"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Run a composite PR readiness check that scans for hygiene issues, performs an AI code review, and generates a PR description — all in one call. Combines meridian_hygiene_scan, meridian_git_review_pr, and meridian_git_generate_pr. Use when preparing to open a pull request.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_skill_pre_merge",
-        "displayName": "Meridian: Pre-merge Check",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "skill"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Run a composite pre-merge check that analyzes incoming remote changes and suggests conflict resolution strategies — all in one call. Combines meridian_git_analyze_inbound and meridian_git_resolve_conflicts. Use before merging or pulling to assess risk.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
-        }
-      },
-      {
-        "name": "meridian_git_export_json",
-        "displayName": "Meridian: Export Git Analytics (JSON)",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Export git analytics data as a JSON file. Includes commit frequency, author stats, file churn, and trend data. Optionally specify a time period.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "period": {
-              "type": "string",
-              "enum": [
-                "3mo",
-                "6mo",
-                "12mo"
-              ],
-              "description": "Time period for the analytics report. Defaults to 3mo."
-            },
-            "author": {
-              "type": "string",
-              "description": "Optional: filter analytics by author name."
-            },
-            "pathPattern": {
-              "type": "string",
-              "description": "Optional: filter analytics by file path glob pattern."
-            }
-          }
-        }
-      },
-      {
-        "name": "meridian_git_export_csv",
-        "displayName": "Meridian: Export Git Analytics (CSV)",
-        "canBeReferencedInPrompt": true,
-        "tags": [
-          "meridian",
-          "git"
-        ],
-        "icon": "$(compass)",
-        "modelDescription": "Export git analytics data as a CSV file. Includes commit frequency, author stats, file churn, and trend data. Optionally specify a time period.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "period": {
-              "type": "string",
-              "enum": [
-                "3mo",
-                "6mo",
-                "12mo"
-              ],
-              "description": "Time period for the analytics report. Defaults to 3mo."
-            },
-            "author": {
-              "type": "string",
-              "description": "Optional: filter analytics by author name."
-            },
-            "pathPattern": {
-              "type": "string",
-              "description": "Optional: filter analytics by file path glob pattern."
-            }
-          }
-        }
-      }
-    ],
     "commands": [
       {
         "command": "meridian.git.status",
@@ -560,12 +68,6 @@
       {
         "command": "meridian.git.commit",
         "title": "Git: Commit",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.git.smartCommit",
-        "title": "Git: Smart Commit (Interactive)",
-        "icon": "$(git-commit)",
         "category": "Meridian"
       },
       {
@@ -589,31 +91,6 @@
         "category": "Meridian"
       },
       {
-        "command": "meridian.hygiene.reviewFile",
-        "title": "Hygiene: Review with AI",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.chat.context",
-        "title": "Chat: Get Context",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.workflow.list",
-        "title": "Workflow: List All",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.workflow.run",
-        "title": "Workflow: Run",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.agent.list",
-        "title": "Agent: List All",
-        "category": "Meridian"
-      },
-      {
         "command": "meridian.git.refresh",
         "title": "Git: Refresh View",
         "category": "Meridian"
@@ -621,22 +98,6 @@
       {
         "command": "meridian.hygiene.refresh",
         "title": "Hygiene: Refresh View",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.workflow.refresh",
-        "title": "Workflow: Refresh View",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.agent.run",
-        "title": "Agent: Run",
-        "icon": "$(play)",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.agent.refresh",
-        "title": "Agent: Refresh View",
         "category": "Meridian"
       },
       {
@@ -667,44 +128,9 @@
         "category": "Meridian"
       },
       {
-        "command": "meridian.git.generatePR",
-        "title": "Git: Generate PR Description",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.git.reviewPR",
-        "title": "Git: Review PR (AI)",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.git.commentPR",
-        "title": "Git: Generate PR Comments",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.git.resolveConflicts",
-        "title": "Git: Resolve Conflicts (AI)",
-        "category": "Meridian"
-      },
-      {
         "command": "meridian.git.sessionBriefing",
-        "title": "Git: Session Briefing (AI)",
+        "title": "Git: Session Briefing",
         "icon": "$(notebook)",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.skill.overview",
-        "title": "Skill: Session Overview",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.skill.prReady",
-        "title": "Skill: PR Readiness Check",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.skill.preMerge",
-        "title": "Skill: Pre-merge Check",
         "category": "Meridian"
       },
       {
@@ -724,22 +150,17 @@
         "meridian.model.default": {
           "type": "string",
           "default": "gpt-4o",
-          "description": "Default language model family for all Meridian AI features (e.g. gpt-4o, claude-3-5-sonnet). Used when no domain-specific override is set."
+          "description": "Default language model family for Meridian's optional AI prose (session briefing, impact analysis), e.g. gpt-4o, claude-3-5-sonnet. Used when no domain-specific override is set."
         },
         "meridian.model.hygiene": {
           "type": "string",
           "default": "",
-          "description": "Language model family for hygiene domain (markdown review). Empty = inherits meridian.model.default."
+          "description": "Language model family for hygiene-domain prose (impact-analysis summary). Empty = inherits meridian.model.default."
         },
         "meridian.model.git": {
           "type": "string",
           "default": "",
-          "description": "Language model family for git domain (commit messages, diff analysis). Empty = inherits meridian.model.default."
-        },
-        "meridian.model.chat": {
-          "type": "string",
-          "default": "",
-          "description": "Language model family for @meridian chat participant direct LLM calls. Empty = inherits meridian.model.default."
+          "description": "Language model family for git-domain prose (session-briefing summary). Empty = inherits meridian.model.default."
         },
         "meridian.security.lmEgress.mode": {
           "type": "string",
@@ -845,17 +266,6 @@
           "minimum": 1,
           "description": "Interval in minutes between automatic hygiene scans."
         },
-        "meridian.chat.model": {
-          "type": "string",
-          "default": "gpt-4",
-          "description": "Default language model for chat operations."
-        },
-        "meridian.chat.contextLines": {
-          "type": "number",
-          "default": 50,
-          "minimum": 1,
-          "description": "Number of lines of context to include from the active file in chat requests."
-        },
         "meridian.sessionBriefing.autoLaunch": {
           "type": "boolean",
           "default": false,
@@ -865,11 +275,6 @@
           "type": "boolean",
           "default": true,
           "description": "Enable startup registration of file watchers for automatic tree/status refresh."
-        },
-        "meridian.startup.enableChatSurface": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable startup registration of @meridian chat participant and LM tool surface."
         },
         "meridian.log.level": {
           "type": "string",
@@ -886,12 +291,6 @@
     },
     "keybindings": [
       {
-        "command": "meridian.git.smartCommit",
-        "key": "ctrl+m ctrl+c",
-        "mac": "cmd+m cmd+c",
-        "when": "workspaceFolderCount > 0"
-      },
-      {
         "command": "meridian.hygiene.scan",
         "key": "ctrl+m ctrl+s",
         "mac": "cmd+m cmd+s",
@@ -907,30 +306,6 @@
         "command": "meridian.refreshAll",
         "key": "ctrl+m ctrl+r",
         "mac": "cmd+m cmd+r",
-        "when": "workspaceFolderCount > 0"
-      },
-      {
-        "command": "meridian.git.generatePR",
-        "key": "ctrl+m ctrl+p",
-        "mac": "cmd+m cmd+p",
-        "when": "workspaceFolderCount > 0"
-      },
-      {
-        "command": "meridian.git.reviewPR",
-        "key": "ctrl+m ctrl+v",
-        "mac": "cmd+m cmd+v",
-        "when": "workspaceFolderCount > 0"
-      },
-      {
-        "command": "meridian.git.commentPR",
-        "key": "ctrl+m ctrl+i",
-        "mac": "cmd+m cmd+i",
-        "when": "workspaceFolderCount > 0"
-      },
-      {
-        "command": "meridian.git.resolveConflicts",
-        "key": "ctrl+m ctrl+x",
-        "mac": "cmd+m cmd+x",
         "when": "workspaceFolderCount > 0"
       },
       {
@@ -959,11 +334,6 @@
           "group": "meridian@2"
         },
         {
-          "command": "meridian.hygiene.reviewFile",
-          "when": "workspaceFolderCount > 0 && resourceExtname == .md",
-          "group": "meridian@3"
-        },
-        {
           "command": "meridian.hygiene.impactAnalysis",
           "when": "workspaceFolderCount > 0 && resourceExtname == .ts",
           "group": "meridian@4"
@@ -983,10 +353,6 @@
           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
         },
         {
-          "command": "meridian.git.smartCommit",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
           "command": "meridian.git.showAnalytics",
           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
         },
@@ -996,22 +362,6 @@
         },
         {
           "command": "meridian.git.exportCsv",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
-          "command": "meridian.git.generatePR",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
-          "command": "meridian.git.reviewPR",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
-          "command": "meridian.git.commentPR",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
-          "command": "meridian.git.resolveConflicts",
           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
         },
         {
@@ -1035,45 +385,12 @@
           "when": "workspaceFolderCount > 0"
         },
         {
-          "command": "meridian.hygiene.reviewFile",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
           "command": "meridian.hygiene.showAnalytics",
           "when": "workspaceFolderCount > 0"
         },
         {
           "command": "meridian.hygiene.impactAnalysis",
           "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.chat.context",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.workflow.list",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.workflow.run",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.agent.list",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.agent.run",
-          "when": "workspaceFolderCount > 0"
-        },
-        {
-          "command": "meridian.skill.overview"
-        },
-        {
-          "command": "meridian.skill.prReady"
-        },
-        {
-          "command": "meridian.skill.preMerge"
         }
       ],
       "view/title": [
@@ -1088,16 +405,6 @@
           "group": "navigation"
         },
         {
-          "command": "meridian.workflow.refresh",
-          "when": "view == meridian.workflow.view",
-          "group": "navigation"
-        },
-        {
-          "command": "meridian.agent.refresh",
-          "when": "view == meridian.agent.view",
-          "group": "navigation"
-        },
-        {
           "command": "meridian.git.showAnalytics",
           "when": "view == meridian.git.view",
           "group": "navigation"
@@ -1108,22 +415,12 @@
           "group": "navigation"
         },
         {
-          "command": "meridian.git.smartCommit",
-          "when": "view == meridian.git.view",
-          "group": "navigation"
-        },
-        {
           "command": "meridian.git.sessionBriefing",
           "when": "view == meridian.git.view",
           "group": "navigation"
         }
       ],
       "view/item/context": [
-        {
-          "command": "meridian.git.smartCommit",
-          "when": "view == meridian.git.view && viewItem == branch",
-          "group": "git@1"
-        },
         {
           "command": "meridian.git.pull",
           "when": "view == meridian.git.view && viewItem == branch",
@@ -1143,34 +440,9 @@
           "command": "meridian.hygiene.ignoreFile",
           "when": "view == meridian.hygiene.view && viewItem =~ /file/",
           "group": "hygiene@3"
-        },
-        {
-          "command": "meridian.hygiene.reviewFile",
-          "when": "view == meridian.hygiene.view && viewItem == markdownFile",
-          "group": "hygiene@4"
-        },
-        {
-          "command": "meridian.workflow.run",
-          "when": "view == meridian.workflow.view && viewItem == workflow",
-          "group": "workflow@1"
-        },
-        {
-          "command": "meridian.agent.run",
-          "when": "view == meridian.agent.view && viewItem == agent",
-          "group": "agent@1"
         }
       ],
       "view/item/inline": [
-        {
-          "command": "meridian.workflow.run",
-          "when": "view == meridian.workflow.view && viewItem == workflow",
-          "group": "inline"
-        },
-        {
-          "command": "meridian.agent.run",
-          "when": "view == meridian.agent.view && viewItem == agent",
-          "group": "inline"
-        },
         {
           "command": "meridian.git.showAnalytics",
           "when": "view == meridian.git.view && viewItem == branch",
@@ -1181,7 +453,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run bundle",
-    "copy-assets": "cp -r media out/media 2>/dev/null || true && cp -r bundled out/bundled 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && cp node_modules/chart.js/dist/chart.umd.js out/domains/git/analytics-ui/chart.umd.js && rm -rf out/domains/git/session-briefing-ui && cp -r src/domains/git/session-briefing-ui out/domains/git/session-briefing-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui && cp node_modules/chart.js/dist/chart.umd.js out/domains/hygiene/analytics-ui/chart.umd.js",
+    "copy-assets": "cp -r media out/media 2>/dev/null || true && mkdir -p out/domains/git && rm -rf out/domains/git/analytics-ui && cp -r src/domains/git/analytics-ui out/domains/git/analytics-ui && cp node_modules/chart.js/dist/chart.umd.js out/domains/git/analytics-ui/chart.umd.js && rm -rf out/domains/git/session-briefing-ui && cp -r src/domains/git/session-briefing-ui out/domains/git/session-briefing-ui && mkdir -p out/domains/hygiene && rm -rf out/domains/hygiene/analytics-ui && cp -r src/domains/hygiene/analytics-ui out/domains/hygiene/analytics-ui && cp node_modules/chart.js/dist/chart.umd.js out/domains/hygiene/analytics-ui/chart.umd.js",
     "bundle": "esbuild src/main.ts --bundle --outfile=out/main.js --external:vscode --external:typescript --format=cjs --platform=node --target=node20 && npm run copy-assets",
     "compile": "tsc -p ./ && npm run copy-assets",
     "watch": "tsc -watch -p ./",

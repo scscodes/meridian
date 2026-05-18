@@ -139,7 +139,7 @@ describe('git.sessionBriefing', () => {
     );
   });
 
-  it('propagates error when generateProseFn fails', async () => {
+  it('degrades to deterministic summary when generateProseFn fails', async () => {
     generateProseFn.mockResolvedValue(
       failure({ code: 'MODEL_UNAVAILABLE', message: 'no language model' })
     );
@@ -147,9 +147,25 @@ describe('git.sessionBriefing', () => {
     const handler = createSessionBriefingHandler(makeSources(git, logger, runLog), generateProseFn);
     const result = await handler(createMockContext(), {} as any);
 
-    expect(result.kind).toBe('err');
-    if (result.kind === 'err') {
-      expect(result.error.code).toBe('MODEL_UNAVAILABLE');
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.summary).toContain("Branch 'develop'");
+      expect(result.value.summary).toContain('dirty');
+      expect(result.value.summary).toContain('staged: 2');
+      expect(result.value.branch).toBe('develop');
+      expect(result.value.isDirty).toBe(true);
+    }
+  });
+
+  it('degrades to deterministic summary when no generateProseFn is injected', async () => {
+    const handler = createSessionBriefingHandler(makeSources(git, logger, runLog));
+    const result = await handler(createMockContext(), {} as any);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.summary).toContain("Branch 'develop'");
+      expect(result.value.summary).toContain('uncommitted file');
+      expect(result.value.uncommittedFiles).toHaveLength(2);
     }
   });
 

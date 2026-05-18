@@ -1,7 +1,9 @@
 # ADR 008 — Router Dispatch Lifecycle Events
 
-**Status:** Accepted
+**Status:** Accepted (revised)
 **Date:** 2026-04-20
+
+> **Revised by [ADR 012](./012-product-reanchor.md) (2026-05-18):** the originating motivation (the `chat.delegate` → `workflow.run` spinner) is void — both are removed. The lifecycle mechanism is retained: it still drives the `gitTree` spinner on direct dispatch.
 
 ## Context
 

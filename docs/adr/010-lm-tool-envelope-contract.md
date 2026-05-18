@@ -1,6 +1,6 @@
 # ADR 010 — LM Tool Envelope Contract
 
-**Status:** Accepted  
+**Status:** Superseded by [ADR 012](./012-product-reanchor.md) (2026-05-18) — the entire LM-tool surface was removed in the 2.0 re-anchor.
 **Date:** 2026-04-20
 
 ## Context

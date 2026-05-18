@@ -5,17 +5,17 @@ import type { Result } from "../src/types";
 
 describe("formatResultMessage", () => {
   // -----------------------------------------------------------------------
-  // 1. Error with known code (NO_CHANGES) → friendly message
+  // 1. Error with known code → friendly message
   // -----------------------------------------------------------------------
   it("maps known error code to friendly message", () => {
     const result: Result<unknown> = failure({
-      code: "NO_CHANGES",
-      message: "There are no staged changes",
+      code: "GIT_STATUS_ERROR",
+      message: "git rev-parse failed",
     });
-    const msg = formatResultMessage("git.smartCommit", result);
+    const msg = formatResultMessage("git.status", result);
 
     expect(msg.level).toBe("error");
-    expect(msg.message).toContain("No changes to commit.");
+    expect(msg.message).toContain("Failed to read git status.");
   });
 
   // -----------------------------------------------------------------------
@@ -76,123 +76,7 @@ describe("formatResultMessage", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 5. workflow.run success → workflow name and step count
-  // -----------------------------------------------------------------------
-  it("formats workflow.run success with name and step count", () => {
-    const result = success({
-      workflowName: "deploy",
-      success: true,
-      duration: 5000,
-      stepCount: 3,
-    });
-    const msg = formatResultMessage("workflow.run", result);
-
-    expect(msg.level).toBe("info");
-    expect(msg.message).toContain("deploy");
-    expect(msg.message).toContain("3 step(s)");
-  });
-
-  // -----------------------------------------------------------------------
-  // 6. workflow.run failure → error code maps to friendly message
-  //    (failures return Result<err>, not success({ success: false }))
-  // -----------------------------------------------------------------------
-  it("maps WORKFLOW_EXECUTION_FAILED to friendly error message", () => {
-    const result: Result<unknown> = failure({
-      code: "WORKFLOW_EXECUTION_FAILED",
-      message: "Step 'build' timed out",
-    });
-    const msg = formatResultMessage("workflow.run", result);
-
-    expect(msg.level).toBe("error");
-    expect(msg.message).toContain("Workflow execution failed");
-  });
-
-  // -----------------------------------------------------------------------
-  // 6b. WORKFLOW_NOT_FOUND → friendly error
-  // -----------------------------------------------------------------------
-  it("maps WORKFLOW_NOT_FOUND to friendly error message", () => {
-    const result: Result<unknown> = failure({
-      code: "WORKFLOW_NOT_FOUND",
-      message: "Workflow not found: deploy",
-    });
-    const msg = formatResultMessage("workflow.run", result);
-
-    expect(msg.level).toBe("error");
-    expect(msg.message).toContain("Workflow not found");
-  });
-
-  // -----------------------------------------------------------------------
-  // 7. chat.delegate success → "Delegated"
-  // -----------------------------------------------------------------------
-  it("formats chat.delegate success with delegated command", () => {
-    const result = success({
-      commandName: "git.status",
-    });
-    const msg = formatResultMessage("chat.delegate", result);
-
-    expect(msg.level).toBe("info");
-    expect(msg.message).toContain("Delegated");
-    expect(msg.message).toContain("git.status");
-  });
-
-  // -----------------------------------------------------------------------
-  // 7b. agent.execute success → agentId + command + timing
-  // -----------------------------------------------------------------------
-  it("formats agent.execute success with agent id and command", () => {
-    const result = success({
-      agentId: "my-agent",
-      success: true,
-      durationMs: 1200,
-      logs: [],
-      executedCommand: "git.status",
-      agentCapabilities: ["git.status"],
-    });
-    const msg = formatResultMessage("agent.execute", result);
-
-    expect(msg.level).toBe("info");
-    expect(msg.message).toContain("my-agent");
-    expect(msg.message).toContain("git.status");
-    expect(msg.message).toContain("1200ms");
-  });
-
-  // -----------------------------------------------------------------------
-  // 7c. agent.execute internal failure → error level with message
-  //     (agent always wraps failures in success({ success: false }))
-  // -----------------------------------------------------------------------
-  it("formats agent.execute internal failure as error with reason", () => {
-    const result = success({
-      agentId: "my-agent",
-      success: false,
-      durationMs: 50,
-      logs: [],
-      error: "Command 'git.status' returned an error",
-      executedCommand: "git.status",
-      agentCapabilities: ["git.status"],
-    });
-    const msg = formatResultMessage("agent.execute", result);
-
-    expect(msg.level).toBe("error");
-    expect(msg.message).toContain("my-agent");
-    expect(msg.message).toContain("failed");
-    expect(msg.message).toContain("Command 'git.status' returned an error");
-  });
-
-  // -----------------------------------------------------------------------
-  // 7d. AGENT_NOT_FOUND → friendly error
-  // -----------------------------------------------------------------------
-  it("maps AGENT_NOT_FOUND to friendly error message", () => {
-    const result: Result<unknown> = failure({
-      code: "AGENT_NOT_FOUND",
-      message: "Agent 'foo' not found",
-    });
-    const msg = formatResultMessage("agent.execute", result);
-
-    expect(msg.level).toBe("error");
-    expect(msg.message).toContain("Agent not found");
-  });
-
-  // -----------------------------------------------------------------------
-  // 8. Unknown command success → generic OK
+  // 5. Unknown command success → generic OK
   // -----------------------------------------------------------------------
   it("returns generic OK for unrecognized command names", () => {
     const result = success({ anything: true });

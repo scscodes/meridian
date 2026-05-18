@@ -16,7 +16,6 @@ function debounce(fn: () => void, ms: number): () => void {
 export interface RefreshTargets {
   gitRefresh: () => void;
   hygieneRefresh: () => void;
-  definitionsRefresh: () => void;
   statusBarUpdate: () => void;
 }
 
@@ -37,10 +36,6 @@ export function setupFileWatchers(
     targets.hygieneRefresh();
   }, UI_SETTINGS.WATCHER_DEBOUNCE_MS);
 
-  const debouncedDefinitionsRefresh = debounce(() => {
-    targets.definitionsRefresh();
-  }, UI_SETTINGS.WATCHER_DEBOUNCE_MS);
-
   // Git state: branch switches, staging, commits
   const gitWatcher = vscode.workspace.createFileSystemWatcher(
     new vscode.RelativePattern(workspaceRoot, ".git/{HEAD,index,refs/**}")
@@ -55,13 +50,5 @@ export function setupFileWatchers(
   fileWatcher.onDidCreate(debouncedHygieneRefresh);
   fileWatcher.onDidDelete(debouncedHygieneRefresh);
 
-  // Agent/workflow definitions
-  const defWatcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(workspaceRoot, ".vscode/{agents,workflows}/*.json")
-  );
-  defWatcher.onDidChange(debouncedDefinitionsRefresh);
-  defWatcher.onDidCreate(debouncedDefinitionsRefresh);
-  defWatcher.onDidDelete(debouncedDefinitionsRefresh);
-
-  context.subscriptions.push(gitWatcher, fileWatcher, defWatcher);
+  context.subscriptions.push(gitWatcher, fileWatcher);
 }

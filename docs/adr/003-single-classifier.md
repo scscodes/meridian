@@ -1,7 +1,7 @@
 # ADR 003 — Single NL Classification Authority
 
 **Date**: 2026-03-04
-**Status**: Accepted
+**Status**: Superseded by [ADR 012](./012-product-reanchor.md) (2026-05-18) — the `chat.delegate` classifier and chat participant were removed in the 2.0 re-anchor.
 
 ---
 

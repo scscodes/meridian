@@ -6,10 +6,9 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { GitProvider, GitStatus, RecentCommit, Logger } from "../../types";
-import { ConflictResolution, ConflictResolutionProse } from "../../domains/git/types";
 import { UI_SETTINGS } from "../../constants";
 
-type GitItemKind = "branch" | "changeGroup" | "changedFile" | "commit" | "conflictGroup" | "conflictFile" | "report";
+type GitItemKind = "branch" | "changeGroup" | "changedFile" | "commit" | "report";
 
 class GitTreeItem extends vscode.TreeItem {
   filePath?: string;
@@ -27,40 +26,13 @@ class GitTreeItem extends vscode.TreeItem {
   }
 }
 
-class ConflictFileTreeItem extends vscode.TreeItem {
-  constructor(
-    public readonly file: ConflictResolution,
-    workspaceRoot: string
-  ) {
-    super(path.basename(file.path), vscode.TreeItemCollapsibleState.None);
-    this.description = file.strategy;
-    this.contextValue = "conflictFile";
-    this.iconPath = new vscode.ThemeIcon(iconForStrategy(file.strategy));
-    this.tooltip = `${file.rationale}\n\nSuggested steps:\n${(file.suggestedSteps ?? []).map(s => `• ${s}`).join("\n")}`;
-    const absolutePath = path.isAbsolute(file.path) ? file.path : path.join(workspaceRoot, file.path);
-    this.resourceUri = vscode.Uri.file(absolutePath);
-    this.command = { command: "vscode.open", title: "Open File", arguments: [this.resourceUri] };
-  }
-}
-
-function iconForStrategy(strategy: ConflictResolution["strategy"]): string {
-  switch (strategy) {
-    case "keep-ours":
-    case "keep-theirs":  return "check";
-    case "manual-merge": return "edit";
-    case "review-needed": return "warning";
-  }
-}
-
-type TreeElement = GitTreeItem | ConflictFileTreeItem;
+type TreeElement = GitTreeItem;
 
 export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
   private _onDidChangeTreeData = new vscode.EventEmitter<TreeElement | undefined | null | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private cached: GitStatus | null = null;
-  private conflictRunning = false;
-  private lastConflictRun: ConflictResolutionProse | null = null;
 
   constructor(
     private readonly gitProvider: GitProvider,
@@ -73,29 +45,13 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     this._onDidChangeTreeData.fire();
   }
 
-  /** Called when resolveConflicts starts. Clears stale per-file children. */
-  setConflictRunning(): void {
-    this.conflictRunning = true;
-    this.lastConflictRun = null;
-    this._onDidChangeTreeData.fire();
-  }
-
-  /** Called when resolveConflicts finishes. Stores result for tree expansion. */
-  setLastConflictRun(data: ConflictResolutionProse | null): void {
-    this.conflictRunning = false;
-    this.lastConflictRun = data;
-    this._onDidChangeTreeData.fire();
-  }
-
   getTreeItem(element: TreeElement): vscode.TreeItem {
     return element;
   }
 
   async getChildren(element?: TreeElement): Promise<TreeElement[]> {
     if (!element)                                                    return this.getRootItems();
-    if (element instanceof ConflictFileTreeItem)                     return [];
     if ((element as GitTreeItem).itemKind === "branch")              return this.getBranchChildren();
-    if ((element as GitTreeItem).itemKind === "conflictGroup")       return this.getConflictChildren();
     if ((element as GitTreeItem).itemKind === "changeGroup")         return this.getFilesForGroup(element as GitTreeItem);
     return [];
   }
@@ -139,41 +95,13 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     );
     branchItem.iconPath = new vscode.ThemeIcon(s.isDirty ? "git-branch" : "check");
 
-    const items: TreeElement[] = [reportItem, branchItem];
-
-    if (this.conflictRunning || this.lastConflictRun) {
-      const fileCount = this.lastConflictRun?.perFile?.length ?? 0;
-      const hasFiles = !this.conflictRunning && fileCount > 0;
-      const description = this.conflictRunning
-        ? "running\u2026"
-        : `${fileCount} file(s)`;
-
-      const conflictGroup = new GitTreeItem(
-        "Conflict Resolution",
-        "conflictGroup",
-        hasFiles ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
-        description
-      );
-      conflictGroup.iconPath = new vscode.ThemeIcon(
-        this.conflictRunning ? "loading~spin" : "git-merge"
-      );
-      items.push(conflictGroup);
-    }
-
-    return items;
+    return [reportItem, branchItem];
   }
 
   private async getBranchChildren(): Promise<GitTreeItem[]> {
     const changeGroups = this.getChangeGroupItems();
     const commitsGroup = await this.getRecentCommitsGroup();
     return [...changeGroups, commitsGroup];
-  }
-
-  private getConflictChildren(): ConflictFileTreeItem[] {
-    if (!this.lastConflictRun) return [];
-    return (this.lastConflictRun.perFile ?? []).map(
-      f => new ConflictFileTreeItem(f, this.workspaceRoot)
-    );
   }
 
   private getChangeGroupItems(): GitTreeItem[] {

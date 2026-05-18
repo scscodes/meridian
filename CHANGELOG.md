@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/scscodes/meridian/compare/v2.0.0...v2.0.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* use valid VS Marketplace categories to unblock release publish ([7830209](https://github.com/scscodes/meridian/commit/783020934937bfabfb8b120581b837cf47f50646))
+
 # [2.0.0](https://github.com/scscodes/meridian/compare/v1.8.3...v2.0.0) (2026-05-18)
 
 

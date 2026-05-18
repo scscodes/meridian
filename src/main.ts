@@ -92,10 +92,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const dispatch = (cmd: Command, ctx: CommandContext) => router.dispatch(cmd, ctx);
   const cmdCtx = getCommandContext(context);
 
-  const trees = setupTreeProviders(context, gitProvider, logger, workspaceRoot, dispatch, cmdCtx);
-
   const { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = createWebviewPanels(
     context, router, workspaceRoot, ctxFn, () => config.getPruneConfig()
+  );
+
+  const trees = setupTreeProviders(
+    context, gitProvider, logger, workspaceRoot, dispatch, cmdCtx,
+    { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel }
   );
 
   registerCommands(context, router, outputChannel, ctxFn, () => config.getPruneConfig(), {

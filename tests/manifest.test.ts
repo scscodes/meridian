@@ -34,6 +34,8 @@ const INFRASTRUCTURE_COMMANDS = new Set([
   "meridian.hygiene.refresh",
   "meridian.statusBar.clicked",
   "meridian.refreshAll",
+  "meridian.reports.open",
+  "meridian.reports.refresh",
 ]);
 
 // ── Load package.json ─────────────────────────────────────────────────────────

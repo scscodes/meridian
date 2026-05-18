@@ -73,18 +73,6 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
       this.cached = result.value;
     }
 
-    const reportItem = new GitTreeItem(
-      "View Git Report",
-      "report",
-      vscode.TreeItemCollapsibleState.None
-    );
-    reportItem.iconPath = new vscode.ThemeIcon("graph");
-    reportItem.tooltip = "Open the Git Analytics report";
-    reportItem.command = {
-      command: "meridian.git.showAnalytics",
-      title: "View Git Report",
-    };
-
     const s = this.cached;
     const dirty = s.isDirty ? "dirty" : "clean";
     const branchItem = new GitTreeItem(
@@ -95,7 +83,7 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     );
     branchItem.iconPath = new vscode.ThemeIcon(s.isDirty ? "git-branch" : "check");
 
-    return [reportItem, branchItem];
+    return [branchItem];
   }
 
   private async getBranchChildren(): Promise<GitTreeItem[]> {

@@ -37,6 +37,16 @@ export abstract class BaseWebviewProvider<TReport> {
     await this.onMessage(msg);
   }
 
+  /** True while a webview panel for this report is live. */
+  isOpen(): boolean {
+    return this.panel !== null;
+  }
+
+  /** Bring an already-open panel forward without recomputing the report. */
+  reveal(): void {
+    this.panel?.reveal(vscode.ViewColumn.One);
+  }
+
   async openPanel(report: TReport): Promise<void> {
     const uiDirUri = vscode.Uri.joinPath(this.extensionUri, ...this.getUiDirSegments());
 

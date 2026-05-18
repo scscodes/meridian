@@ -1,7 +1,7 @@
 {
   "name": "meridian",
   "displayName": "Meridian",
-  "description": "AI-powered git analytics, code hygiene, workflow engine, and chat assistant for VS Code",
+  "description": "Git and hygiene analytics/reporting. More awareness and transparency, with less toil.",
   "version": "1.8.3",
   "publisher": "scscodes",
   "license": "MIT",
@@ -11,17 +11,16 @@
     "url": "https://github.com/scscodes/meridian"
   },
   "categories": [
-    "Programming Languages",
-    "SCM Providers",
-    "Machine Learning"
+    "Productivity",
+    "Software Engineering"
   ],
   "keywords": [
+    "productivity",
     "git",
     "hygiene",
-    "code-review",
-    "ai",
+    "analytics",
     "workflow",
-    "copilot"
+    "toil"
   ],
   "engines": {
     "node": ">=22.22.0",

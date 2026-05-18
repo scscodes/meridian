@@ -56,6 +56,21 @@ interface ImpactContext {
   analysisType: "file" | "function";
 }
 
+/**
+ * Deterministic prose-free summary built purely from the computed analysis.
+ * Used when no language model is available, or prose generation fails — the
+ * blast-radius numbers are the product; the model narration is a garnish.
+ */
+function deterministicSummary(context: ImpactContext): string {
+  const n = (count: number, noun: string) =>
+    `${count} ${noun}${count === 1 ? "" : "s"}`;
+  return (
+    `Changing ${context.target} affects ${n(context.importers.length, "importer")}, ` +
+    `${n(context.callSites.length, "call site")}, and ${n(context.testFiles.length, "test file")} ` +
+    `(${n(context.dependentFiles.length, "dependent file")} total).`
+  );
+}
+
 class ImpactAnalyzer {
   private cache = new TtlCache<string, ImpactContext>(CACHE_SETTINGS.ANALYTICS_TTL_MS);
 
@@ -172,13 +187,27 @@ export function createImpactAnalysisHandler(logger: Logger, generateProseFn?: Ge
         });
       }
 
-      // Generate prose via LLM
-      if (!generateProseFn) {
-        return failure({
-          code: INFRASTRUCTURE_ERROR_CODES.MODEL_UNAVAILABLE,
-          message: "Impact analysis requires a prose generation function (is Copilot enabled?)",
-          context: "hygiene.impactAnalysis",
+      const finalize = (summary: string): Result<ImpactAnalysisResult> =>
+        success({
+          summary,
+          metrics: {
+            importers: context.importers.length,
+            callSites: context.callSites.length,
+            testFiles: context.testFiles.length,
+            dependentFiles: context.dependentFiles.length,
+            importerPaths: context.importers,
+            callSitePaths: context.callSites,
+            testFilePaths: context.testFiles,
+            dependentFilePaths: context.dependentFiles,
+          },
+          targetPath: params.filePath,
+          targetFunction: params.functionName,
         });
+
+      // Prose is an optional garnish over the computed blast radius (ADR 012):
+      // degrade to a deterministic summary when no model / prose fails.
+      if (!generateProseFn) {
+        return finalize(deterministicSummary(context));
       }
 
       const proseResult = await generateProseFn({
@@ -195,24 +224,15 @@ export function createImpactAnalysisHandler(logger: Logger, generateProseFn?: Ge
         },
       });
       if (proseResult.kind === "err") {
-        return proseResult; // Forward LLM error
+        logger.warn(
+          `Impact analysis prose unavailable (${proseResult.error.code}); using deterministic summary`,
+          "hygiene.impactAnalysis",
+          proseResult.error
+        );
+        return finalize(deterministicSummary(context));
       }
 
-      return success({
-        summary: proseResult.value,
-        metrics: {
-          importers: context.importers.length,
-          callSites: context.callSites.length,
-          testFiles: context.testFiles.length,
-          dependentFiles: context.dependentFiles.length,
-          importerPaths: context.importers,
-          callSitePaths: context.callSites,
-          testFilePaths: context.testFiles,
-          dependentFilePaths: context.dependentFiles,
-        },
-        targetPath: params.filePath,
-        targetFunction: params.functionName,
-      });
+      return finalize(proseResult.value);
     } catch (err) {
       return failure({
         code: HYGIENE_ERROR_CODES.IMPACT_ANALYSIS_ERROR,

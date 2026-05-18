@@ -1,7 +1,7 @@
 {
   "name": "meridian",
   "displayName": "Meridian",
-  "description": "A computed-insight instrument panel for your repo: git analytics, workspace hygiene, dead-code and change blast-radius, and a session briefing. Deterministic, inspectable, no LLM guesswork.",
+  "description": "Repository insights that are deterministic and inspectable: start with a session briefing, or review git analytics, workspace hygiene, and surface problems early with dead-code and blast-radius metrics. No model required, but allows for AI summarization when one is available.",
   "version": "1.8.3",
   "publisher": "scscodes",
   "license": "MIT",
@@ -150,17 +150,17 @@
         "meridian.model.default": {
           "type": "string",
           "default": "gpt-4o",
-          "description": "Default language model family for all Meridian AI features (e.g. gpt-4o, claude-3-5-sonnet). Used when no domain-specific override is set."
+          "description": "Default language model family for Meridian's optional AI prose (session briefing, impact analysis), e.g. gpt-4o, claude-3-5-sonnet. Used when no domain-specific override is set."
         },
         "meridian.model.hygiene": {
           "type": "string",
           "default": "",
-          "description": "Language model family for hygiene domain (markdown review). Empty = inherits meridian.model.default."
+          "description": "Language model family for hygiene-domain prose (impact-analysis summary). Empty = inherits meridian.model.default."
         },
         "meridian.model.git": {
           "type": "string",
           "default": "",
-          "description": "Language model family for git domain (commit messages, diff analysis). Empty = inherits meridian.model.default."
+          "description": "Language model family for git-domain prose (session-briefing summary). Empty = inherits meridian.model.default."
         },
         "meridian.security.lmEgress.mode": {
           "type": "string",

@@ -85,20 +85,18 @@ export class GitDomainService implements DomainService {
       "git.showAnalytics": createShowAnalyticsHandler(this.analyzer, logger),
       "git.exportJson": createExportJsonHandler(this.analyzer, logger),
       "git.exportCsv": createExportCsvHandler(this.analyzer, logger),
-      ...(generateProseFn
-        ? {
-            "git.sessionBriefing": createSessionBriefingHandler(
-              {
-                gitProvider,
-                runLog: this.runLog,
-                gitAnalyzer: this.analyzer,
-                getHygieneScan: this.getHygieneScan,
-                logger,
-              } satisfies SessionBriefingSources,
-              generateProseFn
-            ),
-          }
-        : {}),
+      // Always registered: prose is optional and the handler degrades to a
+      // deterministic summary when generateProseFn is absent (ADR 012).
+      "git.sessionBriefing": createSessionBriefingHandler(
+        {
+          gitProvider,
+          runLog: this.runLog,
+          gitAnalyzer: this.analyzer,
+          getHygieneScan: this.getHygieneScan,
+          logger,
+        } satisfies SessionBriefingSources,
+        generateProseFn
+      ),
     };
   }
 

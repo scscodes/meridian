@@ -91,13 +91,16 @@ describe("createImpactAnalysisHandler", () => {
     }
   });
 
-  it("returns MODEL_UNAVAILABLE when generateProseFn not provided", async () => {
+  it("degrades to deterministic summary when generateProseFn not provided", async () => {
     const handler = createImpactAnalysisHandler(logger); // no prose fn
     const result = await handler(BASE_CTX, { filePath: "/ws/src/main.ts" });
 
-    expect(result.kind).toBe("err");
-    if (result.kind === "err") {
-      expect(result.error.code).toBe("MODEL_UNAVAILABLE");
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.value.summary).toContain("2 importers");
+      expect(result.value.summary).toContain("1 test file");
+      expect(result.value.summary).toContain("3 dependent files");
+      expect(result.value.metrics.importers).toBe(2);
     }
   });
 
@@ -131,15 +134,17 @@ describe("createImpactAnalysisHandler", () => {
 
   // ── Prose generation paths ──────────────────────────────────────────────────
 
-  it("forwards LLM error when generateProseFn fails", async () => {
+  it("degrades to deterministic summary when generateProseFn fails", async () => {
     const proseErr = failure({ code: "MODEL_UNAVAILABLE", message: "Copilot offline" });
     const handler = createImpactAnalysisHandler(logger, makeGenerateProse(proseErr));
     const result = await handler(BASE_CTX, { filePath: "/ws/src/main.ts" });
 
-    expect(result.kind).toBe("err");
-    if (result.kind === "err") {
-      expect(result.error.code).toBe("MODEL_UNAVAILABLE");
-      expect(result.error.message).toContain("Copilot offline");
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.value.summary).toContain("2 importers");
+      expect(result.value.summary).toContain("3 dependent files");
+      expect(result.value.metrics.importers).toBe(2);
+      expect(result.value.metrics.testFiles).toBe(1);
     }
   });
 

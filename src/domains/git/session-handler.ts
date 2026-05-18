@@ -1,26 +1,74 @@
 /**
  * Session Briefing Handler — thin prose consumer over the session aggregator.
- * Delegates data aggregation to aggregateSessionBriefing(), then layers AI
- * prose on top to produce the final SessionBriefingReport.
+ * Delegates data aggregation to aggregateSessionBriefing(), then layers an
+ * optional AI prose summary on top to produce the final SessionBriefingReport.
+ *
+ * Prose is a garnish, not the product (ADR 012): when no language model is
+ * available — or prose generation fails for any reason — the briefing degrades
+ * to a deterministic, computed summary rather than erroring. The structured
+ * fields are always present regardless.
  */
 
 import {
   Handler,
   CommandContext,
   GenerateProseFn,
+  Result,
   success,
 } from "../../types";
 import { getPrompt } from "../../infrastructure/prompt-registry";
-import { SessionBriefingReport } from "./types";
+import { SessionBriefing, SessionBriefingReport } from "./types";
 import { SessionBriefingSources, aggregateSessionBriefing } from "./session-aggregator";
 
 /**
- * git.sessionBriefing — Aggregate current workspace state and generate a
- * session briefing via the prose pipeline.
+ * Deterministic plain-text briefing built purely from the computed aggregate.
+ * Rendered via textContent in the webview, so plain text with newlines — no
+ * markdown syntax. Used verbatim when no prose layer is available.
+ */
+function deterministicSummary(agg: SessionBriefing): string {
+  const lines: string[] = [];
+
+  const state = agg.isDirty ? "dirty" : "clean";
+  lines.push(
+    `Branch '${agg.branch}' — ${state} ` +
+      `(staged: ${agg.staged}, unstaged: ${agg.unstaged}, untracked: ${agg.untracked}).`
+  );
+  lines.push(
+    `${agg.recentCommits.length} recent commit${agg.recentCommits.length === 1 ? "" : "s"}, ` +
+      `${agg.uncommittedFiles.length} uncommitted file${agg.uncommittedFiles.length === 1 ? "" : "s"}.`
+  );
+
+  if (agg.activityWindow) {
+    const w = agg.activityWindow;
+    lines.push(
+      `Activity (${w.period}): ${w.commitsInWindow} commits across ${w.filesTouched} files.`
+    );
+  }
+
+  if (agg.hygieneSnapshot) {
+    const h = agg.hygieneSnapshot;
+    lines.push(
+      `Hygiene (scanned ${h.scannedAt}): ${h.deadFileCount} dead, ` +
+        `${h.largeFileCount} large, ${h.logFileCount} logs, ${h.deadCodeItemCount} dead-code items.`
+    );
+  }
+
+  if (agg.flags.length > 0) {
+    lines.push("");
+    lines.push("Flags:");
+    for (const f of agg.flags) lines.push(`  • ${f}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * git.sessionBriefing — Aggregate current workspace state and produce a
+ * session briefing. Prose is optional and degradable.
  */
 export function createSessionBriefingHandler(
   sources: SessionBriefingSources,
-  generateProseFn: GenerateProseFn
+  generateProseFn?: GenerateProseFn
 ): Handler<Record<string, never>, SessionBriefingReport> {
   return async (_ctx: CommandContext) => {
     const aggResult = await aggregateSessionBriefing(sources);
@@ -28,6 +76,17 @@ export function createSessionBriefingHandler(
 
     const agg = aggResult.value;
     const { logger } = sources;
+
+    const fallback = (): Result<SessionBriefingReport> =>
+      success({ ...agg, summary: deterministicSummary(agg) });
+
+    if (!generateProseFn) {
+      logger.info(
+        `Session briefing generated for branch '${agg.branch}' (deterministic — no language model)`,
+        "git.sessionBriefing"
+      );
+      return fallback();
+    }
 
     const proseResult = await generateProseFn({
       domain: "git",
@@ -47,7 +106,14 @@ export function createSessionBriefingHandler(
       },
     });
 
-    if (proseResult.kind === "err") return proseResult;
+    if (proseResult.kind === "err") {
+      logger.warn(
+        `Session briefing prose unavailable (${proseResult.error.code}); using deterministic summary`,
+        "git.sessionBriefing",
+        proseResult.error
+      );
+      return fallback();
+    }
 
     logger.info(`Session briefing generated for branch '${agg.branch}'`, "git.sessionBriefing");
 

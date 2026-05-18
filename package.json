@@ -2,7 +2,7 @@
   "name": "meridian",
   "displayName": "Meridian",
   "description": "Git and hygiene analytics/reporting. More awareness and transparency, with less toil.",
-  "version": "1.8.0",
+  "version": "1.8.3",
   "publisher": "scscodes",
   "license": "MIT",
   "icon": "media/icon.png",

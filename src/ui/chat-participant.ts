@@ -34,8 +34,10 @@ interface FollowupMeta {
   firstWorkflowName?: string;
 }
 
-// Declared slash commands (mirrors package.json chatParticipants.commands[].name)
-const SLASH_MAP: Record<string, CommandName> = {
+// Declared slash commands (mirrors package.json chatParticipants.commands[].name).
+// Exported for manifest parity tests — the test file enforces that this map's
+// keys exactly match the slash names declared in package.json.
+export const SLASH_MAP: Record<string, CommandName> = {
   "/status":    "git.status",
   "/scan":      "hygiene.scan",
   "/workflows": "workflow.list",
@@ -54,6 +56,10 @@ const SLASH_MAP: Record<string, CommandName> = {
   "/inbound":   "git.analyzeInbound",
   "/cleanup":   "hygiene.cleanup",
 };
+
+// Single source of truth for slash-command help text. Derived from SLASH_MAP
+// so any new slash command added above is automatically advertised everywhere.
+const SLASH_HELP = Object.keys(SLASH_MAP).map(s => `\`${s}\``).join(" ");
 
 export function createChatParticipant(
   router: CommandRouter,
@@ -136,15 +142,14 @@ export function createChatParticipant(
         `I don't have a slash command for that, but **Copilot can use Meridian tools directly** — ` +
         `just ask without the \`@meridian\` prefix.\n\n` +
         `**Available slash commands:**\n` +
-        `\`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` ` +
-        `\`/overview\` \`/prready\` \`/premerge\` \`/workflows\` \`/agents\` \`/analytics\` \`/impact\`\n\n` +
+        `${SLASH_HELP}\n\n` +
         `Or describe what you need to Copilot — it has access to all Meridian capabilities as tools.`
       );
       return;
     }
 
     // ── 5. Empty prompt fallback ─────────────────────────────────────────────
-    stream.markdown(`\`@meridian\` — use \`/status\`, \`/scan\`, \`/pr\`, \`/review\`, \`/briefing\`, \`/conflicts\`, \`/overview\`, \`/prready\`, \`/premerge\`, \`/workflows\`, \`/agents\`, \`/analytics\`, or just describe what you need.`);
+    stream.markdown(`\`@meridian\` — use ${SLASH_HELP}, or just describe what you need.`);
     return;
   };
 
@@ -253,7 +258,7 @@ const RESULT_FORMATTERS: Partial<Record<CommandName, ResultFormatter>> = {
     stream.markdown(
       `**Branch:** \`${branch}\` (${dirty})\n\n` +
       `**Active file:** \`${file}\`\n\n` +
-      `Slash commands: \`/status\` \`/scan\` \`/pr\` \`/review\` \`/briefing\` \`/conflicts\` \`/workflows\` \`/agents\` \`/analytics\` \`/impact\`\n\n` +
+      `Slash commands: ${SLASH_HELP}\n\n` +
       `Or ask naturally: _"show me my agents"_, _"what workflows do I have?"_, _"scan for issues"_`
     );
   },

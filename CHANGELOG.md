@@ -1,3 +1,24 @@
+## [1.8.3](https://github.com/scscodes/meridian/compare/v1.8.2...v1.8.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* **chat:** align in-app help and docs with declared slash commands ([d3171ad](https://github.com/scscodes/meridian/commit/d3171ad2be0e6b50aa1ead3b06a702c4debe649b))
+
+## [1.8.2](https://github.com/scscodes/meridian/compare/v1.8.1...v1.8.2) (2026-04-24)
+
+
+### Bug Fixes
+
+* **readme:** restore marketplace screenshots ([886521f](https://github.com/scscodes/meridian/commit/886521fa200a3c8d9b098db6fc90965401fe9838))
+
+## [1.8.1](https://github.com/scscodes/meridian/compare/v1.8.0...v1.8.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **distribution:** announce Open VSX support ([6d9b7f7](https://github.com/scscodes/meridian/commit/6d9b7f79c355199cba048ec1048193e2f4396ef6))
+
 # [1.8.0](https://github.com/scscodes/meridian/compare/v1.7.0...v1.8.0) (2026-04-20)
 
 

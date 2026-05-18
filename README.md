@@ -1,25 +1,25 @@
 # Meridian
 
-**Less toil between your local changes and review-ready output — without leaving VS Code.**
+**A computed-insight instrument panel for your repository — without leaving VS Code.**
 
-Clean grouped commits, generated PR docs, and the codebase context you actually need. Drive it from the command palette, the sidebar, or `@meridian` in Copilot Chat.
+Git analytics, workspace hygiene, change blast-radius, and a session briefing. Deterministic and inspectable: it shows you what your repo is doing, it doesn't wrap an LLM around commodity dev actions. Drive it from the Meridian sidebar or the command palette.
 
 ---
 
 ## What it does
 
-- **Smart Commit** — bundles your staged *and* unstaged work into grouped commits with messages derived from what changed, not LLM guesses. You pick the groups, edit any message, confirm — each group lands as its own commit.
-- **Pull Requests** — generate the description (title, summary, grouped changes, test plan), run an AI review for a single verdict with per-file comments by severity, or get targeted inline feedback on specific files.
-- **Session Briefing** — branch state, recent commits, uncommitted files, and risk flags (large changesets, detached HEAD) in one read. Start the day oriented; re-orient after a branch switch.
-- **Git Analytics** — churn, volatility, and authorship in one dashboard, with JSON and CSV export for reporting or downstream analysis.
-- **Code Health** — Hygiene Scan finds dead files, dead code (unused imports, locals, params), large files, and stale logs; dry-run, then clean in one pass. Impact Analysis traces importers, call sites, and test coverage so you size the blast radius before you refactor.
-- **Workflows & Agents** — JSON-defined automation with retries, timeouts, and conditional step routing; agents wrap approved commands and workflow targets into reusable execution profiles.
+- **Git Analytics** — churn, file volatility, and authorship in one dashboard, with JSON and CSV export for reporting or downstream analysis.
+- **Code Health** — Hygiene Scan finds dead files, dead code (unused imports, locals, params), large files, and stale logs; dry-run, then clean in one pass.
+- **Impact Analysis** — traces importers, call sites, and test coverage via the TypeScript compiler API so you size the blast radius before you refactor.
+- **Session Briefing** — branch state, recent commits, uncommitted files, recent run activity, hygiene snapshot, and risk flags (large changesets, detached HEAD) in one read. Start the day oriented; re-orient after a branch switch.
+
+All four are computed surfaces — no model calls required to produce them. The session briefing optionally adds a prose summary when a language model is available, and degrades cleanly to the raw aggregate when it isn't.
 
 ---
 
 ## Getting started
 
-Open the Command Palette and search `Meridian`, use the Meridian sidebar, or type `@meridian` in Copilot Chat. Configure under **Settings** → `meridian.*`.
+Open the Command Palette and search `Meridian`, or use the Meridian sidebar (Git and Hygiene views). Configure under **Settings** → `meridian.*`.
 
 - **Requires** VS Code 1.91+
 - **Works in** VS Code, Cursor, VSCodium, and compatible editors — via the VS Marketplace and Open VSX

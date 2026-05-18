@@ -1,7 +1,9 @@
 # ADR 009 — Run Log Schema and Versioning Policy
 
-**Status:** Accepted  
+**Status:** Accepted (revised)
 **Date:** 2026-04-20
+
+> **Revised by [ADR 012](./012-product-reanchor.md) (2026-05-18):** the run log now serves the computed-insight / session-briefing surface, not skill discoverability or an AI layer. The router still emits events for git/hygiene dispatches. The `source` enum members `workflow`/`agent`/`skill` are permanently unused but **retained** — the schema version is deliberately **not** bumped (stability over cosmetic trimming).
 
 ## Context
 

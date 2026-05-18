@@ -1,7 +1,9 @@
 # ADR 006 — Rendering Surface Decision Matrix
 
 **Date**: 2026-03-09
-**Status**: Accepted
+**Status**: Accepted (revised)
+
+> **Revised by [ADR 012](./012-product-reanchor.md) (2026-05-18):** the chat-stream and LM-tool rows are removed — no chat participant or LM tools exist post-re-anchor. The authoritative surfaces are now panel / output channel / tree / toast. The prior ADR 006 compliance backlog (`hygiene.reviewFile`, `git.resolveConflicts` migration) is void: those commands were deleted.
 
 ---
 

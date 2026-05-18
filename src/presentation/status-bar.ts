@@ -59,12 +59,10 @@ export function setupStatusBar(
 
       const pick = await vscode.window.showQuickPick<StatusBarQuickPickItem>(
         [
-          { label: "$(git-commit) Smart Commit",        command: "meridian.git.smartCommit" },
-          { label: "$(git-pull-request) Generate PR",    command: "meridian.git.generatePR" },
-          { label: "$(eye) Review PR",                   command: "meridian.git.reviewPR" },
           { label: "$(book) Session Briefing",           command: "meridian.git.sessionBriefing" },
-          { label: "", kind: vscode.QuickPickItemKind.Separator },
           { label: "$(search) Hygiene Scan",             command: "meridian.hygiene.scan" },
+          { label: "$(microscope) Impact Analysis",      command: "meridian.hygiene.impactAnalysis" },
+          { label: "", kind: vscode.QuickPickItemKind.Separator },
           { label: "$(graph) Git Analytics",             command: "meridian.git.showAnalytics" },
           { label: "$(graph) Hygiene Analytics",         command: "meridian.hygiene.showAnalytics" },
           { label: "", kind: vscode.QuickPickItemKind.Separator },

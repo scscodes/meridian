@@ -12,26 +12,19 @@ import { presentResult, PresenterContext } from "./result-presenters";
 
 /** Commands that show a progress notification during dispatch. */
 const PROGRESS_COMMANDS: ReadonlySet<CommandName> = new Set([
-  "git.generatePR", "git.reviewPR", "git.sessionBriefing",
-  "git.showAnalytics", "hygiene.scan",
-  "skill.overview", "skill.prReady", "skill.preMerge",
+  "git.sessionBriefing", "git.showAnalytics", "hygiene.scan",
 ] as CommandName[]);
 
 const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
-  "git.generatePR": "Generating PR description...",
-  "git.reviewPR": "Reviewing branch changes...",
   "git.sessionBriefing": "Generating session briefing...",
   "git.showAnalytics": "Loading git analytics...",
   "hygiene.scan": "Scanning workspace...",
-  "skill.overview": "Running session overview...",
-  "skill.prReady": "Checking PR readiness...",
-  "skill.preMerge": "Running pre-merge check...",
 };
 
 /**
  * Presentation-layer command metadata.
- * Mirrors the role of CatalogEntry in command-catalog.ts, but for the VS Code surface:
- * maps VS Code command IDs to internal CommandNames with display metadata.
+ * Maps VS Code command IDs to internal CommandNames with display metadata
+ * for the VS Code surface.
  *
  * title undefined    = internal command (not declared in contributes.commands)
  * showInPalette true = appears in commandPalette (requires title)
@@ -55,33 +48,15 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   { vsCodeId: "meridian.git.status",            commandName: "git.status",           title: "Git: Show Status",               showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.pull",              commandName: "git.pull",             title: "Git: Pull",                      showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.commit",            commandName: "git.commit",           title: "Git: Commit",                    showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.smartCommit",       commandName: "git.smartCommit",      title: "Git: Smart Commit (Interactive)", showInPalette: true,  requiresGit: true,  icon: "$(git-commit)" },
-  { vsCodeId: "meridian.git.analyzeInbound",    commandName: "git.analyzeInbound"    /* LM tool only — not manifest-declared */                                        },
   { vsCodeId: "meridian.git.showAnalytics",     commandName: "git.showAnalytics",    title: "Git: Show Analytics",            showInPalette: true,  requiresGit: true,  icon: "$(graph)" },
   { vsCodeId: "meridian.git.exportJson",        commandName: "git.exportJson",       title: "Git: Export Analytics JSON",     showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.exportCsv",         commandName: "git.exportCsv",        title: "Git: Export Analytics CSV",      showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.generatePR",        commandName: "git.generatePR",       title: "Git: Generate PR Description",   showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.reviewPR",          commandName: "git.reviewPR",         title: "Git: Review PR (AI)",            showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.commentPR",         commandName: "git.commentPR",        title: "Git: Generate PR Comments",      showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Git: Session Briefing (AI)",     showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
-  // git.resolveConflicts — dedicated registration in specialized-commands.ts (tree expansion hooks)
+  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Git: Session Briefing",          showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
   // ── Hygiene ──────────────────────────────────────────────────────────────────
   { vsCodeId: "meridian.hygiene.scan",          commandName: "hygiene.scan",         title: "Hygiene: Scan Workspace",        showInPalette: true  },
   { vsCodeId: "meridian.hygiene.cleanup",       commandName: "hygiene.cleanup",      title: "Hygiene: Cleanup",               showInPalette: true  },
   { vsCodeId: "meridian.hygiene.showAnalytics", commandName: "hygiene.showAnalytics",title: "Hygiene: Show Analytics",        showInPalette: true,                     icon: "$(graph)" },
   // hygiene.impactAnalysis — dedicated registration per ADR 005 (active-file fallback + function name prompt)
-  // ── Chat ─────────────────────────────────────────────────────────────────────
-  { vsCodeId: "meridian.chat.context",          commandName: "chat.context",         title: "Chat: Get Context",              showInPalette: true  },
-  { vsCodeId: "meridian.chat.delegate",         commandName: "chat.delegate"         /* LM tool only — not manifest-declared */                                        },
-  // ── Workflow ──────────────────────────────────────────────────────────────────
-  { vsCodeId: "meridian.workflow.list",         commandName: "workflow.list",        title: "Workflow: List All",             showInPalette: true  },
-  // ── Agent ─────────────────────────────────────────────────────────────────────
-  { vsCodeId: "meridian.agent.list",            commandName: "agent.list",           title: "Agent: List All",                showInPalette: true  },
-  { vsCodeId: "meridian.agent.execute",         commandName: "agent.execute"         /* LM tool only — not manifest-declared */                                        },
-  // ── Skill ─────────────────────────────────────────────────────────────────────
-  { vsCodeId: "meridian.skill.overview",   commandName: "skill.overview",   title: "Skill: Session Overview",    showInPalette: true,  requiresGit: true },
-  { vsCodeId: "meridian.skill.prReady",    commandName: "skill.prReady",    title: "Skill: PR Readiness Check",  showInPalette: true,  requiresGit: true },
-  { vsCodeId: "meridian.skill.preMerge",   commandName: "skill.preMerge",   title: "Skill: Pre-merge Check",     showInPalette: true,  requiresGit: true },
 ];
 
 /**

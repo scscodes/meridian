@@ -46,31 +46,17 @@ export interface Command<P = unknown> {
 // Discriminated union of all commands (extensible per domain)
 export type CommandName =
   | GitCommandName
-  | HygieneCommandName
-  | ChatCommandName
-  | WorkflowCommandName
-  | AgentCommandName
-  | SkillCommandName;
+  | HygieneCommandName;
 
 export type GitCommandName =
   | "git.status"
   | "git.pull"
   | "git.commit"
-  | "git.smartCommit"
-  | "git.analyzeInbound"
   | "git.showAnalytics"
   | "git.exportJson"
   | "git.exportCsv"
-  | "git.generatePR"
-  | "git.reviewPR"
-  | "git.commentPR"
-  | "git.resolveConflicts"
   | "git.sessionBriefing";
 export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics" | "hygiene.impactAnalysis";
-export type ChatCommandName = "chat.context" | "chat.delegate";
-export type WorkflowCommandName = "workflow.list" | "workflow.run";
-export type AgentCommandName = "agent.list" | "agent.execute";
-export type SkillCommandName = "skill.overview" | "skill.prReady" | "skill.preMerge";
 
 // ============================================================================
 // Handler Interface (Aiogram-style Router Pattern)
@@ -223,12 +209,6 @@ export interface WorkspaceScan {
   deadCode: DeadCodeScan;
 }
 
-export interface ChatContext {
-  activeFile?: string;
-  gitBranch?: string;
-  gitStatus?: GitStatus;
-}
-
 // ============================================================================
 // Cross-Cutting Concerns
 // ============================================================================
@@ -254,54 +234,6 @@ export type Middleware = (
 ) => Promise<void>;
 
 // ============================================================================
-// Workflow Types
-// ============================================================================
-
-export interface WorkflowStep {
-  id: string;
-  command: CommandName;
-  params: Record<string, unknown>;
-  onSuccess?: string; // Next step id or "exit"
-  onFailure?: string; // Next step id or "exit"
-  conditions?: WorkflowCondition[];
-  retry?: {
-    maxAttempts: number; // Total attempts (not retries); clamped to min 1
-    delayMs?: number; // Initial delay ms, default 1000
-    backoffMultiplier?: number; // Default 2
-    maxDelayMs?: number; // Cap on backoff, default 5000
-  };
-  timeout?: number; // Per-attempt timeout ms; undefined = no timeout
-}
-
-export interface WorkflowCondition {
-  type: "success" | "failure" | "output" | "variable" | "env"; // "env" kept as alias for "variable"
-  key?: string; // For output/variable conditions
-  value?: unknown;
-  nextStepId?: string; // Branch target when condition matches
-}
-
-export interface WorkflowDefinition {
-  name: string;
-  description?: string;
-  version?: string;
-  steps: WorkflowStep[];
-  triggers?: string[]; // Event names that trigger this workflow
-}
-
-// ============================================================================
-// Agent Types
-// ============================================================================
-
-export interface AgentDefinition {
-  id: string;
-  description?: string;
-  version?: string;
-  capabilities: CommandName[]; // Commands this agent can execute
-  workflowTriggers?: string[]; // Workflows this agent can trigger
-  metadata?: Record<string, unknown>;
-}
-
-// ============================================================================
 // Prose Generation
 // ============================================================================
 
@@ -310,7 +242,7 @@ export interface AgentDefinition {
  * Compatible with generateProse() from infrastructure/prose-generator.
  */
 export type GenerateProseFn = (request: {
-  domain: "hygiene" | "git" | "chat";
+  domain: "hygiene" | "git";
   systemPrompt: string;
   data: Record<string, unknown>;
 }) => Promise<Result<string>>;
@@ -332,29 +264,6 @@ export interface DispatchEvent {
 
 export interface DispatchCompleteEvent extends DispatchEvent {
   result: Result<unknown>;
-}
-
-// LM tool envelope (ADR 010) — stable JSON shape for Copilot tool results
-
-export type LmToolRenderHint =
-  | "status"
-  | "chat_markdown"
-  | "output_channel"
-  | "tree_view"
-  | "webview";
-
-export interface LmToolEnvelope<TData = unknown> {
-  summary: string;
-  data: TData;
-  followups: string[];
-  renderHint: LmToolRenderHint;
-}
-
-export interface LmToolErrorData {
-  code: string;
-  message: string;
-  details?: unknown;
-  context?: string;
 }
 
 // ============================================================================

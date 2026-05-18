@@ -1,7 +1,9 @@
 # ADR 004 — GenerateProseFn Dependency Injection
 
 **Date**: 2026-03-04
-**Status**: Accepted
+**Status**: Accepted (scope narrowed)
+
+> **Revised by [ADR 012](./012-product-reanchor.md) (2026-05-18):** the surviving `GenerateProseFn` consumers are `git.sessionBriefing` and `hygiene.impactAnalysis` (the latter optional — it degrades to the raw analysis when no model is available). All other prose paths (PR generation/review/comment, conflict resolution, smart-commit messages, NL classification) were removed. The injection pattern stands; its scope is now two handlers.
 
 ---
 

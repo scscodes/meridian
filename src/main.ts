@@ -9,24 +9,16 @@ import { Logger } from "./infrastructure/logger";
 import { CommandContext, Command } from "./types";
 import { createGitDomain } from "./domains/git/service";
 import { createHygieneDomain } from "./domains/hygiene/service";
-import { createChatDomain } from "./domains/chat/service";
-import { createWorkflowDomain } from "./domains/workflow/service";
-import { createAgentDomain } from "./domains/agent/service";
-import { createSkillDomain } from "./domains/skill/service";
 import {
   createObservabilityMiddleware,
   createAuditMiddleware,
 } from "./cross-cutting/middleware";
-import { StepRunner } from "./infrastructure/workflow-engine";
 import { createGitProvider } from "./infrastructure/git-provider";
 import { createWorkspaceProvider } from "./infrastructure/workspace-provider";
 import {
   TelemetryTracker,
   ConsoleTelemetrySink,
 } from "./infrastructure/telemetry";
-import { createChatParticipant } from "./ui/chat-participant";
-import { createSmartCommitApprovalUI } from "./ui/smart-commit-quick-pick";
-import { registerMeridianTools } from "./ui/lm-tools";
 import { generateProse } from "./infrastructure/prose-generator";
 import { Config } from "./infrastructure/config";
 import { createRunLog } from "./infrastructure/run-log";
@@ -37,7 +29,6 @@ import { setupStatusBar } from "./presentation/status-bar";
 import { setupFileWatchers } from "./presentation/file-watchers";
 import { setupTreeProviders } from "./presentation/tree-setup";
 import { registerSpecializedCommands } from "./presentation/specialized-commands";
-import { registerDispatchSignaling } from "./presentation/dispatch-signaling";
 import { createWebviewPanels } from "./presentation/webview-setup";
 
 // ============================================================================
@@ -73,7 +64,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-  const extensionPath = context.extensionUri.fsPath;
   const gitProvider = createGitProvider(workspaceRoot);
   const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);
   const runLog = createRunLog(workspaceRoot, logger);
@@ -83,55 +73,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   router.use(createObservabilityMiddleware(logger, telemetry));
   router.use(createAuditMiddleware(logger));
 
-  const dispatchNested = (cmd: Command, ctx: CommandContext) =>
-    router.dispatch(cmd, {
-      ...ctx,
-      runId: undefined,
-      parentRunId: ctx.runId,
-    });
-
-  const stepRunner: StepRunner = async (command: Command, ctx: CommandContext) => {
-    const result = await dispatchNested(command, ctx);
-    if (result.kind === "ok") {
-      return { kind: "ok" as const, value: (result.value as Record<string, unknown>) || {} };
-    }
-    return { kind: "err" as const, error: result.error };
-  };
-
   // ── Domain registration ─────────────────────────────────────────────
-  const smartCommitApprovalUI = createSmartCommitApprovalUI();
   const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse);
   router.registerDomain(createGitDomain(
-    gitProvider, logger, workspaceRoot, smartCommitApprovalUI, generateProse,
+    gitProvider, logger, workspaceRoot, generateProse,
     runLog, () => hygieneDomain.getLastScan()
   ));
   router.registerDomain(hygieneDomain);
-  router.registerDomain(
-    createChatDomain(
-      gitProvider,
-      logger,
-      dispatchNested,
-      generateProse
-    )
-  );
-  router.registerDomain(
-    createWorkflowDomain(logger, stepRunner, workspaceRoot, extensionPath, runLog)
-  );
-  router.registerDomain(
-    createAgentDomain(
-      logger,
-      workspaceRoot,
-      extensionPath,
-      dispatchNested
-    )
-  );
-  router.registerDomain(
-    createSkillDomain(
-      logger,
-      dispatchNested,
-      runLog
-    )
-  );
 
   const validationResult = await router.validateDomains();
   if (validationResult.kind === "err") {
@@ -146,14 +94,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const trees = setupTreeProviders(context, gitProvider, logger, workspaceRoot, dispatch, cmdCtx);
 
-  context.subscriptions.push(
-    ...registerDispatchSignaling(
-      router,
-      { workflowTree: trees.workflowTree, gitTree: trees.gitTree },
-      logger
-    )
-  );
-
   const { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = createWebviewPanels(
     context, router, workspaceRoot, ctxFn, () => config.getPruneConfig()
   );
@@ -162,18 +102,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     outputChannel, analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel,
   });
 
-  registerSpecializedCommands(context, router, outputChannel, ctxFn, trees.workflowTree, trees.hygieneTree, trees.gitTree);
+  registerSpecializedCommands(context, router, outputChannel, ctxFn, trees.hygieneTree);
 
   const statusBar = setupStatusBar(context, gitProvider, () => {
     trees.gitTree.refresh();
     trees.hygieneTree.refresh();
-    trees.workflowTree.refresh();
-    trees.agentTree.refresh();
   });
 
   const startupConfig = vscode.workspace.getConfiguration("meridian.startup");
   const enableFileWatchers = startupConfig.get<boolean>("enableFileWatchers", true);
-  const enableChatSurface = startupConfig.get<boolean>("enableChatSurface", true);
 
   if (!enableFileWatchers) {
     logger.info("Startup: file watchers disabled by config", "activate");
@@ -181,18 +118,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     setupFileWatchers(context, workspaceRoot, {
       gitRefresh: () => trees.gitTree.refresh(),
       hygieneRefresh: () => trees.hygieneTree.refresh(),
-      definitionsRefresh: () => { trees.workflowTree.refresh(); trees.agentTree.refresh(); },
       statusBarUpdate: () => statusBar.update(),
     });
   }
 
-  // ── Chat + LM tools ────────────────────────────────────────────────
-  if (enableChatSurface) {
-    context.subscriptions.push(createChatParticipant(router, ctxFn, logger, trees.workflowTree, trees.gitTree, trees.hygieneTree));
-    context.subscriptions.push(...registerMeridianTools(router, ctxFn, logger));
-  } else {
-    logger.info("Startup: chat participant and LM tools disabled by config", "activate");
-  }
   // ── Finalize ────────────────────────────────────────────────────────
   statusBar.update();
 

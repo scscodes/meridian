@@ -1,6 +1,6 @@
 # Meridian Command Reference
 
-**Meridian** is a VS Code extension that brings domain-driven automation to your development workflow. Built on a composable command architecture, it exposes Git operations, workspace hygiene, workflow orchestration, and AI-powered analysis through commands, sidebar views, and Copilot Chat integration—all backed by explicit error handling and structured logging.
+**Meridian** is a computed-insight instrument panel for your repository. It exposes git analytics, workspace hygiene, change blast-radius, and a session briefing through commands, sidebar views, and webview dashboards — all backed by explicit error handling and structured logging. It does not wrap an LLM around commodity dev actions. (See [ADR 012](./adr/012-product-reanchor.md) for the 2.0 re-anchor.)
 
 This document describes all user-accessible features, organized by domain.
 
@@ -8,7 +8,7 @@ This document describes all user-accessible features, organized by domain.
 
 ## Git Domain
 
-Core version control operations with analytics, smart commits, and PR utilities.
+Version-control state plus computed analytics.
 
 ### **git.status**
 Read-only. Returns current branch name, dirty state (clean/dirty), and counts of staged, unstaged, and untracked files. Use this to monitor local state before operations.
@@ -17,146 +17,87 @@ Read-only. Returns current branch name, dirty state (clean/dirty), and counts of
 Fetch and merge changes from the remote. Pulls the current branch (or a specified branch) with full error reporting for merge conflicts and network issues.
 
 ### **git.commit**
-Create a commit with a provided message. Validates the message and stages all changes if requested, with comprehensive error handling for detached states or dirty index.
-
-### **git.smartCommit**
-Interactive batch-commit workflow that groups unstaged changes, suggests messages via LLM, and presents an approval UI (quick-pick) before committing. Ideal for large changesets that benefit from semantic grouping.
+Create a commit with a provided message. Validates the message, with comprehensive error handling for detached states or a dirty index.
 
 ### **git.showAnalytics**
-Open a full-screen dashboard displaying Git analytics: churn (commits per file), volatility (recent change frequency), authorship (commits per author), commit trends (over time), and top contributors. Includes real-time chart rendering and drill-down capabilities.
+Open a full-screen dashboard displaying Git analytics: churn (commits per file), volatility (recent change frequency), authorship (commits per author), commit trends (over time), and top contributors. Real-time chart rendering with drill-down.
 
 ### **git.exportJson**
-Export the current Git analytics report (churn, volatility, authorship, trends) as JSON for external processing, integration with CI/CD, or long-term archival.
+Export the current Git analytics report (churn, volatility, authorship, trends) as JSON for external processing, CI/CD integration, or archival.
 
 ### **git.exportCsv**
-Export Git analytics to CSV format (one row per file or author, with metrics columns) for spreadsheet analysis or reporting.
-
-### **git.generatePR**
-Analyze the current branch relative to a target branch (default: `main`), then generate a professional PR description. Includes summary, key changes, file breakdown, and risk assessment. Result is copied to clipboard and shown in the Output channel.
-
-### **git.reviewPR**
-Send the current branch diff to an LLM for a structured code review. Returns a verdict (APPROVE, REQUEST_CHANGES, COMMENT), summary, and per-file comments with severity tags. Output is copied to clipboard and displayed in the Output channel.
-
-### **git.commentPR**
-Generate inline PR comments on specific files or lines. Parses the branch diff and uses an LLM to suggest targeted, actionable comments. Results are copied to clipboard and logged to Output.
-
-### **git.resolveConflicts**
-Analyze merge conflicts in the current branch and suggest resolution strategies (ours, theirs, manual with step-by-step guidance) for each conflicted file. Output includes per-file rationale and suggested resolution steps.
+Export Git analytics to CSV (one row per file or author, with metrics columns) for spreadsheet analysis or reporting.
 
 ### **git.sessionBriefing**
-Generate a prose summary of current workspace state for session orientation. Aggregates git working-tree status, recent commits, run-log activity (`recentRuns`), git analytics (`activityWindow`), and hygiene scan state (`hygieneSnapshot`) into a `SessionBriefing` record, then layers AI prose on top. Optional slices degrade gracefully when data is unavailable. Useful for standup notes, context switching, or morning orientation.
+Generate a session-orientation summary. Aggregates git working-tree status, recent commits, run-log activity (`recentRuns`), git analytics (`activityWindow`), and hygiene scan state (`hygieneSnapshot`) into a deterministic `SessionBriefing` record, then layers optional AI prose on top. Optional slices degrade gracefully when data is unavailable; the prose layer degrades to the raw aggregate when no language model is available. Useful for standup notes, context switching, or morning orientation.
 
 ---
 
 ## Hygiene Domain
 
-Workspace analysis and cleanup: identify dead code, large files, and stale logs.
+Workspace analysis and cleanup: dead code, large files, stale logs, change impact.
 
 ### **hygiene.scan**
-Scan the workspace for cleanup candidates in several categories:
-- **Dead files**: Unused imports, orphaned modules (via TypeScript Compiler API)
-- **Large files**: Disk space issues, above configured threshold
-- **Log files**: Stale `.log` files above age and size thresholds
-- **Markdown files**: Documentation artifacts for potential review or archival
+Scan the workspace for cleanup candidates:
+- **Dead files**: unused imports, orphaned modules (via the TypeScript Compiler API)
+- **Dead code**: unused exports, locals, and parameters
+- **Large files**: above the configured size threshold
+- **Log files**: stale `.log` files above age and size thresholds
+- **Markdown files**: documentation artifacts for review or archival
 
-Respects `.gitignore` and `.meridianignore` patterns. Returns a categorized list of candidates with file paths, sizes, ages, and reasons for inclusion.
+Respects `.gitignore` and `.meridianignore` patterns. Returns a categorized list with file paths, sizes, ages, and reasons.
 
 ### **hygiene.cleanup**
-Delete specified files with optional dry-run mode. Ideal for batch removal of candidates surfaced by `hygiene.scan`. Respects user confirmation (warning dialog) before deletion.
+Delete specified files with optional dry-run mode. Batch removal of candidates surfaced by `hygiene.scan`. Requires user confirmation before deletion.
 
 ### **hygiene.impactAnalysis**
-Trace the blast radius of a file or function change by analyzing imports, call sites, and test coverage via the TypeScript Compiler API. Returns a prose summary (via LLM) describing which files depend on the target, which tests exercise it, and the scope of impact. Helps assess the risk of refactoring or removing code.
+Trace the blast radius of a file or function change by analyzing imports, call sites, and test coverage via the TypeScript Compiler API. Returns importers, call sites, dependent file count, test coverage, and an optional prose summary (when a language model is available). Helps assess refactor/removal risk.
 
 ### **hygiene.showAnalytics**
-Open a dashboard displaying Hygiene analytics: prune candidates over time (trend chart), file-type breakdown (pie chart), disk impact (total and per-category), and age/size distributions. Configurable thresholds for what counts as "large" or "stale" via workspace settings.
+Open a dashboard displaying Hygiene analytics: prune candidates over time, file-type breakdown, disk impact (total and per-category), and age/size distributions. Configurable thresholds via workspace settings.
 
----
-
-## Workflow Domain
-
-Compose and execute automation workflows from JSON definitions.
-
-### **workflow.list**
-List all available workflows discovered from `.vscode/workflows/*.json` (and bundled assets). Returns workflow name, description, version, and step count for each.
-
-### **workflow.run**
-Execute a named workflow by orchestrating its steps in sequence. Steps can be conditional, share variables, and dispatch Meridian commands. Use this to automate repetitive tasks (e.g., "prepare PR" = status → pull → smartCommit → generatePR).
-
-After a run completes, the workflow item in the Workflow View becomes expandable — click to reveal per-step pass/fail results with inline error details. When triggered via `@meridian`, the chat response includes a step-by-step summary.
-
----
-
-## Agent Domain
-
-Define and execute autonomous agents that compose commands and workflows.
-
-### **agent.list**
-List all available agents discovered from `.vscode/agents/*.json`. Returns agent ID, description, version, declared capabilities (which commands they can run), and workflow triggers they respond to.
-
-### **agent.execute**
-Run an agent by specifying its ID, target command or workflow, and optional parameters. The agent validates it has the requested capability, then executes the target. Returns a structured execution report: success/failure, execution logs, timing, and output. Use this to automate multi-step tasks via reusable automation profiles.
-
----
-
-## Chat Domain
-
-Copilot Chat integration and context gathering.
-
-### **chat.context**
-Gather workspace context for Copilot: active file path, current Git branch, Git status (staged/unstaged/untracked counts). Returns a structured object. Useful as a preamble before delegating complex tasks to Copilot Chat.
-
-### **chat.delegate**
-Classify a free-form task description using an LLM and dispatch it to the matching Meridian command. This is the single classification authority — the `@meridian` chat participant, LM tools, and workflows all route through it rather than maintaining their own classifiers.
-
-### **@meridian chat participant**
-Use `@meridian` in Copilot Chat to interact with Meridian. Natural language is the primary interface — describe what you want and Meridian routes it via LLM intent classification (e.g., "show uncommitted changes", "what's the blast radius of createStatusHandler?", "run the morning sync workflow"). Slash commands (`/status`, `/scan`, `/workflows`, `/agents`, `/analytics`, `/context`, `/pr`, `/review`, `/briefing`, `/conflicts`, `/impact`, `/overview`, `/prready`, `/premerge`, `/commit`, `/inbound`, `/cleanup`) are accelerator shortcuts for common operations and mirror the set declared in `package.json`.
-
-### **Meridian LM Tools**
-All major commands across Git, Hygiene, Workflow, and Agent domains are exposed as LM tools, allowing Copilot to autonomously discover and invoke Meridian features during agentic workflows — including export commands (`git.exportJson`, `git.exportCsv`).
+### File actions (sidebar / explorer context)
+- **Delete File** — remove a file flagged by the last scan (confirmation required).
+- **Ignore File** — append the file's pattern to `.meridianignore`.
 
 ---
 
 ## Sidebar Views & UI
 
 ### **Git View** (`meridian.git.view`)
-Browse current branch, dirty state, and recent commits. Right-click to pull, commit, or run Smart Commit. Inline action buttons for common operations.
+Browse current branch, dirty state, change groups (staged/unstaged/untracked, expandable to files), and recent commits. Inline action to open the Git Analytics report.
 
 ### **Hygiene View** (`meridian.hygiene.view`)
-Browse hygiene scan results (dead files, large files, logs, markdown). Inline actions to delete, ignore, or request AI review of markdown files.
-
-### **Workflow View** (`meridian.workflow.view`)
-Browse available workflows with descriptions and step counts. Click to run; inline status indicators show last run result and execution time. After a run, expand the workflow item to see per-step pass/fail with `pass`/`error` icons and inline error messages. Stale results are cleared automatically when a re-run starts.
-
-### **Agent View** (`meridian.agent.view`)
-Browse available agents with descriptions and capabilities. Click to execute with modal parameter selection.
+Browse hygiene scan results (dead files, dead code, large files, logs, markdown) and the latest impact-analysis result. Inline actions to delete or ignore flagged files.
 
 ### **Status Bar**
-Real-time Git status indicator (branch, dirty state, change counts). Click to open Quick Pick with top actions (Smart Commit, Hygiene Scan, Analytics, Refresh).
+Real-time Git status indicator (branch, dirty state, change counts). Click to open a Quick Pick with top actions (Session Briefing, Hygiene Scan, Impact Analysis, Git/Hygiene Analytics, Refresh All).
 
 ---
 
 ## Configuration
 
-All features respect workspace settings under the `meridian.*` namespace:
+All features respect workspace settings under the `meridian.*` namespace, including:
 
 - `meridian.git.autofetch` — Auto-fetch on open (boolean, default: false)
 - `meridian.hygiene.enabled` — Enable scans and analytics (boolean, default: true)
-- `meridian.hygiene.prune.minAgeDays` — Minimum file age (days) before a file is eligible as a prune candidate (number, default: 30)
-- `meridian.hygiene.prune.maxSizeMB` — Files larger than this size (MB) are flagged when also older than `minAgeDays` (number, default: 1)
-- `meridian.hygiene.prune.minLineCount` — Files with this many lines or more are flagged when also older than `minAgeDays`. Set to 0 to disable (number, default: 0)
+- `meridian.hygiene.prune.minAgeDays` — Minimum file age (days) before a file is a prune candidate (number, default: 30)
+- `meridian.hygiene.prune.maxSizeMB` — Files larger than this (MB) are flagged when also older than `minAgeDays` (number, default: 1)
+- `meridian.hygiene.prune.minLineCount` — Files with this many lines or more are flagged when also older than `minAgeDays`; 0 disables (number, default: 0)
+- `meridian.sessionBriefing.autoLaunch` — Open a Session Briefing on activation (boolean, default: false)
+- `meridian.startup.enableFileWatchers` — Register file watchers for auto tree/status refresh (boolean, default: true)
 - `meridian.log.level` — Logger verbosity: debug, info, warn, error (default: info)
 
 ---
 
 ## Output & Results
 
-Commands surface results via the surface best matched to their output type (see `docs/adr/006-rendering-surface-decision-matrix.md`):
-- **Tree Panel** — structured step sequences (workflow results with per-step pass/fail), live state during execution
-- **Output Channel** (`Meridian`) — long-form prose (PR descriptions, reviews, briefings, streaming AI reviews)
-- **Webview Panels** — analytics dashboards (Git, Hygiene) with full-screen charts and tables
-- **Chat Stream** — NL-triggered results formatted as markdown in the Copilot Chat panel
-- **Notifications** — success/error toasts; all errors where the output channel contains diagnostic detail include a "Show Output" action button
-- **Clipboard** — selected outputs (PR descriptions, reviews, briefings, impact analysis) auto-copy for pasting
+Commands surface results via the surface best matched to their output type (see [ADR 006](./adr/006-rendering-surface-decision-matrix.md)):
+- **Webview Panels** — analytics dashboards (Git, Hygiene) and the session briefing, with full-screen charts and tables
+- **Tree Panel** — branch state, change groups, scan results, impact-analysis expansion
+- **Output Channel** (`Meridian`) — long-form prose (session briefing, impact summary) and diagnostics
+- **Notifications** — success/error toasts; errors where the output channel holds diagnostic detail include a "Show Output" action button
+- **Clipboard** — selected outputs (session briefing summary, impact analysis) auto-copy for pasting
 
 ---
 
@@ -165,8 +106,5 @@ Commands surface results via the surface best matched to their output type (see 
 Domains, handlers, and middleware are designed for extension:
 - Add custom commands by implementing a new domain and handler
 - Chain middleware for custom auth, rate-limiting, or observability
-- Define custom workflows in `.vscode/workflows/*.json`
-- Create automation agents in `.vscode/agents/*.json` that wrap Meridian capabilities
-- Export LM tools for autonomous Copilot workflows
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for extension points and patterns.
+See the ADRs in [docs/adr/](./adr/) for extension points and patterns.

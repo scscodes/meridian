@@ -1,3 +1,27 @@
+# [2.0.0](https://github.com/scscodes/meridian/compare/v1.8.3...v2.0.0) (2026-05-18)
+
+
+* feat!: re-anchor to computed-insight instrument panel (2.0) ([177399d](https://github.com/scscodes/meridian/commit/177399dbf060479e081004b2a9c6a9f82c917839))
+
+
+### Bug Fixes
+
+* degrade session briefing & impact analysis to deterministic output when no model ([d858d20](https://github.com/scscodes/meridian/commit/d858d20c39399fe9e7f12638ec9981c5385909b7))
+
+
+### BREAKING CHANGES
+
+* Removed commands git.smartCommit, git.generatePR,
+git.reviewPR, git.commentPR, git.resolveConflicts, git.analyzeInbound,
+hygiene.reviewFile, all workflow.* and agent.* commands, all chat.*
+commands; removed the @meridian chat participant and all 21 language
+model tools; removed the Workflows and Agents sidebar views; removed
+config keys meridian.model.chat, meridian.chat.model,
+meridian.chat.contextLines, meridian.startup.enableChatSurface.
+ADR 003, 007, 010 superseded; 004, 006, 008-lifecycle, 009, 011 revised.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
 ## [1.8.3](https://github.com/scscodes/meridian/compare/v1.8.2...v1.8.3) (2026-04-26)
 
 

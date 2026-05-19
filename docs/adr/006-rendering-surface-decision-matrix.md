@@ -21,10 +21,12 @@ Surface choice is determined by **output shape and trigger source**, not by comm
 
 | Output shape | Primary intent | Surface |
 |---|---|---|
-| Structured multi-entity report (analytics, history) | Review / explore | Webview panel |
+| Structured multi-entity report (git analytics, hygiene analytics, session briefing) | Review / explore | Webview panel |
 | Ordered step sequence with per-item pass/fail | Monitor / debug | Tree panel expansion |
-| Long-form prose (session briefing, impact analysis) | Copy / share | Output channel + clipboard |
+| Long-form prose (impact analysis) | Copy / share | Output channel + clipboard |
 | Short scalar / status (git status, scan summary) | Glance | Toast |
+
+Note: session briefing was originally classified as long-form prose. ADRs 011 and 012 promoted it to the product's forward headline rendered as a structured webview panel; the matrix above reflects that current state. Its optional prose `summary` rides inside the panel payload, not the output channel.
 
 ### Rules
 
@@ -35,6 +37,8 @@ Surface choice is determined by **output shape and trigger source**, not by comm
 3. **Tree expansion** is appropriate when the parent entity already exists in the tree and the result is an ordered child sequence (workflow steps, scan files, dead-code issues). The tree provides persistent, navigable state that the output channel cannot.
 
 4. **"Show Output" error button is mandatory** whenever the command's happy path writes to the output channel. If the output channel contains the diagnostic detail, errors must offer to reveal it. Fixed centrally in `command-registry.ts` — not per-command.
+
+5. **Webview panels are their own success feedback — no toast on open.** A specialized presenter case in `result-presenters.ts` must not call `showInformationMessage` after `openPanel`: the panel coming forward *is* the acknowledgement, and a redundant toast is the asymmetry that prompted this rule. Errors during in-panel refresh/filter post a `type:"error"` banner via `BaseWebviewProvider.handleError` and do **not** raise a modal toast; the panel is already focused. Progress notifications during initial compute are governed separately by `PROGRESS_COMMANDS` (membership rule documented in `command-registry.ts`). Enforced by `tests/presenter-parity.test.ts`.
 
 ### Scope
 

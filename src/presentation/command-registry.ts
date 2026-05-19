@@ -10,7 +10,13 @@ import { formatResultMessage } from "../infrastructure/result-handler";
 import { PruneConfig } from "../domains/hygiene/analytics-types";
 import { presentResult, PresenterContext } from "./result-presenters";
 
-/** Commands that show a progress notification during dispatch. */
+/**
+ * Commands that show a progress notification during dispatch.
+ *
+ * Membership rule: compute is reliably >~1s on a real repo.
+ * `hygiene.showAnalytics` is deliberately excluded — it consumes pre-scanned
+ * state and returns near-instantly; a progress toast would just flash.
+ */
 const PROGRESS_COMMANDS: ReadonlySet<CommandName> = new Set([
   "git.sessionBriefing", "git.showAnalytics", "hygiene.scan",
 ] as CommandName[]);

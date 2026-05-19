@@ -11,7 +11,6 @@ import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider, SessionBriefingWebviewProvider } from "../infrastructure/webview-provider";
 import { SessionBriefingReport } from "../domains/git/types";
-import { copyWithPolicy } from "../security/operation-policy";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -52,15 +51,11 @@ export async function presentResult(
     }
 
     case "git.sessionBriefing": {
+      // Panel-opening is the feedback — no success toast, no clipboard prompt.
+      // Parity with git.showAnalytics / hygiene.showAnalytics (ADR 006 Rule 5).
       const report = result.value as SessionBriefingReport;
       await sessionBriefingPanel.openPanel(report);
       outputChannel.appendLine(`[${ts()}] Session briefing panel opened`);
-      const copied = await copyWithPolicy(report.summary, "Session briefing summary");
-      vscode.window.showInformationMessage(
-        copied
-          ? "Session briefing opened — summary copied to clipboard"
-          : "Session briefing opened"
-      );
       return true;
     }
 

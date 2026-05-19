@@ -118,10 +118,12 @@ export abstract class BaseWebviewProvider<TReport> {
   }
 
   protected handleError(label: string, e: unknown): void {
+    // In-panel banner is the canonical surface for refresh/filter failures —
+    // contextual, dismissible, and consistent across all three webviews.
+    // No modal toast: panel is already focused; double-notify is noise.
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[Meridian] ${label}:`, e);
     this.panel?.webview.postMessage({ type: "error", payload: msg });
-    vscode.window.showErrorMessage(`${label}: ${msg}`);
   }
 
   private buildHtml(webview: vscode.Webview, uiDirUri: vscode.Uri): string {

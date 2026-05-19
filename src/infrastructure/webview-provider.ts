@@ -388,6 +388,22 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
       }
     }
 
+    const pr = report.pendingChangeRisk;
+    if (pr && pr.files.length > 0) {
+      lines.push("");
+      lines.push("Pending-Change Risk");
+      lines.push(`Total Changed,${pr.totalChanged}`);
+      lines.push(`High-Risk,${pr.hotspotCount}`);
+      lines.push(`Capped,${pr.capped}`);
+      lines.push("");
+      lines.push("Path,Status,Churn,Volatility,Risk");
+      for (const f of pr.files) {
+        lines.push(
+          `${csvStr(f.path)},${f.status},${f.churn ?? ""},${f.volatility ?? ""},${f.risk}`
+        );
+      }
+    }
+
     return lines.join("\n");
   }
 

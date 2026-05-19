@@ -8,7 +8,7 @@ import { aggregateSessionBriefing, SessionBriefingSources } from '../src/domains
 import { success, failure, RunEventV1, RUN_EVENT_SCHEMA_VERSION } from '../src/types';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
 import type { GitAnalyticsReport } from '../src/domains/git/analytics-types';
-import { SESSION_BRIEFING } from '../src/constants';
+import { SESSION_BRIEFING, PENDING_RISK } from '../src/constants';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -402,5 +402,134 @@ describe('aggregateSessionBriefing', () => {
     }
     // analytics was started (hoisted) but did not affect the failed result
     expect(analyzer.analyze as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+  });
+
+  // ── 17. Pending-change risk — dirty-set × analytics risk join ────────────
+  const fm = (
+    path: string,
+    risk: 'high' | 'medium' | 'low',
+    volatility: number,
+    commitCount = 5
+  ) => ({
+    path, commitCount, insertions: 0, deletions: 0, volatility,
+    authors: [] as string[], lastModified: new Date(), risk,
+  });
+
+  it('joins dirty files to analytics risk; annotates new (A) vs cold (M/D) when absent', async () => {
+    git.setAllChanges([
+      createMockChange({ path: 'src/hot.ts', status: 'M' }),
+      createMockChange({ path: 'src/brand-new.ts', status: 'A' }),
+      createMockChange({ path: 'src/quiet.ts', status: 'M' }),
+    ]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({ files: [fm('src/hot.ts', 'high', 8.2, 40)] }),
+      })
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const p = result.value.pendingChangeRisk!;
+    expect(p.totalChanged).toBe(3);
+    expect(p.hotspotCount).toBe(1);
+    const byPath = Object.fromEntries(p.files.map((f) => [f.path, f]));
+    expect(byPath['src/hot.ts']).toEqual({ path: 'src/hot.ts', status: 'M', churn: 40, volatility: 8.2, risk: 'high' });
+    expect(byPath['src/brand-new.ts']).toEqual({ path: 'src/brand-new.ts', status: 'A', churn: null, volatility: null, risk: 'new' });
+    expect(byPath['src/quiet.ts']).toEqual({ path: 'src/quiet.ts', status: 'M', churn: null, volatility: null, risk: 'cold' });
+  });
+
+  it('rename-normalizes the dirty path before joining to analytics', async () => {
+    git.setAllChanges([createMockChange({ path: 'src/{old.ts => renamed.ts}', status: 'R' })]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({ files: [fm('src/renamed.ts', 'medium', 4, 12)] }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const p = result.value.pendingChangeRisk!;
+    expect(p.files).toEqual([
+      { path: 'src/renamed.ts', status: 'R', churn: 12, volatility: 4, risk: 'medium' },
+    ]);
+  });
+
+  it('dedupes the same normalized path appearing staged and unstaged', async () => {
+    git.setAllChanges([
+      createMockChange({ path: 'src/dup.ts', status: 'M' }),
+      createMockChange({ path: 'src/dup.ts', status: 'M' }),
+    ]);
+    const result = await aggregateSessionBriefing(makeSources(git, logger, runLog));
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const p = result.value.pendingChangeRisk!;
+    expect(p.totalChanged).toBe(1);
+    expect(p.files).toHaveLength(1);
+  });
+
+  it('sorts risk→volatility→path desc deterministically', async () => {
+    git.setAllChanges([
+      createMockChange({ path: 'src/b-med.ts', status: 'M' }),
+      createMockChange({ path: 'src/a-med.ts', status: 'M' }),
+      createMockChange({ path: 'src/hi.ts', status: 'M' }),
+      createMockChange({ path: 'src/lo.ts', status: 'M' }),
+    ]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          files: [
+            fm('src/b-med.ts', 'medium', 3),
+            fm('src/a-med.ts', 'medium', 3),
+            fm('src/hi.ts', 'high', 1),
+            fm('src/lo.ts', 'low', 9),
+          ],
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pendingChangeRisk!.files.map((f) => f.path)).toEqual([
+      'src/hi.ts', 'src/a-med.ts', 'src/b-med.ts', 'src/lo.ts',
+    ]);
+  });
+
+  it('caps the table at PENDING_RISK.MAX_FILES but aggregates from the full pre-cap set', async () => {
+    const n = PENDING_RISK.MAX_FILES + 2;
+    git.setAllChanges(Array.from({ length: n }, (_, i) =>
+      createMockChange({ path: `src/h${String(i).padStart(2, '0')}.ts`, status: 'M' })));
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          files: Array.from({ length: n }, (_, i) =>
+            fm(`src/h${String(i).padStart(2, '0')}.ts`, 'high', n - i)),
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const p = result.value.pendingChangeRisk!;
+    expect(p.totalChanged).toBe(n);
+    expect(p.hotspotCount).toBe(n);
+    expect(p.capped).toBe(true);
+    expect(p.files).toHaveLength(PENDING_RISK.MAX_FILES);
+  });
+
+  it('raises a flag at PENDING_RISK.HOTSPOT_FLAG_THRESHOLD high-risk files', async () => {
+    const n = PENDING_RISK.HOTSPOT_FLAG_THRESHOLD;
+    git.setAllChanges(Array.from({ length: n }, (_, i) =>
+      createMockChange({ path: `src/x${i}.ts`, status: 'M' })));
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          files: Array.from({ length: n }, (_, i) => fm(`src/x${i}.ts`, 'high', 5)),
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.flags).toContain(`Modifying ${n} high-risk files`);
+  });
+
+  it('omits pendingChangeRisk when analytics is unavailable (fail-soft)', async () => {
+    git.setAllChanges([createMockChange({ path: 'src/a.ts', status: 'M' })]);
+    const brokenAnalyzer = { analyze: vi.fn().mockRejectedValue(new Error('no repo')) } as unknown as GitAnalyzer;
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { gitAnalyzer: brokenAnalyzer })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pendingChangeRisk).toBeUndefined();
   });
 });

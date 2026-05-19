@@ -72,6 +72,23 @@ function deterministicSummary(agg: SessionBriefing): string {
     }
   }
 
+  if (agg.pendingChangeRisk && agg.pendingChangeRisk.totalChanged > 0) {
+    const p = agg.pendingChangeRisk;
+    lines.push(
+      `Pending-change risk: ${p.totalChanged} changed file${p.totalChanged === 1 ? "" : "s"}, ` +
+        `${p.hotspotCount} high-risk.`
+    );
+    const hot = p.files.filter((f) => f.risk === "high");
+    if (hot.length > 0) {
+      lines.push("High-risk:");
+      for (const f of hot) {
+        lines.push(
+          `  • ${f.path} (volatility ${f.volatility?.toFixed(1) ?? "—"}, churn ${f.churn ?? "—"})`
+        );
+      }
+    }
+  }
+
   if (agg.flags.length > 0) {
     lines.push("");
     lines.push("Flags:");
@@ -122,6 +139,7 @@ export function createSessionBriefingHandler(
         recentRuns: agg.recentRuns,
         activityWindow: agg.activityWindow,
         hygieneSnapshot: agg.hygieneSnapshot,
+        pendingChangeRisk: agg.pendingChangeRisk,
       },
     });
 

@@ -16,6 +16,7 @@ import {
   TrendData,
 } from "./analytics-types";
 import { ANALYTICS_SETTINGS, CACHE_SETTINGS, WORKSPACE_EXCLUDE_BASE } from "../../constants";
+import { normalizeRenamePath } from "./git-path";
 import { TtlCache } from "../../infrastructure/cache";
 
 /** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
@@ -223,14 +224,7 @@ export class GitAnalyzer {
         const deletions = parseInt(parts[1]) || 0;
         const path = parts[2].trim();
 
-        // Normalize git rename notation to destination path.
-        // Brace form:  "src/{old.ts => new.ts}" → "src/new.ts"
-        // Simple form: "old.ts => new.ts"       → "new.ts"
-        const normalizedPath = path.includes(" => ")
-          ? (path.includes("{")
-              ? path.replace(/\{[^}]* => ([^}]*)\}/g, "$1")
-              : path.split(" => ").pop()!)
-          : path;
+        const normalizedPath = normalizeRenamePath(path);
 
         if (normalizedPath) {
           files.push({ path: normalizedPath, insertions, deletions });

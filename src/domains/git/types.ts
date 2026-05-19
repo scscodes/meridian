@@ -41,6 +41,15 @@ export interface ActivityWindow {
    * SESSION_BRIEFING.CHURN_SAMPLE_LIMIT.
    */
   topChurnFiles?: Array<{ path: string; volatility: number; risk: FileRiskLevel }>;
+  /**
+   * Tail of the commit-frequency series (already computed in the analytics
+   * report, previously discarded) for the briefing sparkline — the shape
+   * behind the trend arrow. Optional and fail-soft like the rest of this
+   * slice; length capped by SESSION_BRIEFING.SPARKLINE_MAX_POINTS. Viz-only:
+   * carried into JSON export and prose data, intentionally not surfaced in the
+   * explicit-field CSV or the deterministic plain-text summary.
+   */
+  commitFrequency?: { labels: string[]; data: number[] };
 }
 
 export interface HygieneSnapshot {

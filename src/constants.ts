@@ -278,6 +278,14 @@ export const SESSION_BRIEFING = {
   /** Max highest-volatility files retained in the ActivityWindow churn sample */
   CHURN_SAMPLE_LIMIT: 5,
 
+  /**
+   * Max commit-frequency series points retained in the ActivityWindow for the
+   * briefing sparkline. 3mo ≈ 13 weekly points; this defensively bounds the
+   * wire shape if the analytics period is widened via options (ADR 011:
+   * additive ActivityWindow fields must be sample-limited via this block).
+   */
+  SPARKLINE_MAX_POINTS: 16,
+
   /** Max dead-code items retained in the HygieneSnapshot sample */
   DEAD_CODE_SAMPLE_LIMIT: 5,
 

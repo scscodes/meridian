@@ -133,6 +133,14 @@ export async function aggregateSessionBriefing(
       topChurnFiles: analyticsReport.churnFiles
         .slice(0, SESSION_BRIEFING.CHURN_SAMPLE_LIMIT)
         .map((f) => ({ path: f.path, volatility: f.volatility, risk: f.risk })),
+      commitFrequency: {
+        labels: analyticsReport.commitFrequency.labels.slice(
+          -SESSION_BRIEFING.SPARKLINE_MAX_POINTS
+        ),
+        data: analyticsReport.commitFrequency.data.slice(
+          -SESSION_BRIEFING.SPARKLINE_MAX_POINTS
+        ),
+      },
     };
   }
 

@@ -12,6 +12,56 @@ let chartInstances = {};
 // Top-5 vivid colors + gray for "Other"
 const DONUT_PALETTE = ["#06b6d4", "#f59e0b", "#8b5cf6", "#10b981", "#ef4444", "#6b7280"];
 
+// Risk Hotspots scatter: cap points (top by volatility) so the chart stays
+// readable/fast on large histories; tooltip carries the full path so the cap
+// never hides a file's identity. Radius bounds in px; area (perceived size)
+// scales linearly with total lines via a sqrt mapping.
+const HOTSPOT_MAX_POINTS = 60;
+const HOTSPOT_MIN_R = 3;
+const HOTSPOT_MAX_R = 22;
+const RISK_COLORS = {
+  high:   { fill: "rgba(239, 68, 68, 0.55)",  border: "#ef4444" },
+  medium: { fill: "rgba(245, 158, 11, 0.55)", border: "#f59e0b" },
+  low:    { fill: "rgba(34, 197, 94, 0.50)",  border: "#22c55e" },
+};
+
+/**
+ * Pure: map FileMetric[] → bubble points, capped to the top
+ * HOTSPOT_MAX_POINTS by volatility. Returns [] for empty/missing input.
+ * Extra fields (path, lines, risk) ride along for the tooltip; Chart.js
+ * reads only {x, y, r}.
+ */
+function hotspotPoints(files) {
+  const list = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (list.length === 0) return [];
+
+  const top = list
+    .slice()
+    .sort((a, b) => (b.volatility || 0) - (a.volatility || 0))
+    .slice(0, HOTSPOT_MAX_POINTS);
+
+  const maxLines = Math.max(
+    1,
+    ...top.map((f) => (f.insertions || 0) + (f.deletions || 0))
+  );
+
+  return top.map((f) => {
+    const lines = (f.insertions || 0) + (f.deletions || 0);
+    const scaled =
+      HOTSPOT_MIN_R +
+      Math.sqrt(lines / maxLines) * (HOTSPOT_MAX_R - HOTSPOT_MIN_R);
+    const r = Math.max(HOTSPOT_MIN_R, Math.min(HOTSPOT_MAX_R, scaled));
+    return {
+      x: f.commitCount || 0,
+      y: f.volatility || 0,
+      r,
+      lines,
+      path: normalizeGitPath(f.path || ""),
+      risk: RISK_COLORS[f.risk] ? f.risk : "low",
+    };
+  });
+}
+
 /**
  * Post a refresh request to the extension with the current period selection.
  */
@@ -72,6 +122,73 @@ function updateSummary() {
 function renderCharts() {
   renderChurnByFileTypeChart();
   renderChurnByDirectoryChart();
+  renderHotspotChart();
+}
+
+/**
+ * Render the Risk Hotspots scatter: one bubble dataset per risk tier so the
+ * legend doubles as a risk filter. x = change frequency, y = volatility,
+ * bubble area ∝ total lines changed.
+ */
+function renderHotspotChart() {
+  const ctx = document.getElementById("hotspotChart");
+  if (!ctx) return;
+
+  if (chartInstances.hotspot) {
+    chartInstances.hotspot.destroy();
+  }
+
+  const points = hotspotPoints(analyticsData.files || []);
+  if (points.length === 0) return;
+
+  const tiers = ["high", "medium", "low"];
+  const datasets = tiers
+    .map((tier) => ({
+      label: tier[0].toUpperCase() + tier.slice(1) + " risk",
+      data: points.filter((p) => p.risk === tier),
+      backgroundColor: RISK_COLORS[tier].fill,
+      borderColor: RISK_COLORS[tier].border,
+      borderWidth: 1,
+    }))
+    .filter((d) => d.data.length > 0);
+
+  chartInstances.hotspot = new Chart(ctx, {
+    type: "bubble",
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: "Commits (change frequency)", color: "#9ca3af" },
+          ticks: { color: "#9ca3af", precision: 0 },
+          grid: { color: "rgba(255,255,255,0.06)" },
+          beginAtZero: true,
+        },
+        y: {
+          title: { display: true, text: "Volatility (lines / commit)", color: "#9ca3af" },
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(255,255,255,0.06)" },
+          beginAtZero: true,
+        },
+      },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: { color: "#e8e8e8", padding: 12, font: { size: 12 }, boxWidth: 12 },
+        },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const p = item.raw;
+              return `${p.path} — ${p.x} commit${p.x === 1 ? "" : "s"}, ` +
+                `volatility ${Number(p.y).toFixed(1)}, ${p.lines} lines`;
+            },
+          },
+        },
+      },
+    },
+  });
 }
 
 /**

@@ -176,6 +176,16 @@ button:hover {
   min-height: 0;
 }
 
+/* Full-width scatter row (Risk Hotspots) — needs more vertical room than
+   the side-by-side donuts. */
+.charts-wide {
+  grid-template-columns: 1fr;
+}
+
+.chart-tall {
+  height: 360px;
+}
+
 /* Churn bar (inline in commits table) */
 
 .churn-bar {

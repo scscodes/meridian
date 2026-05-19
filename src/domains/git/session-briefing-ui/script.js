@@ -91,6 +91,37 @@
     return "▬ stable";
   }
 
+  // Inline-SVG sparkline of the commit-frequency series — the shape behind the
+  // trend arrow. No Chart.js dependency (this webview ships none). Returns ""
+  // for degenerate input (missing, <2 points, or all-zero) so the caller can
+  // hide the block, mirroring the topChurnFiles empty-guard.
+  function sparklineSvg(series) {
+    var data = Array.isArray(series) ? series.map(Number).filter(function (n) {
+      return isFinite(n);
+    }) : [];
+    if (data.length < 2) return "";
+    var max = Math.max.apply(null, data);
+    var min = Math.min.apply(null, data);
+    if (max <= 0) return "";
+
+    var W = 240, H = 44, padY = H * 0.12;
+    var span = max - min;
+    var pts = data.map(function (v, i) {
+      var x = (i / (data.length - 1)) * W;
+      var y = span === 0
+        ? H / 2
+        : H - padY - ((v - min) / span) * (H - 2 * padY);
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    var d = "M" + pts.join(" L");
+
+    return '<svg class="sparkline" viewBox="0 0 ' + W + ' ' + H +
+      '" preserveAspectRatio="none" role="img" aria-label="Commit frequency trend">' +
+      '<path d="' + d + '" fill="none" stroke="#06b6d4" stroke-width="1.5" ' +
+      'vector-effect="non-scaling-stroke" stroke-linejoin="round" ' +
+      'stroke-linecap="round" /></svg>';
+  }
+
   function renderActivity(w) {
     var section = document.getElementById("activitySection");
     if (!w) {
@@ -115,6 +146,12 @@
       cards.push(metricCard("Volatility", trendLabel(w.trends.volatilityDirection)));
     }
     document.getElementById("activityMetrics").innerHTML = cards.join("");
+
+    var sb = document.getElementById("sparklineBlock");
+    var spark = sparklineSvg(w.commitFrequency && w.commitFrequency.data);
+    sb.innerHTML = spark
+      ? '<h3 class="sub">Commit Frequency</h3>' + spark
+      : "";
 
     var churn = w.topChurnFiles || [];
     var cb = document.getElementById("churnBlock");

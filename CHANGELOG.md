@@ -1,3 +1,11 @@
+# [2.3.0](https://github.com/scscodes/meridian/compare/v2.2.0...v2.3.0) (2026-05-19)
+
+
+### Features
+
+* **ui:** normalize webview-report popup parity (ADR 006 Rule 5) ([91de6cb](https://github.com/scscodes/meridian/commit/91de6cbbf94c10cc226b6d007d53d1066fa99da5))
+* **ui:** unify webview-report labels via REPORT_LABELS single-source ([bced871](https://github.com/scscodes/meridian/commit/bced871e498df8a57715290da53752e77e59f2a9))
+
 # [2.2.0](https://github.com/scscodes/meridian/compare/v2.1.0...v2.2.0) (2026-05-19)
 
 

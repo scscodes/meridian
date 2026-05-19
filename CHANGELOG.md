@@ -1,3 +1,13 @@
+# [2.1.0](https://github.com/scscodes/meridian/compare/v2.0.1...v2.1.0) (2026-05-19)
+
+
+### Features
+
+* normalize Reports sidebar section ([1cf55c1](https://github.com/scscodes/meridian/commit/1cf55c16d337cc9f2d94cca300b829ad10006b70))
+* promote webview reports to Panel Reports sidebar view ([5da796d](https://github.com/scscodes/meridian/commit/5da796d8289cfcbe5cd117794389d45aa8129aa4))
+* **session-briefing:** retain high-ROI analytics/hygiene insight; hoist peripheral fetches; extract constants ([f824c6c](https://github.com/scscodes/meridian/commit/f824c6c04b9b02921a527b91754996b09d7f61bb)), closes [hi#ROI](https://github.com/hi/issues/ROI) [#4](https://github.com/scscodes/meridian/issues/4)
+* surface retained insight in briefing UI+CSV ([1d3232a](https://github.com/scscodes/meridian/commit/1d3232ae531a31e348462dbac570e49e816c7138))
+
 ## [2.0.1](https://github.com/scscodes/meridian/compare/v2.0.0...v2.0.1) (2026-05-18)
 
 

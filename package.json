@@ -46,7 +46,7 @@
       "meridian-explorer": [
         {
           "id": "meridian.reports.view",
-          "name": "Panel Reports"
+          "name": "Reports"
         },
         {
           "id": "meridian.git.view",
@@ -97,12 +97,14 @@
       {
         "command": "meridian.git.refresh",
         "title": "Git: Refresh View",
-        "category": "Meridian"
+        "category": "Meridian",
+        "icon": "$(refresh)"
       },
       {
         "command": "meridian.hygiene.refresh",
         "title": "Hygiene: Refresh View",
-        "category": "Meridian"
+        "category": "Meridian",
+        "icon": "$(refresh)"
       },
       {
         "command": "meridian.reports.open",

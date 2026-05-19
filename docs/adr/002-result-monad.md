@@ -7,7 +7,9 @@
 
 ## Context
 
-Domain handlers are async, deeply nested, and invoked from multiple surfaces: chat participant, command palette, LM tools, and keybindings. Exceptions thrown inside handlers can be swallowed silently by VS Code's event loop or by call sites that omit try/catch. Silent failures produce no error telemetry and no user feedback.
+Domain handlers are async, deeply nested, and invoked from multiple surfaces: the command palette, tree views/panels, keybindings, and the background scheduler. Exceptions thrown inside handlers can be swallowed silently by VS Code's event loop or by call sites that omit try/catch. Silent failures produce no error telemetry and no user feedback.
+
+> *Surface list updated for 2.0 — chat participant and LM tools were removed ([ADR 012](./012-product-reanchor.md)). The Result-monad decision is independent of which surfaces invoke handlers; this is an example-list correction only, the decision stands unchanged.*
 
 ---
 

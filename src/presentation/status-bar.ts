@@ -4,6 +4,7 @@
 
 import * as vscode from "vscode";
 import { GitProvider } from "../types";
+import { REPORT_LABELS } from "../report-labels";
 
 export interface StatusBarHandle {
   update: () => Promise<void>;
@@ -59,12 +60,12 @@ export function setupStatusBar(
 
       const pick = await vscode.window.showQuickPick<StatusBarQuickPickItem>(
         [
-          { label: "$(book) Session Briefing",           command: "meridian.git.sessionBriefing" },
+          { label: `$(book) ${REPORT_LABELS.sessionBriefing}`,           command: "meridian.git.sessionBriefing" },
           { label: "$(search) Hygiene Scan",             command: "meridian.hygiene.scan" },
           { label: "$(microscope) Impact Analysis",      command: "meridian.hygiene.impactAnalysis" },
           { label: "", kind: vscode.QuickPickItemKind.Separator },
-          { label: "$(graph) Git Analytics",             command: "meridian.git.showAnalytics" },
-          { label: "$(graph) Hygiene Analytics",         command: "meridian.hygiene.showAnalytics" },
+          { label: `$(graph) ${REPORT_LABELS.gitAnalytics}`,             command: "meridian.git.showAnalytics" },
+          { label: `$(graph) ${REPORT_LABELS.hygieneAnalytics}`,         command: "meridian.hygiene.showAnalytics" },
           { label: "", kind: vscode.QuickPickItemKind.Separator },
           { label: "$(refresh) Refresh All Views",       command: "meridian.refreshAll" },
         ],

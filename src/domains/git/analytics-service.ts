@@ -16,6 +16,7 @@ import {
   TrendData,
 } from "./analytics-types";
 import { ANALYTICS_SETTINGS, CACHE_SETTINGS, WORKSPACE_EXCLUDE_BASE } from "../../constants";
+import { REPORT_LABELS, reportCsvHeader } from "../../report-labels";
 import { normalizeRenamePath } from "./git-path";
 import { TtlCache } from "../../infrastructure/cache";
 
@@ -523,7 +524,7 @@ export function gitReportToCsv(report: GitAnalyticsReport): string {
 
   const lines: string[] = [];
 
-  lines.push("Git Analytics Report");
+  lines.push(reportCsvHeader(REPORT_LABELS.gitAnalytics));
   lines.push(`Period,${report.period}`);
   lines.push(`Generated,${report.generatedAt.toISOString()}`);
   lines.push("");

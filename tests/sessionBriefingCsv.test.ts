@@ -64,6 +64,7 @@ describe("SessionBriefingWebviewProvider.reportToCsv", () => {
 
     const csv = (makeProvider() as unknown as { reportToCsv(r: SessionBriefingReport): string }).reportToCsv(report);
 
+    expect(csv.startsWith("Session Briefing Report\n")).toBe(true);
     expect(csv).toContain("\nActivity\n");
     expect(csv).toContain("Commit Trend,up");
     expect(csv).toContain("Commit Confidence,0.75");

@@ -9,16 +9,23 @@ import { CommandName, Command, CommandContext } from "../types";
 import { formatResultMessage } from "../infrastructure/result-handler";
 import { PruneConfig } from "../domains/hygiene/analytics-types";
 import { presentResult, PresenterContext } from "./result-presenters";
+import { REPORT_LABELS } from "../report-labels";
 
-/** Commands that show a progress notification during dispatch. */
+/**
+ * Commands that show a progress notification during dispatch.
+ *
+ * Membership rule: compute is reliably >~1s on a real repo.
+ * `hygiene.showAnalytics` is deliberately excluded — it consumes pre-scanned
+ * state and returns near-instantly; a progress toast would just flash.
+ */
 const PROGRESS_COMMANDS: ReadonlySet<CommandName> = new Set([
   "git.sessionBriefing", "git.showAnalytics", "hygiene.scan",
 ] as CommandName[]);
 
 const PROGRESS_TITLES: Partial<Record<CommandName, string>> = {
-  "git.sessionBriefing": "Generating session briefing...",
-  "git.showAnalytics": "Loading git analytics...",
-  "hygiene.scan": "Scanning workspace...",
+  "git.sessionBriefing": `Generating ${REPORT_LABELS.sessionBriefing}…`,
+  "git.showAnalytics": `Loading ${REPORT_LABELS.gitAnalytics}…`,
+  "hygiene.scan": "Scanning workspace…",
 };
 
 /**
@@ -48,14 +55,14 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   { vsCodeId: "meridian.git.status",            commandName: "git.status",           title: "Git: Show Status",               showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.pull",              commandName: "git.pull",             title: "Git: Pull",                      showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.commit",            commandName: "git.commit",           title: "Git: Commit",                    showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.showAnalytics",     commandName: "git.showAnalytics",    title: "Git: Show Analytics",            showInPalette: true,  requiresGit: true,  icon: "$(graph)" },
+  { vsCodeId: "meridian.git.showAnalytics",     commandName: "git.showAnalytics",    title: "Git Analytics",                  showInPalette: true,  requiresGit: true,  icon: "$(graph)" },
   { vsCodeId: "meridian.git.exportJson",        commandName: "git.exportJson",       title: "Git: Export Analytics JSON",     showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.exportCsv",         commandName: "git.exportCsv",        title: "Git: Export Analytics CSV",      showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Git: Session Briefing",          showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
+  { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Session Briefing",               showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
   // ── Hygiene ──────────────────────────────────────────────────────────────────
   { vsCodeId: "meridian.hygiene.scan",          commandName: "hygiene.scan",         title: "Hygiene: Scan Workspace",        showInPalette: true  },
   { vsCodeId: "meridian.hygiene.cleanup",       commandName: "hygiene.cleanup",      title: "Hygiene: Cleanup",               showInPalette: true  },
-  { vsCodeId: "meridian.hygiene.showAnalytics", commandName: "hygiene.showAnalytics",title: "Hygiene: Show Analytics",        showInPalette: true,                     icon: "$(graph)" },
+  { vsCodeId: "meridian.hygiene.showAnalytics", commandName: "hygiene.showAnalytics",title: "Hygiene Analytics",              showInPalette: true,                     icon: "$(graph)" },
   // hygiene.impactAnalysis — dedicated registration per ADR 005 (active-file fallback + function name prompt)
 ];
 

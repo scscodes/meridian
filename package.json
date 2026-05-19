@@ -120,7 +120,7 @@
       },
       {
         "command": "meridian.git.showAnalytics",
-        "title": "Git: Show Analytics",
+        "title": "Git Analytics",
         "icon": "$(graph)",
         "category": "Meridian"
       },
@@ -136,7 +136,7 @@
       },
       {
         "command": "meridian.hygiene.showAnalytics",
-        "title": "Hygiene: Show Analytics",
+        "title": "Hygiene Analytics",
         "icon": "$(graph)",
         "category": "Meridian"
       },
@@ -147,7 +147,7 @@
       },
       {
         "command": "meridian.git.sessionBriefing",
-        "title": "Git: Session Briefing",
+        "title": "Session Briefing",
         "icon": "$(notebook)",
         "category": "Meridian"
       },

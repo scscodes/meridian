@@ -11,7 +11,7 @@ import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider, SessionBriefingWebviewProvider } from "../infrastructure/webview-provider";
 import { SessionBriefingReport } from "../domains/git/types";
-import { copyWithPolicy } from "../security/operation-policy";
+import { REPORT_LABELS } from "../report-labels";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -41,26 +41,22 @@ export async function presentResult(
   switch (commandName) {
     case "git.showAnalytics": {
       await analyticsPanel.openPanel(result.value as GitAnalyticsReport);
-      outputChannel.appendLine(`[${ts()}] Analytics panel opened`);
+      outputChannel.appendLine(`[${ts()}] ${REPORT_LABELS.gitAnalytics} panel opened`);
       return true;
     }
 
     case "hygiene.showAnalytics": {
       await hygieneAnalyticsPanel.openPanel(result.value as HygieneAnalyticsReport);
-      outputChannel.appendLine(`[${ts()}] Hygiene analytics panel opened`);
+      outputChannel.appendLine(`[${ts()}] ${REPORT_LABELS.hygieneAnalytics} panel opened`);
       return true;
     }
 
     case "git.sessionBriefing": {
+      // Panel-opening is the feedback — no success toast, no clipboard prompt.
+      // Parity with git.showAnalytics / hygiene.showAnalytics (ADR 006 Rule 5).
       const report = result.value as SessionBriefingReport;
       await sessionBriefingPanel.openPanel(report);
-      outputChannel.appendLine(`[${ts()}] Session briefing panel opened`);
-      const copied = await copyWithPolicy(report.summary, "Session briefing summary");
-      vscode.window.showInformationMessage(
-        copied
-          ? "Session briefing opened — summary copied to clipboard"
-          : "Session briefing opened"
-      );
+      outputChannel.appendLine(`[${ts()}] ${REPORT_LABELS.sessionBriefing} panel opened`);
       return true;
     }
 

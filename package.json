@@ -45,6 +45,10 @@
     "views": {
       "meridian-explorer": [
         {
+          "id": "meridian.reports.view",
+          "name": "Reports"
+        },
+        {
           "id": "meridian.git.view",
           "name": "Git"
         },
@@ -93,11 +97,25 @@
       {
         "command": "meridian.git.refresh",
         "title": "Git: Refresh View",
-        "category": "Meridian"
+        "category": "Meridian",
+        "icon": "$(refresh)"
       },
       {
         "command": "meridian.hygiene.refresh",
         "title": "Hygiene: Refresh View",
+        "category": "Meridian",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "meridian.reports.open",
+        "title": "Meridian: View Report",
+        "icon": "$(open-preview)",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.reports.refresh",
+        "title": "Meridian: Refresh Report",
+        "icon": "$(refresh)",
         "category": "Meridian"
       },
       {
@@ -403,21 +421,6 @@
           "command": "meridian.hygiene.refresh",
           "when": "view == meridian.hygiene.view",
           "group": "navigation"
-        },
-        {
-          "command": "meridian.git.showAnalytics",
-          "when": "view == meridian.git.view",
-          "group": "navigation"
-        },
-        {
-          "command": "meridian.hygiene.showAnalytics",
-          "when": "view == meridian.hygiene.view",
-          "group": "navigation"
-        },
-        {
-          "command": "meridian.git.sessionBriefing",
-          "when": "view == meridian.git.view",
-          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -444,9 +447,14 @@
       ],
       "view/item/inline": [
         {
-          "command": "meridian.git.showAnalytics",
-          "when": "view == meridian.git.view && viewItem == branch",
-          "group": "inline"
+          "command": "meridian.reports.open",
+          "when": "view == meridian.reports.view && viewItem == report",
+          "group": "inline@1"
+        },
+        {
+          "command": "meridian.reports.refresh",
+          "when": "view == meridian.reports.view && viewItem == report",
+          "group": "inline@2"
         }
       ]
     }

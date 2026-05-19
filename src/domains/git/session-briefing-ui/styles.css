@@ -317,9 +317,41 @@ tbody tr:hover {
   opacity: 0.85;
 }
 
+/* Activity & Hygiene metrics + risk badges */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.metrics .card .value {
+  font-size: 20px;
+}
+
+h3.sub {
+  margin: 6px 0 8px;
+  opacity: 0.55;
+}
+
+.risk {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.risk-high { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.risk-medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.risk-low { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+
 /* Responsive */
 
 @media (max-width: 700px) {
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .metrics { grid-template-columns: repeat(2, 1fr); }
   .header-row { flex-direction: column; align-items: flex-start; gap: 8px; }
 }

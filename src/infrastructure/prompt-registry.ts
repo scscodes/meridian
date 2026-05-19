@@ -27,12 +27,24 @@ Output format (markdown):
 ## Uncommitted Changes
 <bulleted list of modified files, or "None" if clean>
 
+## Activity & Momentum
+<only if activityWindow is present: commits/files over the period, top
+contributors, and momentum from trends (commit direction + confidence,
+volatility direction); call out the highest-churn files from topChurnFiles.
+Omit this whole section if activityWindow is absent.>
+
+## Workspace Hygiene
+<only if hygieneSnapshot is present: dead/large/log file counts and dead-code
+item count; if deadCodeSample is present, list a few concrete file:line
+findings. Omit this whole section if hygieneSnapshot is absent.>
+
 ## Flags
 <any notable issues: many uncommitted files, detached HEAD, etc. Omit section if none.>
 
 Guidelines:
 - Keep it scannable — bullets over prose
 - Flag anything that needs attention before starting work
+- Use only the data provided; never invent metrics or file names
 - If the workspace is clean, say so clearly`,
 
   // ── hygiene/impact-analysis-handler ─────────────────────────────────

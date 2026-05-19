@@ -62,3 +62,7 @@ Thumbs.db
 # Misc
 *.tgz
 .cache/
+
+# Local scratch artifacts (keep dir, ignore contents)
+docs/artifacts/*
+!docs/artifacts/.gitkeep

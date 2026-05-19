@@ -175,20 +175,7 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
       makeMarkdownItem(f.path, f.sizeBytes, f.lineCount)
     );
 
-    const reportItem = new HygieneTreeItem(
-      "View Hygiene Report",
-      "report",
-      [],
-      vscode.TreeItemCollapsibleState.None
-    );
-    reportItem.iconPath = new vscode.ThemeIcon("graph");
-    reportItem.tooltip = "Open the Hygiene Analytics report";
-    reportItem.command = {
-      command: "meridian.hygiene.showAnalytics",
-      title: "View Hygiene Report",
-    };
-
-    const items: HygieneTreeItem[] = [reportItem];
+    const items: HygieneTreeItem[] = [];
     if (this.lastImpactResult) {
       items.push(this.buildImpactSection());
     }

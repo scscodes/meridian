@@ -269,6 +269,18 @@ export const SESSION_BRIEFING = {
   /** Number of most-recent run-log entries fetched for the briefing */
   RECENT_RUN_LIMIT: 10,
 
+  /** Number of most-recent commits fetched for the briefing's git-core slice */
+  RECENT_COMMIT_LIMIT: 10,
+
+  /** Max contributors surfaced in the ActivityWindow */
+  TOP_CONTRIBUTORS_LIMIT: 3,
+
+  /** Max highest-volatility files retained in the ActivityWindow churn sample */
+  CHURN_SAMPLE_LIMIT: 5,
+
+  /** Max dead-code items retained in the HygieneSnapshot sample */
+  DEAD_CODE_SAMPLE_LIMIT: 5,
+
   /** Analytics period passed to GitAnalyzer */
   ANALYTICS_PERIOD: "3mo" as const,
 

@@ -1,13 +1,18 @@
 # ADR 009 — Run Log Schema and Versioning Policy
 
-**Status:** Accepted (revised)
+**Status:** Accepted — schema current, consumer/role narrowed by [ADR 012](./012-product-reanchor.md)
 **Date:** 2026-04-20
 
-> **Revised by [ADR 012](./012-product-reanchor.md) (2026-05-18):** the run log now serves the computed-insight / session-briefing surface, not skill discoverability or an AI layer. The router still emits events for git/hygiene dispatches. The `source` enum members `workflow`/`agent`/`skill` are permanently unused but **retained** — the schema version is deliberately **not** bumped (stability over cosmetic trimming).
+## Current state (post-2.0, authoritative — code-verified)
+
+- **Role:** the run log serves the computed-insight / session-briefing surface. It is *not* a skill-discoverability or AI substrate (that framing is void). The router feeds it for every git/hygiene dispatch.
+- **`source` enum (`RunEventSource`, `src/types.ts:277`) is exactly `"router" | "workflow" | "skill"`.** There is **no `agent` member** — do not introduce one; any earlier prose naming `agent` was inaccurate. Post-2.0 the only value ever emitted is `"router"`; `"workflow"` and `"skill"` are inert members retained for schema stability.
+- **`RecentRunEntry.workflowName` / `skillName` are always `undefined`** post-2.0. Inert, retained for ADR 011 wire compatibility. Do not build new logic on either field.
+- **Schema version is deliberately NOT bumped** for this narrowing — removing inert members would force a V1→V2 migration of the version-pinned on-disk log for cosmetic gain (exactly the fragility the Version Policy below exists to prevent). Documented intent: if/when the schema bumps for a *substantive* reason (e.g. an expanded session-briefing payload), the inert members ride that increment out — not as a standalone change.
 
 ## Context
 
-Foundation #1 in the roadmap requires a stable substrate for execution history before any UI consumption. Upcoming work (session briefing aggregation, workflow run history, and skill discoverability) depends on a shared, deterministic event source with correlation across router dispatches and nested command execution.
+Foundation #1 in the roadmap required a stable substrate for execution history before any UI consumption. The surviving consumer is session-briefing aggregation (ADR 011), which depends on a shared, deterministic event source with correlation across router dispatches and nested command execution. *(The original motivation also cited workflow run history and skill discoverability; both were removed in the 2.0 re-anchor — the substrate's value is now solely the briefing.)*
 
 Prior to this ADR, execution information existed only in transient logger output and command return payloads, which made cross-surface history reconstruction brittle and hard to evolve.
 

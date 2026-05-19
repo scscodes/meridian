@@ -8,6 +8,7 @@ import { aggregateSessionBriefing, SessionBriefingSources } from '../src/domains
 import { success, failure, RunEventV1, RUN_EVENT_SCHEMA_VERSION } from '../src/types';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
 import type { GitAnalyticsReport } from '../src/domains/git/analytics-types';
+import { SESSION_BRIEFING } from '../src/constants';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -292,5 +293,114 @@ describe('aggregateSessionBriefing', () => {
       expect(result.value.recentRuns).toBeUndefined();
       expect(result.value.flags).toContain('Run log unavailable');
     }
+  });
+
+  // ── 12. T1 — recentCommitLimit constant + option override ─────────────────
+  it('fetches RECENT_COMMIT_LIMIT commits by default and honors the option override', async () => {
+    const spy = vi.spyOn(git, 'getRecentCommits');
+
+    await aggregateSessionBriefing(makeSources(git, logger, runLog));
+    expect(spy).toHaveBeenLastCalledWith(SESSION_BRIEFING.RECENT_COMMIT_LIMIT);
+
+    await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { options: { recentCommitLimit: 3 } })
+    );
+    expect(spy).toHaveBeenLastCalledWith(3);
+  });
+
+  // ── 13. T1 — topContributors capped at TOP_CONTRIBUTORS_LIMIT ─────────────
+  it('caps topContributors at SESSION_BRIEFING.TOP_CONTRIBUTORS_LIMIT', async () => {
+    const manyAuthors = Array.from({ length: 6 }, (_, i) => ({
+      name: `A${i}`, commits: 10 - i, insertions: 0, deletions: 0, filesChanged: 0, lastActive: new Date(),
+    }));
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { gitAnalyzer: makeAnalyzer({ topAuthors: manyAuthors }) })
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.activityWindow?.topContributors).toHaveLength(
+        SESSION_BRIEFING.TOP_CONTRIBUTORS_LIMIT
+      );
+    }
+  });
+
+  // ── 14. T3 — trends + capped churn sample retained from analytics ─────────
+  it('retains trends and a capped churn sample in the activity window', async () => {
+    const churn = Array.from({ length: 8 }, (_, i) => ({
+      path: `src/f${i}.ts`, commitCount: 9 - i, insertions: 0, deletions: 0,
+      volatility: 9 - i, authors: [], lastModified: new Date(), risk: 'high' as const,
+    }));
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { gitAnalyzer: makeAnalyzer({ churnFiles: churn }) })
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      const w = result.value.activityWindow;
+      expect(w?.trends).toEqual({
+        commitDirection: 'up',
+        commitConfidence: 0.75,
+        volatilityDirection: 'stable',
+      });
+      expect(w?.topChurnFiles).toHaveLength(SESSION_BRIEFING.CHURN_SAMPLE_LIMIT);
+      expect(w?.topChurnFiles?.[0]).toEqual({ path: 'src/f0.ts', volatility: 9, risk: 'high' });
+    }
+  });
+
+  // ── 15. T3 — dead-code sample retained, omitted when empty ────────────────
+  it('retains a capped dead-code sample, omitting it when there are none', async () => {
+    const withItems = {
+      scan: {
+        deadFiles: [], largeFiles: [], logFiles: [], markdownFiles: [],
+        deadCode: {
+          items: Array.from({ length: 7 }, (_, i) => ({
+            filePath: `/abs/f${i}.ts`, line: i + 1, character: 1,
+            message: `unused ${i}`, code: 6133, category: 'unusedLocal' as const,
+          })),
+          tsconfigPath: null, durationMs: 0, fileCount: 7,
+        },
+      },
+      scannedAt: '2026-05-19T00:00:00.000Z',
+    };
+    const r1 = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { getHygieneScan: () => withItems })
+    );
+    expect(r1.kind).toBe('ok');
+    if (r1.kind === 'ok') {
+      const s = r1.value.hygieneSnapshot;
+      expect(s?.deadCodeSample).toHaveLength(SESSION_BRIEFING.DEAD_CODE_SAMPLE_LIMIT);
+      expect(s?.deadCodeSample?.[0]).toEqual({ filePath: '/abs/f0.ts', line: 1, message: 'unused 0' });
+    }
+
+    const empty = {
+      scan: {
+        deadFiles: [], largeFiles: [], logFiles: [], markdownFiles: [],
+        deadCode: { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0 },
+      },
+      scannedAt: '2026-05-19T00:00:00.000Z',
+    };
+    const r2 = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { getHygieneScan: () => empty })
+    );
+    expect(r2.kind).toBe('ok');
+    if (r2.kind === 'ok') {
+      expect(r2.value.hygieneSnapshot?.deadCodeSample).toBeUndefined();
+    }
+  });
+
+  // ── 16. T2 — hoisted analytics does not break git-core fail-fast ──────────
+  it('still returns the git-core error when commits fail, with analytics hoisted', async () => {
+    const analyzer = makeAnalyzer();
+    vi.spyOn(git, 'getRecentCommits').mockResolvedValue(
+      failure({ code: 'GIT_LOG_ERROR', message: 'log failed' })
+    );
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { gitAnalyzer: analyzer })
+    );
+    expect(result.kind).toBe('err');
+    if (result.kind === 'err') {
+      expect(result.error.code).toBe('GIT_LOG_ERROR');
+    }
+    // analytics was started (hoisted) but did not affect the failed result
+    expect(analyzer.analyze as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalled();
   });
 });

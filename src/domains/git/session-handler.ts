@@ -43,6 +43,19 @@ function deterministicSummary(agg: SessionBriefing): string {
     lines.push(
       `Activity (${w.period}): ${w.commitsInWindow} commits across ${w.filesTouched} files.`
     );
+    if (w.trends) {
+      lines.push(
+        `Momentum: commits ${w.trends.commitDirection} ` +
+          `(confidence ${w.trends.commitConfidence.toFixed(2)}), ` +
+          `volatility ${w.trends.volatilityDirection}.`
+      );
+    }
+    if (w.topChurnFiles && w.topChurnFiles.length > 0) {
+      lines.push("Top churn:");
+      for (const f of w.topChurnFiles) {
+        lines.push(`  • ${f.path} (volatility ${f.volatility.toFixed(1)}, ${f.risk} risk)`);
+      }
+    }
   }
 
   if (agg.hygieneSnapshot) {
@@ -51,6 +64,12 @@ function deterministicSummary(agg: SessionBriefing): string {
       `Hygiene (scanned ${h.scannedAt}): ${h.deadFileCount} dead, ` +
         `${h.largeFileCount} large, ${h.logFileCount} logs, ${h.deadCodeItemCount} dead-code items.`
     );
+    if (h.deadCodeSample && h.deadCodeSample.length > 0) {
+      lines.push("Dead code:");
+      for (const d of h.deadCodeSample) {
+        lines.push(`  • ${d.filePath}:${d.line} — ${d.message}`);
+      }
+    }
   }
 
   if (agg.flags.length > 0) {

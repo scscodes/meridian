@@ -33,7 +33,7 @@ export interface SessionBriefingSources {
   gitAnalyzer: GitAnalyzer;
   getHygieneScan: HygieneScanGetter | undefined;
   logger: Logger;
-  options?: { recentRunLimit?: number };
+  options?: { recentRunLimit?: number; recentCommitLimit?: number };
 }
 
 export async function aggregateSessionBriefing(
@@ -41,11 +41,22 @@ export async function aggregateSessionBriefing(
 ): Promise<Result<SessionBriefing>> {
   const { gitProvider, runLog, gitAnalyzer, getHygieneScan, logger, options } = sources;
   const recentRunLimit = options?.recentRunLimit ?? SESSION_BRIEFING.RECENT_RUN_LIMIT;
+  const recentCommitLimit = options?.recentCommitLimit ?? SESSION_BRIEFING.RECENT_COMMIT_LIMIT;
+
+  // Start peripheral fetches concurrently with git-core (all fail-soft).
+  // Both are reject-safe — runLog.readLatest resolves a Result and never
+  // throws; analyze() has a .catch — so a fail-fast git-core return below
+  // cannot strand an unhandled rejection. This takes the analytics history
+  // walk off the critical path on the common (git-core success) path.
+  const runLogFetch = runLog ? runLog.readLatest(recentRunLimit) : null;
+  const analyticsFetch = gitAnalyzer
+    .analyze({ period: SESSION_BRIEFING.ANALYTICS_PERIOD })
+    .catch((): null => null);
 
   // ── Git core — fail-fast ─────────────────────────────────────────────────
   const [statusResult, commitsResult, changesResult] = await Promise.all([
     gitProvider.status(),
-    gitProvider.getRecentCommits(10),
+    gitProvider.getRecentCommits(recentCommitLimit),
     gitProvider.getAllChanges(),
   ]);
   if (statusResult.kind === "err") return statusResult;
@@ -63,12 +74,6 @@ export async function aggregateSessionBriefing(
   if (status.branch === "HEAD") {
     flags.push("Detached HEAD — not on a named branch");
   }
-
-  // Start peripheral fetches concurrently (all fail-soft)
-  const runLogFetch = runLog ? runLog.readLatest(recentRunLimit) : null;
-  const analyticsFetch = gitAnalyzer
-    .analyze({ period: SESSION_BRIEFING.ANALYTICS_PERIOD })
-    .catch((): null => null);
 
   // ── Run log — fail-soft ──────────────────────────────────────────────────
   let recentRuns: RecentRunEntry[] | undefined;
@@ -117,10 +122,17 @@ export async function aggregateSessionBriefing(
       period: analyticsReport.period,
       commitsInWindow: analyticsReport.summary.totalCommits,
       filesTouched: analyticsReport.summary.totalFilesModified,
-      topContributors: analyticsReport.topAuthors.slice(0, 3).map((a) => ({
-        name: a.name,
-        commits: a.commits,
-      })),
+      topContributors: analyticsReport.topAuthors
+        .slice(0, SESSION_BRIEFING.TOP_CONTRIBUTORS_LIMIT)
+        .map((a) => ({ name: a.name, commits: a.commits })),
+      trends: {
+        commitDirection: analyticsReport.trends.commitTrend.direction,
+        commitConfidence: analyticsReport.trends.commitTrend.confidence,
+        volatilityDirection: analyticsReport.trends.volatilityTrend.direction,
+      },
+      topChurnFiles: analyticsReport.churnFiles
+        .slice(0, SESSION_BRIEFING.CHURN_SAMPLE_LIMIT)
+        .map((f) => ({ path: f.path, volatility: f.volatility, risk: f.risk })),
     };
   }
 
@@ -129,12 +141,16 @@ export async function aggregateSessionBriefing(
   const lastScan = getHygieneScan?.();
   if (lastScan) {
     const { scan, scannedAt } = lastScan;
+    const deadCodeSample = scan.deadCode.items
+      .slice(0, SESSION_BRIEFING.DEAD_CODE_SAMPLE_LIMIT)
+      .map((d) => ({ filePath: d.filePath, line: d.line, message: d.message }));
     hygieneSnapshot = {
       scannedAt,
       deadFileCount: scan.deadFiles.length,
       largeFileCount: scan.largeFiles.length,
       logFileCount: scan.logFiles.length,
       deadCodeItemCount: scan.deadCode.items.length,
+      ...(deadCodeSample.length > 0 ? { deadCodeSample } : {}),
     };
     if (scan.deadFiles.length >= SESSION_BRIEFING.DEAD_FILE_FLAG_THRESHOLD) {
       flags.push(`Hygiene: ${scan.deadFiles.length} dead files`);

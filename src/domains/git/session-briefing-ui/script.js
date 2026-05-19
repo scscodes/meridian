@@ -35,6 +35,7 @@
     renderFlags(report.flags);
     renderActivity(report.activityWindow);
     renderHygiene(report.hygieneSnapshot);
+    renderPendingRisk(report.pendingChangeRisk);
     currentCommits = report.recentCommits || [];
     currentSort = { col: null, asc: true };
     renderCommitsTable(currentCommits);
@@ -204,6 +205,39 @@
           '<td class="path-link" data-path="' + esc(d.filePath) + '">' + esc(d.filePath) + '</td>' +
           '<td>' + Number(d.line) + '</td>' +
           '<td class="commit-msg">' + esc(d.message) + '</td>' +
+          '</tr>';
+      }).join("") +
+      '</tbody></table>';
+  }
+
+  // ── Pending-change risk (dirty-set × analytics risk join) ──────────
+
+  function renderPendingRisk(p) {
+    var section = document.getElementById("pendingRiskSection");
+    if (!p || !p.files || p.files.length === 0) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+    document.getElementById("pendingRiskHint").textContent =
+      "(" + p.totalChanged + " changed" +
+      (p.capped ? ", showing top " + p.files.length : "") + ")";
+
+    document.getElementById("pendingRiskMetrics").innerHTML = [
+      metricCard("Changed", p.totalChanged),
+      metricCard("High-Risk", p.hotspotCount),
+    ].join("");
+
+    document.getElementById("pendingRiskBlock").innerHTML =
+      '<table><thead><tr><th>Path</th><th>Status</th><th>Churn</th>' +
+      '<th>Volatility</th><th>Risk</th></tr></thead><tbody>' +
+      p.files.map(function (f) {
+        return '<tr>' +
+          '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
+          '<td>' + esc(f.status) + '</td>' +
+          '<td>' + (f.churn == null ? '&mdash;' : Number(f.churn)) + '</td>' +
+          '<td>' + (f.volatility == null ? '&mdash;' : Number(f.volatility).toFixed(1)) + '</td>' +
+          '<td><span class="risk risk-' + esc(f.risk) + '">' + esc(f.risk) + '</span></td>' +
           '</tr>';
       }).join("") +
       '</tbody></table>';

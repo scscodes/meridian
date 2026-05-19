@@ -77,11 +77,38 @@ describe("SessionBriefingWebviewProvider.reportToCsv", () => {
     expect(csv).toContain('"/abs/x.ts",12,"unused ""y"""');
   });
 
-  it("omits Activity/Hygiene sections when those slices are absent (fail-soft)", () => {
+  it("emits a Pending-Change Risk section, comma-escaped, with new/cold blanks", () => {
+    const report: SessionBriefingReport = {
+      ...base,
+      pendingChangeRisk: {
+        totalChanged: 3,
+        hotspotCount: 1,
+        capped: false,
+        files: [
+          { path: "src/hot.ts", status: "M", churn: 40, volatility: 8.2, risk: "high" },
+          { path: "src/a,b.ts", status: "A", churn: null, volatility: null, risk: "new" },
+          { path: "src/quiet.ts", status: "M", churn: null, volatility: null, risk: "cold" },
+        ],
+      },
+    };
+
+    const csv = (makeProvider() as unknown as { reportToCsv(r: SessionBriefingReport): string }).reportToCsv(report);
+
+    expect(csv).toContain("\nPending-Change Risk\n");
+    expect(csv).toContain("Total Changed,3");
+    expect(csv).toContain("High-Risk,1");
+    expect(csv).toContain("Capped,false");
+    expect(csv).toContain('"src/hot.ts",M,40,8.2,high');
+    expect(csv).toContain('"src/a,b.ts",A,,,new');
+    expect(csv).toContain('"src/quiet.ts",M,,,cold');
+  });
+
+  it("omits Activity/Hygiene/Pending-Change sections when those slices are absent (fail-soft)", () => {
     const csv = (makeProvider() as unknown as { reportToCsv(r: SessionBriefingReport): string }).reportToCsv(base);
 
     expect(csv).not.toContain("\nActivity\n");
     expect(csv).not.toContain("\nHygiene\n");
+    expect(csv).not.toContain("\nPending-Change Risk\n");
     expect(csv).toContain("Recent Commits");
   });
 });

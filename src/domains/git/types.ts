@@ -2,7 +2,7 @@
  * Git Domain Types — Session Briefing aggregate.
  */
 
-import { RecentCommit, CommandName } from "../../types";
+import { RecentCommit, CommandName, GitFileChange } from "../../types";
 import { AnalyticsPeriod, TrendDirection, FileRiskLevel } from "./analytics-types";
 
 // ============================================================================
@@ -66,6 +66,38 @@ export interface HygieneSnapshot {
   deadCodeSample?: Array<{ filePath: string; line: number; message: string }>;
 }
 
+/**
+ * One changed (dirty) file annotated with its computed risk. `churn` /
+ * `volatility` are null and `risk` is `"new"` (status A — no history) or
+ * `"cold"` (status M/D but untouched in the analytics window — low, not
+ * unknown) when the file has no FileMetric in the analytics window;
+ * otherwise they carry the analytics values and `risk` is the FileMetric tier.
+ */
+export interface PendingChangeFile {
+  path: string;
+  status: GitFileChange["status"];
+  churn: number | null;
+  volatility: number | null;
+  risk: FileRiskLevel | "new" | "cold";
+}
+
+/**
+ * Deterministic join of the dirty-set against the already-computed analytics
+ * risk model — surfaces which files you are about to commit are historically
+ * dangerous. Optional top-level slice (NOT nested in ActivityWindow): present
+ * iff the analytics peripheral is available; the dirty-set itself is git-core
+ * (fail-fast) so it is always known when this slice is present. `files` is
+ * sorted risk→volatility→path desc and capped at PENDING_RISK.MAX_FILES;
+ * `totalChanged` / `hotspotCount` are computed from the full pre-cap set so
+ * the headline counts stay accurate even when the table is truncated.
+ */
+export interface PendingChangeRisk {
+  totalChanged: number;
+  hotspotCount: number;
+  capped: boolean;
+  files: PendingChangeFile[];
+}
+
 export interface SessionBriefing {
   generatedAt: string;
   branch: string;
@@ -79,6 +111,7 @@ export interface SessionBriefing {
   recentRuns?: RecentRunEntry[];
   activityWindow?: ActivityWindow;
   hygieneSnapshot?: HygieneSnapshot;
+  pendingChangeRisk?: PendingChangeRisk;
 }
 
 export type SessionBriefingReport = SessionBriefing & { summary: string };

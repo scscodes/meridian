@@ -354,6 +354,8 @@ h3.sub {
 .risk-high { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 .risk-medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
 .risk-low { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.risk-new { background: rgba(6, 182, 212, 0.2); color: #06b6d4; }
+.risk-cold { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
 
 /* Responsive */
 

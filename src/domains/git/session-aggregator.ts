@@ -17,13 +17,17 @@ import {
 } from "../../types";
 import { RunLog } from "../../infrastructure/run-log";
 import { GitAnalyzer } from "./analytics-service";
+import { FileMetric } from "./analytics-types";
+import { normalizeRenamePath } from "./git-path";
 import {
   SessionBriefing,
   RecentRunEntry,
   ActivityWindow,
   HygieneSnapshot,
+  PendingChangeRisk,
+  PendingChangeFile,
 } from "./types";
-import { SESSION_BRIEFING } from "../../constants";
+import { SESSION_BRIEFING, PENDING_RISK } from "../../constants";
 
 export type HygieneScanGetter = () => { scan: WorkspaceScan; scannedAt: string } | undefined;
 
@@ -34,6 +38,81 @@ export interface SessionBriefingSources {
   getHygieneScan: HygieneScanGetter | undefined;
   logger: Logger;
   options?: { recentRunLimit?: number; recentCommitLimit?: number };
+}
+
+/**
+ * Deterministic risk ordering for the pending-change table: dangerous files
+ * first; a brand-new file (no history) ahead of a known-low file; a "cold"
+ * file (changed but quiet in the analytics window — low, not unknown) last.
+ */
+const RISK_RANK: Record<PendingChangeFile["risk"], number> = {
+  high: 5,
+  medium: 4,
+  new: 3,
+  low: 2,
+  cold: 1,
+};
+
+/**
+ * Join the dirty-set against the already-computed analytics risk model. Pure,
+ * no I/O. Dirty paths are rename-normalized (the analytics `FileMetric.path`
+ * side already is — shared `normalizeRenamePath`) then deduped: `getAllChanges`
+ * already merges staged+unstaged by raw path, so this residual dedupe only
+ * catches rename+further-edit. Files absent from the analytics window are
+ * annotated `"new"` (status A → no history) or `"cold"` (status M/D → changed
+ * but quiet in-window: low, not unknown). Sorted risk→volatility→path desc;
+ * `totalChanged`/`hotspotCount` come from the FULL pre-cap set; the table is
+ * capped at PENDING_RISK.MAX_FILES with `capped` signalling truncation.
+ */
+function computePendingChangeRisk(
+  uncommitted: ReadonlyArray<{ path: string; status: PendingChangeFile["status"] }>,
+  files: ReadonlyArray<FileMetric>
+): PendingChangeRisk {
+  const metricByPath = new Map<string, FileMetric>();
+  for (const f of files) metricByPath.set(f.path, f);
+
+  const deduped = new Map<string, PendingChangeFile["status"]>();
+  for (const c of uncommitted) {
+    const key = normalizeRenamePath(c.path);
+    if (!deduped.has(key)) deduped.set(key, c.status);
+  }
+
+  const annotated: PendingChangeFile[] = [];
+  for (const [path, status] of deduped) {
+    const metric = metricByPath.get(path);
+    annotated.push(
+      metric
+        ? {
+            path,
+            status,
+            churn: metric.commitCount,
+            volatility: metric.volatility,
+            risk: metric.risk,
+          }
+        : {
+            path,
+            status,
+            churn: null,
+            volatility: null,
+            risk: status === "A" ? "new" : "cold",
+          }
+    );
+  }
+
+  annotated.sort((a, b) => {
+    const r = RISK_RANK[b.risk] - RISK_RANK[a.risk];
+    if (r !== 0) return r;
+    const v = (b.volatility ?? -1) - (a.volatility ?? -1);
+    if (v !== 0) return v;
+    return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+  });
+
+  return {
+    totalChanged: annotated.length,
+    hotspotCount: annotated.filter((f) => f.risk === "high").length,
+    capped: annotated.length > PENDING_RISK.MAX_FILES,
+    files: annotated.slice(0, PENDING_RISK.MAX_FILES),
+  };
 }
 
 export async function aggregateSessionBriefing(
@@ -113,6 +192,7 @@ export async function aggregateSessionBriefing(
 
   // ── Git analytics — fail-soft ────────────────────────────────────────────
   let activityWindow: ActivityWindow | undefined;
+  let pendingChangeRisk: PendingChangeRisk | undefined;
   const analyticsReport = await analyticsFetch;
   if (!analyticsReport) {
     logger.warn("Session briefing: analytics unavailable", "aggregateSessionBriefing");
@@ -142,6 +222,11 @@ export async function aggregateSessionBriefing(
         ),
       },
     };
+
+    pendingChangeRisk = computePendingChangeRisk(uncommitted, analyticsReport.files);
+    if (pendingChangeRisk.hotspotCount >= PENDING_RISK.HOTSPOT_FLAG_THRESHOLD) {
+      flags.push(`Modifying ${pendingChangeRisk.hotspotCount} high-risk files`);
+    }
   }
 
   // ── Hygiene snapshot — fail-soft ─────────────────────────────────────────
@@ -183,5 +268,6 @@ export async function aggregateSessionBriefing(
     recentRuns,
     activityWindow,
     hygieneSnapshot,
+    pendingChangeRisk,
   });
 }

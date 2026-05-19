@@ -306,6 +306,32 @@ export const SESSION_BRIEFING = {
 } as const;
 
 // ============================================================================
+// Pending-Change Risk
+// ============================================================================
+
+/**
+ * Bounds for the additive `SessionBriefing.pendingChangeRisk` slice — the
+ * deterministic join of the dirty-set against the already-computed analytics
+ * risk model. Pure post-processing; no new I/O (ADR 011 additive-slice rule).
+ */
+export const PENDING_RISK = {
+  /**
+   * Max changed files retained in the slice after the deterministic
+   * risk→volatility→path sort. The cap is applied AFTER sorting, so the
+   * highest-risk files are never truncated; `capped` signals truncation and
+   * the aggregate counts are computed from the full pre-cap set.
+   */
+  MAX_FILES: 20,
+
+  /**
+   * Number of changed files at a `high` risk tier at or above which a visible
+   * "Modifying N high-risk files" flag is raised, consistent with the other
+   * SESSION_BRIEFING flag thresholds.
+   */
+  HOTSPOT_FLAG_THRESHOLD: 3,
+} as const;
+
+// ============================================================================
 // UI Settings
 // ============================================================================
 

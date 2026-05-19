@@ -341,6 +341,53 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
       lines.push(`${csvStr(f.path)},${f.status}`);
     }
 
+    const w = report.activityWindow;
+    if (w) {
+      lines.push("");
+      lines.push("Activity");
+      lines.push(`Period,${w.period}`);
+      lines.push(`Commits In Window,${w.commitsInWindow}`);
+      lines.push(`Files Touched,${w.filesTouched}`);
+      if (w.trends) {
+        lines.push(`Commit Trend,${w.trends.commitDirection}`);
+        lines.push(`Commit Confidence,${w.trends.commitConfidence}`);
+        lines.push(`Volatility Trend,${w.trends.volatilityDirection}`);
+      }
+      lines.push("");
+      lines.push("Top Contributors");
+      lines.push("Name,Commits");
+      for (const a of w.topContributors) {
+        lines.push(`${csvStr(a.name)},${a.commits}`);
+      }
+      if (w.topChurnFiles && w.topChurnFiles.length > 0) {
+        lines.push("");
+        lines.push("Top Churn Files");
+        lines.push("Path,Volatility,Risk");
+        for (const f of w.topChurnFiles) {
+          lines.push(`${csvStr(f.path)},${f.volatility},${f.risk}`);
+        }
+      }
+    }
+
+    const h = report.hygieneSnapshot;
+    if (h) {
+      lines.push("");
+      lines.push("Hygiene");
+      lines.push(`Scanned At,${h.scannedAt}`);
+      lines.push(`Dead Files,${h.deadFileCount}`);
+      lines.push(`Large Files,${h.largeFileCount}`);
+      lines.push(`Log Files,${h.logFileCount}`);
+      lines.push(`Dead Code Items,${h.deadCodeItemCount}`);
+      if (h.deadCodeSample && h.deadCodeSample.length > 0) {
+        lines.push("");
+        lines.push("Dead Code Sample");
+        lines.push("File,Line,Message");
+        for (const d of h.deadCodeSample) {
+          lines.push(`${csvStr(d.filePath)},${d.line},${csvStr(d.message)}`);
+        }
+      }
+    }
+
     return lines.join("\n");
   }
 

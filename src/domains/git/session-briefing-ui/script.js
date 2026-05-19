@@ -33,6 +33,8 @@
     renderBranchBar(report);
     renderSummaryCards(report);
     renderFlags(report.flags);
+    renderActivity(report.activityWindow);
+    renderHygiene(report.hygieneSnapshot);
     currentCommits = report.recentCommits || [];
     currentSort = { col: null, asc: true };
     renderCommitsTable(currentCommits);
@@ -74,6 +76,100 @@
         return '<div class="flag"><span class="flag-icon">&#9888;</span>' + esc(f) + '</div>';
       }).join("") +
       '</div>';
+  }
+
+  // ── Activity & Hygiene (retained computed insight) ─────────────────
+
+  function metricCard(label, value) {
+    return '<div class="card"><h3>' + esc(label) + '</h3>' +
+      '<p class="value">' + esc(value) + '</p></div>';
+  }
+
+  function trendLabel(d) {
+    if (d === "up") return "▲ up";
+    if (d === "down") return "▼ down";
+    return "▬ stable";
+  }
+
+  function renderActivity(w) {
+    var section = document.getElementById("activitySection");
+    if (!w) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+    document.getElementById("activityPeriod").textContent = "(" + esc(w.period) + ")";
+
+    var cards = [
+      metricCard("Commits", w.commitsInWindow),
+      metricCard("Files Touched", w.filesTouched),
+    ];
+    if (w.trends) {
+      cards.push(
+        metricCard(
+          "Commit Trend",
+          trendLabel(w.trends.commitDirection) +
+            " · " + Math.round(w.trends.commitConfidence * 100) + "%"
+        )
+      );
+      cards.push(metricCard("Volatility", trendLabel(w.trends.volatilityDirection)));
+    }
+    document.getElementById("activityMetrics").innerHTML = cards.join("");
+
+    var churn = w.topChurnFiles || [];
+    var cb = document.getElementById("churnBlock");
+    if (churn.length === 0) {
+      cb.innerHTML = "";
+      return;
+    }
+    cb.innerHTML =
+      '<h3 class="sub">Top Churn Files</h3>' +
+      '<table><thead><tr><th>Path</th><th>Volatility</th><th>Risk</th></tr></thead><tbody>' +
+      churn.map(function (f) {
+        return '<tr>' +
+          '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
+          '<td>' + Number(f.volatility).toFixed(1) + '</td>' +
+          '<td><span class="risk risk-' + esc(f.risk) + '">' + esc(f.risk) + '</span></td>' +
+          '</tr>';
+      }).join("") +
+      '</tbody></table>';
+  }
+
+  function renderHygiene(h) {
+    var section = document.getElementById("hygieneSection");
+    if (!h) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+    document.getElementById("hygieneScannedAt").textContent = h.scannedAt
+      ? "(scanned " + new Date(h.scannedAt).toLocaleString() + ")"
+      : "";
+
+    document.getElementById("hygieneMetrics").innerHTML = [
+      metricCard("Dead Files", h.deadFileCount),
+      metricCard("Large Files", h.largeFileCount),
+      metricCard("Log Files", h.logFileCount),
+      metricCard("Dead Code", h.deadCodeItemCount),
+    ].join("");
+
+    var sample = h.deadCodeSample || [];
+    var db = document.getElementById("deadCodeBlock");
+    if (sample.length === 0) {
+      db.innerHTML = "";
+      return;
+    }
+    db.innerHTML =
+      '<h3 class="sub">Dead Code Sample</h3>' +
+      '<table><thead><tr><th>File</th><th>Line</th><th>Message</th></tr></thead><tbody>' +
+      sample.map(function (d) {
+        return '<tr>' +
+          '<td class="path-link" data-path="' + esc(d.filePath) + '">' + esc(d.filePath) + '</td>' +
+          '<td>' + Number(d.line) + '</td>' +
+          '<td class="commit-msg">' + esc(d.message) + '</td>' +
+          '</tr>';
+      }).join("") +
+      '</tbody></table>';
   }
 
   // ── Sortable commits table ─────────────────────────────────────────

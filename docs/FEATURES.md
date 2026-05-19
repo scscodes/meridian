@@ -65,7 +65,7 @@ Open a dashboard displaying Hygiene analytics: prune candidates over time, file-
 ## Sidebar Views & UI
 
 ### **Panel Reports View** (`meridian.reports.view`)
-First view in the Meridian activity-bar container — the anchored, first-class entry point for the three webview reports, in order: **Session Briefing**, **Git Analytics**, **Hygiene**. Report rows carry no glyphs by design. Single-click (or the hover **View** action, `$(open-preview)`) reveals a live panel without recomputing, or runs the report once if no panel is open. The hover **Refresh** action (`$(refresh)`) always recomputes. The former in-tree "View Git Report" / "View Hygiene Report" nodes and the Git/Hygiene view-title report icons were removed — report entry now lives exclusively here.
+First view in the Meridian activity-bar container — the anchored, first-class entry point for the three webview reports, in order: **Session Briefing**, **Git Analytics**, **Hygiene Analytics**. Report rows carry no glyphs by design. Single-click (or the hover **View** action, `$(open-preview)`) reveals a live panel without recomputing, or runs the report once if no panel is open. The hover **Refresh** action (`$(refresh)`) always recomputes. The former in-tree "View Git Report" / "View Hygiene Report" nodes and the Git/Hygiene view-title report icons were removed — report entry now lives exclusively here.
 
 ### **Git View** (`meridian.git.view`)
 Browse current branch, dirty state, change groups (staged/unstaged/untracked, expandable to files), and recent commits. The Git Analytics report is reached via the Panel Reports view.
@@ -74,7 +74,7 @@ Browse current branch, dirty state, change groups (staged/unstaged/untracked, ex
 Browse hygiene scan results (dead files, dead code, large files, logs, markdown) and the latest impact-analysis result. Context actions to delete or ignore flagged files. The Hygiene report is reached via the Panel Reports view.
 
 ### **Status Bar**
-Real-time Git status indicator (branch, dirty state, change counts). Click to open a Quick Pick with top actions (Session Briefing, Hygiene Scan, Impact Analysis, Git/Hygiene Analytics, Refresh All).
+Real-time Git status indicator (branch, dirty state, change counts). Click to open a Quick Pick with top actions (Session Briefing, Hygiene Scan, Impact Analysis, Git Analytics, Hygiene Analytics, Refresh All).
 
 ---
 

@@ -8,6 +8,7 @@ import { gitReportToCsv } from "../domains/git/analytics-service";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { SessionBriefingReport } from "../domains/git/types";
 import { resolveWorkspacePath } from "../security/path-guard";
+import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
 
 // ============================================================================
 // Base Class
@@ -175,7 +176,7 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
   }
 
   protected getViewId(): string { return "meridian.analytics"; }
-  protected getViewTitle(): string { return "Git Analytics — Meridian"; }
+  protected getViewTitle(): string { return REPORT_LABELS.gitAnalytics; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "git", "analytics-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-git-analytics"; }
 
@@ -231,7 +232,7 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
   }
 
   protected getViewId(): string { return "meridian.hygiene.analytics"; }
-  protected getViewTitle(): string { return "Hygiene Analytics — Meridian"; }
+  protected getViewTitle(): string { return REPORT_LABELS.hygieneAnalytics; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "hygiene", "analytics-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-hygiene-analytics"; }
 
@@ -244,7 +245,7 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
     const csvStr = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines: string[] = [];
 
-    lines.push("Hygiene Analytics Report");
+    lines.push(reportCsvHeader(REPORT_LABELS.hygieneAnalytics));
     lines.push(`Generated,${report.generatedAt instanceof Date ? report.generatedAt.toISOString() : String(report.generatedAt)}`);
     lines.push(`Workspace,${csvStr(report.workspaceRoot)}`);
     lines.push(`Total Files,${report.summary.totalFiles}`);
@@ -313,7 +314,7 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
   }
 
   protected getViewId(): string { return "meridian.sessionBriefing"; }
-  protected getViewTitle(): string { return "Session Briefing — Meridian"; }
+  protected getViewTitle(): string { return REPORT_LABELS.sessionBriefing; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "git", "session-briefing-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-session-briefing"; }
 
@@ -321,7 +322,7 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
     const csvStr = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines: string[] = [];
 
-    lines.push("Session Briefing Report");
+    lines.push(reportCsvHeader(REPORT_LABELS.sessionBriefing));
     lines.push(`Generated,${report.generatedAt}`);
     lines.push(`Branch,${csvStr(report.branch)}`);
     lines.push(`Dirty,${report.isDirty}`);

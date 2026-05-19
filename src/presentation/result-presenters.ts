@@ -11,6 +11,7 @@ import { GitAnalyticsReport } from "../domains/git/analytics-types";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { AnalyticsWebviewProvider, HygieneAnalyticsWebviewProvider, SessionBriefingWebviewProvider } from "../infrastructure/webview-provider";
 import { SessionBriefingReport } from "../domains/git/types";
+import { REPORT_LABELS } from "../report-labels";
 
 export interface PresenterContext {
   outputChannel: vscode.OutputChannel;
@@ -40,13 +41,13 @@ export async function presentResult(
   switch (commandName) {
     case "git.showAnalytics": {
       await analyticsPanel.openPanel(result.value as GitAnalyticsReport);
-      outputChannel.appendLine(`[${ts()}] Analytics panel opened`);
+      outputChannel.appendLine(`[${ts()}] ${REPORT_LABELS.gitAnalytics} panel opened`);
       return true;
     }
 
     case "hygiene.showAnalytics": {
       await hygieneAnalyticsPanel.openPanel(result.value as HygieneAnalyticsReport);
-      outputChannel.appendLine(`[${ts()}] Hygiene analytics panel opened`);
+      outputChannel.appendLine(`[${ts()}] ${REPORT_LABELS.hygieneAnalytics} panel opened`);
       return true;
     }
 
@@ -55,7 +56,7 @@ export async function presentResult(
       // Parity with git.showAnalytics / hygiene.showAnalytics (ADR 006 Rule 5).
       const report = result.value as SessionBriefingReport;
       await sessionBriefingPanel.openPanel(report);
-      outputChannel.appendLine(`[${ts()}] Session briefing panel opened`);
+      outputChannel.appendLine(`[${ts()}] ${REPORT_LABELS.sessionBriefing} panel opened`);
       return true;
     }
 

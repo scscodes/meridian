@@ -9,14 +9,15 @@
  */
 
 import * as vscode from "vscode";
+import { REPORT_LABELS } from "../../report-labels";
 
 export type ReportId = "sessionBriefing" | "gitAnalytics" | "hygiene";
 
 /** Display order is the array order in REPORTS below. */
 const REPORTS: ReadonlyArray<{ id: ReportId; label: string }> = [
-  { id: "sessionBriefing", label: "Session Briefing" },
-  { id: "gitAnalytics", label: "Git Analytics" },
-  { id: "hygiene", label: "Hygiene Analytics" },
+  { id: "sessionBriefing", label: REPORT_LABELS.sessionBriefing },
+  { id: "gitAnalytics", label: REPORT_LABELS.gitAnalytics },
+  { id: "hygiene", label: REPORT_LABELS.hygieneAnalytics },
 ];
 
 export class ReportTreeItem extends vscode.TreeItem {

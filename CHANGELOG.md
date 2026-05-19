@@ -1,3 +1,11 @@
+# [2.2.0](https://github.com/scscodes/meridian/compare/v2.1.0...v2.2.0) (2026-05-19)
+
+
+### Features
+
+* add pending-change risk to session briefing ([ebf56e1](https://github.com/scscodes/meridian/commit/ebf56e1fecb299af5c8b5582721eb243eceabd8c))
+* **webviews:** risk-hotspot scatter + commit-frequency sparkline (Phase 1a) ([31db003](https://github.com/scscodes/meridian/commit/31db003353e3c40dbd58e96ac6026ce69a17af91))
+
 # [2.1.0](https://github.com/scscodes/meridian/compare/v2.0.1...v2.1.0) (2026-05-19)
 
 

@@ -45,7 +45,7 @@ Scan the workspace for cleanup candidates:
 - **Log files**: stale `.log` files above age and size thresholds
 - **Markdown files**: documentation artifacts for review or archival
 
-Respects `.gitignore` and `.meridianignore` patterns. Returns a categorized list with file paths, sizes, ages, and reasons.
+Respects `.gitignore` and `.meridian/.meridianignore` patterns. Returns a categorized list with file paths, sizes, ages, and reasons.
 
 ### **hygiene.cleanup**
 Delete specified files with optional dry-run mode. Batch removal of candidates surfaced by `hygiene.scan`. Requires user confirmation before deletion.
@@ -58,7 +58,7 @@ Open a dashboard displaying Hygiene analytics: prune candidates over time, file-
 
 ### File actions (sidebar / explorer context)
 - **Delete File** — remove a file flagged by the last scan (confirmation required).
-- **Ignore File** — append the file's pattern to `.meridianignore`.
+- **Ignore File** — append the file's pattern to `.meridian/.meridianignore`.
 
 ---
 
@@ -87,6 +87,13 @@ All features respect workspace settings under the `meridian.*` namespace, includ
 - `meridian.hygiene.prune.minLineCount` — Files with this many lines or more are flagged when also older than `minAgeDays`; 0 disables (number, default: 0)
 - `meridian.sessionBriefing.autoLaunch` — Open a Session Briefing on activation (boolean, default: false)
 - `meridian.startup.enableFileWatchers` — Register file watchers for auto tree/status refresh (boolean, default: true)
+
+### Workspace dotdir (`.meridian/`)
+
+Per-workspace Meridian state lives under `.meridian/` at the workspace root (see [ADR 014](./adr/014-dotdir-doctrine.md)):
+
+- `.meridian/.meridianignore` — gitignore-syntax patterns excluded from hygiene scans. Editor syntax highlighting is provided via the built-in `ignore` language association. Legacy `.meridianignore` at the workspace root is auto-relocated on activation.
+- `.meridian/settings.json` — sparse JSON overrides for `meridian.*` settings. Present keys take precedence over VS Code user/workspace settings; absent keys fall through. Example: `{ "hygiene.prune.minAgeDays": 7 }`.
 
 ---
 

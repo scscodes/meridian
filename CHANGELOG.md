@@ -1,3 +1,17 @@
+# [2.5.0](https://github.com/scscodes/meridian/compare/v2.4.0...v2.5.0) (2026-05-20)
+
+
+### Bug Fixes
+
+* mock fs.renameSync in dotdir migration tests ([6186fa8](https://github.com/scscodes/meridian/commit/6186fa8911192f83bf098996fbfb82b0f8e00db6))
+
+
+### Features
+
+* auto-migrate legacy .meridianignore on activation ([daa043a](https://github.com/scscodes/meridian/commit/daa043acc248633860abb70ad5f80c5833832d70))
+* consolidate settings reads, purge dead Config class, dedupe ignore reader ([51b4c7d](https://github.com/scscodes/meridian/commit/51b4c7d4033f99364d2004c02d3a7d08aeb407d0))
+* **settings:** .meridian/settings.json overrides VS Code meridian.* keys ([995dd5c](https://github.com/scscodes/meridian/commit/995dd5ca43edb8d142ad52990865e49eaa6417ae))
+
 # [2.4.0](https://github.com/scscodes/meridian/compare/v2.3.0...v2.4.0) (2026-05-20)
 
 

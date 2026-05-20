@@ -19,9 +19,10 @@ import { ANALYTICS_SETTINGS, CACHE_SETTINGS, WORKSPACE_EXCLUDE_BASE } from "../.
 import { REPORT_LABELS, reportCsvHeader } from "../../report-labels";
 import { normalizeRenamePath } from "./git-path";
 import { TtlCache } from "../../infrastructure/cache";
+import { ignoreFileMtimeMs, readMeridianIgnorePatterns } from "../../security/ignore-store";
 
-/** Glob patterns to exclude from file-level analytics (build artifacts, deps) */
-const ANALYTICS_EXCLUDE = [
+/** Baseline glob patterns excluded from file-level analytics (build artifacts, deps). */
+const ANALYTICS_EXCLUDE_BASE = [
   ...WORKSPACE_EXCLUDE_BASE,
   "**/out/**",
   "**/dist/**",
@@ -36,11 +37,23 @@ export class GitAnalyzer {
   constructor(private readonly workspaceRoot: string = process.cwd()) {}
 
   /**
-   * Generate cache key from options
+   * Generate cache key from options. Folds in the .meridianignore mtime so an
+   * edit to the ignore file (e.g. from a webview "Ignore" action) invalidates
+   * stale entries without an explicit clearCache() handoff.
    */
   private getCacheKey(opts: AnalyticsOptions): string {
-    const parts = [opts.period, opts.author || "all", opts.pathPattern || "all"];
+    const parts = [
+      opts.period,
+      opts.author || "all",
+      opts.pathPattern || "all",
+      `ignore=${ignoreFileMtimeMs(this.workspaceRoot)}`,
+    ];
     return parts.join("|");
+  }
+
+  /** Patterns to exclude from file-level analytics — baseline + user .meridianignore. */
+  private getExcludePatterns(): string[] {
+    return [...ANALYTICS_EXCLUDE_BASE, ...readMeridianIgnorePatterns(this.workspaceRoot)];
   }
 
   /**
@@ -266,13 +279,14 @@ export class GitAnalyzer {
    */
   private aggregateFiles(commits: CommitMetric[]): FileMetric[] {
     const fileMap = new Map<string, FileMetric>();
+    const excludePatterns = this.getExcludePatterns();
 
     for (const commit of commits) {
       for (const fileChange of commit.files) {
         const { path, insertions, deletions } = fileChange;
 
-        // Skip build artifacts and ignored directories
-        if (micromatch.isMatch(path, ANALYTICS_EXCLUDE)) {
+        // Skip build artifacts, deps, and user .meridianignore patterns.
+        if (micromatch.isMatch(path, excludePatterns)) {
           continue;
         }
 

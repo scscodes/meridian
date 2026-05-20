@@ -14,12 +14,26 @@ import {
   SessionBriefingWebviewProvider,
 } from "../infrastructure/webview-provider";
 
+/**
+ * Cache-invalidation callbacks for analyzer caches whose output a webview
+ * report consumes. Wired in main.ts where the analyzer instances live; passed
+ * to webview providers so the webview-driven "Ignore" action can invalidate
+ * stale entries before re-rendering.
+ */
+export interface WebviewCacheInvalidators {
+  /** Clear the GitAnalyzer report cache. */
+  readonly invalidateGitAnalytics: () => void;
+  /** Clear the HygieneAnalyzer file-scan cache. */
+  readonly invalidateHygieneAnalytics: () => void;
+}
+
 export function createWebviewPanels(
   context: vscode.ExtensionContext,
   router: CommandRouter,
   workspaceRoot: string,
   getCommandContext: () => CommandContext,
-  readPruneConfig: () => PruneConfig
+  readPruneConfig: () => PruneConfig,
+  invalidators: WebviewCacheInvalidators
 ): {
   analyticsPanel: AnalyticsWebviewProvider;
   hygieneAnalyticsPanel: HygieneAnalyticsWebviewProvider;
@@ -33,7 +47,8 @@ export function createWebviewPanels(
       const result = await router.dispatch({ name: "git.showAnalytics", params: opts }, freshCtx);
       if (result.kind === "ok") { return result.value as GitAnalyticsReport; }
       throw new Error((result as any).error?.message ?? "Analytics failed");
-    }
+    },
+    invalidators.invalidateGitAnalytics
   );
 
   const hygieneAnalyticsPanel = new HygieneAnalyticsWebviewProvider(
@@ -46,9 +61,12 @@ export function createWebviewPanels(
       );
       if (result.kind === "ok") return result.value as HygieneAnalyticsReport;
       throw new Error((result as any).error?.message ?? "Hygiene analytics failed");
-    }
+    },
+    invalidators.invalidateHygieneAnalytics
   );
 
+  // Session briefing pulls from both analyzers, so an ignore from this surface
+  // must invalidate both caches before the next refresh.
   const sessionBriefingPanel = new SessionBriefingWebviewProvider(
     context.extensionUri,
     workspaceRoot,
@@ -60,6 +78,10 @@ export function createWebviewPanels(
       );
       if (result.kind === "ok") return result.value as SessionBriefingReport;
       throw new Error((result as any).error?.message ?? "Session briefing failed");
+    },
+    () => {
+      invalidators.invalidateGitAnalytics();
+      invalidators.invalidateHygieneAnalytics();
     }
   );
 

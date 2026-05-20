@@ -337,6 +337,69 @@
     }
   });
 
+  // ── Right-click ignore menu ────────────────────────────────────────
+  // Sends an "ignorePath" message; the extension appends to .meridianignore
+  // and invalidates both analyzer caches (briefing pulls from git +
+  // hygiene) so the next refresh reflects the change for analytics-derived
+  // rows (topChurnFiles, pendingChangeRisk's joined entries).
+  (function installIgnoreContextMenu() {
+    var activeMenu = null;
+    function dismiss() {
+      if (activeMenu && activeMenu.parentNode) {
+        activeMenu.parentNode.removeChild(activeMenu);
+      }
+      activeMenu = null;
+    }
+    function build(rawPath, x, y) {
+      dismiss();
+      var menu = document.createElement("div");
+      menu.className = "meridian-context-menu";
+      menu.setAttribute("role", "menu");
+
+      var header = document.createElement("div");
+      header.className = "menu-header";
+      header.textContent = rawPath;
+      menu.appendChild(header);
+
+      function addItem(label, kind) {
+        var item = document.createElement("div");
+        item.className = "menu-item";
+        item.setAttribute("role", "menuitem");
+        item.textContent = label;
+        item.addEventListener("click", function () {
+          vscode.postMessage({ type: "ignorePath", payload: { path: rawPath, kind: kind } });
+          dismiss();
+        });
+        menu.appendChild(item);
+      }
+      addItem("Ignore file", "file");
+      addItem("Ignore folder", "folder");
+
+      document.body.appendChild(menu);
+      var rect = menu.getBoundingClientRect();
+      var maxX = window.innerWidth - rect.width - 4;
+      var maxY = window.innerHeight - rect.height - 4;
+      menu.style.left = Math.min(x, Math.max(0, maxX)) + "px";
+      menu.style.top  = Math.min(y, Math.max(0, maxY)) + "px";
+      activeMenu = menu;
+    }
+
+    document.addEventListener("contextmenu", function (e) {
+      var link = e.target.closest && e.target.closest(".path-link");
+      if (!link || !link.dataset || !link.dataset.path) return;
+      e.preventDefault();
+      build(link.dataset.path, e.clientX, e.clientY);
+    });
+    document.addEventListener("click", function (e) {
+      if (activeMenu && !activeMenu.contains(e.target)) dismiss();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") dismiss();
+    });
+    window.addEventListener("blur", dismiss);
+    window.addEventListener("scroll", dismiss, true);
+  })();
+
   // ── Util ───────────────────────────────────────────────────────────
   function esc(str) {
     if (str == null) return "";

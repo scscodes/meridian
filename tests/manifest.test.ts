@@ -36,6 +36,7 @@ const INFRASTRUCTURE_COMMANDS = new Set([
   "meridian.refreshAll",
   "meridian.reports.open",
   "meridian.reports.refresh",
+  "meridian.openSettings",
 ]);
 
 // ── Load package.json ─────────────────────────────────────────────────────────

@@ -73,6 +73,13 @@ export function setupTreeProviders(
       if (!item) return;
       void vscode.commands.executeCommand(reportMap[item.reportId].cmd);
     }),
+    // Explicit settings cog — host-portable replacement for VS Code's implicit
+    // view→extension settings affordance, which Cursor doesn't honor (it falls
+    // through to the unfiltered Settings page). Pinning to @ext:scscodes.meridian
+    // gives deterministic scoping across VS Code, Cursor, VSCodium, etc.
+    vscode.commands.registerCommand("meridian.openSettings", () => {
+      void vscode.commands.executeCommand("workbench.action.openSettings", "@ext:scscodes.meridian");
+    }),
   );
 
   return { gitTree, hygieneTree, reportsTree };

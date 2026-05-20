@@ -160,6 +160,12 @@
         "command": "meridian.refreshAll",
         "title": "Refresh All Views",
         "category": "Meridian"
+      },
+      {
+        "command": "meridian.openSettings",
+        "title": "Open Settings",
+        "icon": "$(settings-gear)",
+        "category": "Meridian"
       }
     ],
     "configuration": {
@@ -421,6 +427,21 @@
           "command": "meridian.hygiene.refresh",
           "when": "view == meridian.hygiene.view",
           "group": "navigation"
+        },
+        {
+          "command": "meridian.openSettings",
+          "when": "view == meridian.reports.view",
+          "group": "navigation@99"
+        },
+        {
+          "command": "meridian.openSettings",
+          "when": "view == meridian.git.view",
+          "group": "navigation@99"
+        },
+        {
+          "command": "meridian.openSettings",
+          "when": "view == meridian.hygiene.view",
+          "group": "navigation@99"
         }
       ],
       "view/item/context": [

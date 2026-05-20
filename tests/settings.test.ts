@@ -1,12 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import * as vscode from "vscode";
 import { readSetting, SETTING_DEFAULTS } from "../src/infrastructure/settings";
 
 vi.mock("vscode", () => ({
   workspace: {
     getConfiguration: vi.fn(),
+    workspaceFolders: undefined as undefined | ReadonlyArray<{ uri: { fsPath: string } }>,
   },
 }));
+
+function setWorkspaceRoot(root: string | undefined): void {
+  (vscode.workspace as unknown as {
+    workspaceFolders?: ReadonlyArray<{ uri: { fsPath: string } }>;
+  }).workspaceFolders = root === undefined ? undefined : [{ uri: { fsPath: root } }];
+}
+
+function makeWorkspace(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "meridian-settings-"));
+}
 
 type MockedCfg = ReturnType<typeof vscode.workspace.getConfiguration>;
 
@@ -17,6 +31,7 @@ function mockCfg(get: (key: string, fallback: unknown) => unknown): MockedCfg {
 describe("readSetting()", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    setWorkspaceRoot(undefined);
   });
 
   it("returns the VS Code-provided value when present", () => {
@@ -55,5 +70,77 @@ describe("readSetting()", () => {
 
     expect(readSetting("startup.enableFileWatchers")).toBe(true);
     expect(readSetting("security.gitNetwork.allowedHosts")).toEqual([]);
+  });
+
+  describe(".meridian/settings.json workspace overrides", () => {
+    it("overrides VS Code value when key is present in workspace settings", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "hygiene.prune.minAgeDays": 7 })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => 30)
+      );
+
+      expect(readSetting("hygiene.prune.minAgeDays")).toBe(7);
+    });
+
+    it("falls through to VS Code config when key is absent from workspace settings", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "hygiene.prune.minAgeDays": 7 })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => "claude-3-sonnet")
+      );
+
+      expect(readSetting("model.default")).toBe("claude-3-sonnet");
+    });
+
+    it("falls through to VS Code config when workspace settings JSON is malformed", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        "{ not valid json"
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => 30)
+      );
+
+      expect(readSetting("hygiene.prune.minAgeDays")).toBe(30);
+    });
+
+    it("falls through to VS Code config when workspace settings file is missing", () => {
+      const root = makeWorkspace();
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => 30)
+      );
+
+      expect(readSetting("hygiene.prune.minAgeDays")).toBe(30);
+    });
+
+    it("falls through when workspace settings JSON is an array (not an object)", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify(["nope"])
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => true)
+      );
+
+      expect(readSetting("startup.enableFileWatchers")).toBe(true);
+    });
   });
 });

@@ -198,9 +198,9 @@ describe("hygiene.scan (createScanHandler)", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 9. .meridianignore exclusion
+  // 9. .meridian/.meridianignore exclusion
   // -----------------------------------------------------------------------
-  it("excludes files matching .meridianignore patterns", async () => {
+  it("excludes files matching .meridian/.meridianignore patterns", async () => {
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any) => {
       if (String(filePath).endsWith(".meridianignore")) {
         return "*.tmp\n";

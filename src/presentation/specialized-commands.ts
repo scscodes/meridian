@@ -60,8 +60,8 @@ export function registerSpecializedCommands(
       }
       vscode.window.showInformationMessage(
         result.value.alreadyExists
-          ? `Already in .meridianignore: ${result.value.pattern}`
-          : `Added to .meridianignore: ${result.value.pattern}`
+          ? `Already in .meridian/.meridianignore: ${result.value.pattern}`
+          : `Added to .meridian/.meridianignore: ${result.value.pattern}`
       );
       hygieneTree.refresh();
     }),

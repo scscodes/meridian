@@ -33,6 +33,14 @@
   ],
   "main": "./out/main.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "ignore",
+        "filenamePatterns": [
+          "**/.meridian/.meridianignore"
+        ]
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {

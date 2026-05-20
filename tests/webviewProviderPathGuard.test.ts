@@ -57,7 +57,7 @@ describe("WebviewProvider path boundary enforcement", () => {
     expect(showErrorMessageMock).toHaveBeenCalled();
   });
 
-  it("blocks ignorePath message for paths outside workspace and does not write .meridianignore", async () => {
+  it("blocks ignorePath message for paths outside workspace and does not write .meridian/.meridianignore", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-webview-ignore-root-"));
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-webview-ignore-outside-"));
     const outsideFile = path.join(outside, "secret.txt");
@@ -83,7 +83,7 @@ describe("WebviewProvider path boundary enforcement", () => {
     expect(invalidate).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
     expect(showErrorMessageMock).toHaveBeenCalled();
-    expect(fs.existsSync(path.join(root, ".meridianignore"))).toBe(false);
+    expect(fs.existsSync(path.join(root, ".meridian", ".meridianignore"))).toBe(false);
   });
 
   it("ignorePath message inside workspace appends, invalidates cache, and refreshes report", async () => {
@@ -112,7 +112,7 @@ describe("WebviewProvider path boundary enforcement", () => {
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(showInformationMessageMock).toHaveBeenCalled();
-    expect(fs.readFileSync(path.join(root, ".meridianignore"), "utf-8")).toBe(
+    expect(fs.readFileSync(path.join(root, ".meridian", ".meridianignore"), "utf-8")).toBe(
       "src/noisy.ts\n"
     );
   });

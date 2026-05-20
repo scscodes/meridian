@@ -1,16 +1,16 @@
 /**
- * .meridianignore — read and append helpers.
+ * .meridian/.meridianignore — read and append helpers.
  *
- * Canonical, security-gated I/O for the workspace's .meridianignore file.
- * Centralizes:
+ * Canonical, security-gated I/O for the workspace's ignore file (located at
+ * .meridian/.meridianignore per ADR 014). Centralizes:
  *   - pattern read + normalization (was duplicated in hygiene/analytics-service)
  *   - append-with-dedupe (was inline in specialized-commands.ts, no dedupe)
  *   - workspace-boundary enforcement via path-guard on every write
  *
- * .meridianignore file format: one bare relative path per line, blank lines
- * and lines beginning with `#` are ignored. Patterns are normalized at read
- * time to `**\/<pattern>` so micromatch matches both relative and absolute
- * forms (mirrors gitignore semantics).
+ * File format: one bare relative path per line, blank lines and lines
+ * beginning with `#` are ignored. Patterns are normalized at read time to
+ * `**\/<pattern>` so micromatch matches both relative and absolute forms
+ * (mirrors gitignore semantics).
  */
 
 import * as fs from "fs";
@@ -18,7 +18,7 @@ import * as path from "path";
 import { Result, success, failure } from "../types";
 import { resolveWorkspacePath } from "./path-guard";
 
-const IGNORE_FILE = ".meridianignore";
+const IGNORE_FILE = path.join(".meridian", ".meridianignore");
 
 export interface IgnoreAppendResult {
   /** The bare relative path written to (or already in) .meridianignore. */
@@ -50,7 +50,7 @@ function readIgnoreFilePatterns(filePath: string): string[] {
   }
 }
 
-/** Parse .meridianignore into micromatch-ready glob patterns. */
+/** Parse .meridian/.meridianignore into micromatch-ready glob patterns. */
 export function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
   return readIgnoreFilePatterns(path.join(workspaceRoot, IGNORE_FILE));
 }
@@ -61,8 +61,8 @@ export function readGitignorePatterns(workspaceRoot: string): string[] {
 }
 
 /**
- * Read the raw bare patterns currently in .meridianignore (no globbing
- * applied) for dedupe comparisons. Mirrors readMeridianIgnorePatterns'
+ * Read the raw bare patterns currently in .meridian/.meridianignore (no
+ * globbing applied) for dedupe comparisons. Mirrors readMeridianIgnorePatterns'
  * blank/comment handling but preserves the on-disk form.
  */
 function readRawPatterns(workspaceRoot: string): { lines: Set<string>; raw: string } {
@@ -82,7 +82,7 @@ function readRawPatterns(workspaceRoot: string): { lines: Set<string>; raw: stri
 
 /**
  * Best-effort timestamp for cache-busting. Analyzers can fold this into
- * their cache keys so an .meridianignore edit invalidates stale entries
+ * their cache keys so an ignore-file edit invalidates stale entries
  * without an explicit clearCache() handoff. Returns 0 if the file is
  * missing; consumers should treat any change in the returned value as
  * "patterns may have changed".
@@ -96,14 +96,15 @@ export function ignoreFileMtimeMs(workspaceRoot: string): number {
 }
 
 /**
- * Append a bare relative path to .meridianignore.
+ * Append a bare relative path to .meridian/.meridianignore.
  *
  * kind="file"   → adds the file's own relative path.
  * kind="folder" → adds the file's parent directory relative path.
  *
  * The path is run through resolveWorkspacePath() first so symlink escapes
  * or `../` traversal are rejected. Existing identical entries are detected
- * and no duplicate is written.
+ * and no duplicate is written. The `.meridian/` parent directory is created
+ * if missing — first-append in a fresh workspace must not crash.
  *
  * Refuses to add the workspace root itself ("." / "") as a folder pattern,
  * since that would silence every report.
@@ -140,7 +141,7 @@ export function appendIgnorePattern(
     });
   }
 
-  // Normalize path separators to forward-slash for portable .meridianignore
+  // Normalize path separators to forward-slash for portable ignore-file
   // entries (matches the convention used elsewhere in the repo and what
   // micromatch expects).
   const normalized = pattern.split(path.sep).join("/");
@@ -152,12 +153,13 @@ export function appendIgnorePattern(
 
   const ignorePath = path.join(workspaceRoot, IGNORE_FILE);
   try {
+    fs.mkdirSync(path.dirname(ignorePath), { recursive: true });
     const prefix = raw.length > 0 && !raw.endsWith("\n") ? "\n" : "";
     fs.appendFileSync(ignorePath, `${prefix}${normalized}\n`);
   } catch (err) {
     return failure({
       code: "IGNORE_WRITE_FAILED",
-      message: `Failed to update .meridianignore: ${err instanceof Error ? err.message : String(err)}`,
+      message: `Failed to update .meridian/.meridianignore: ${err instanceof Error ? err.message : String(err)}`,
       context: "appendIgnorePattern",
       details: err,
     });

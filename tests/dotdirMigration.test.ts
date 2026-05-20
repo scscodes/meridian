@@ -72,7 +72,7 @@ describe("migrateLegacyIgnoreFile", () => {
     expect(info).not.toHaveBeenCalled();
   });
 
-  it("logs warn with DOTDIR_MIGRATION_FAILED code when rename throws", () => {
+  it("logs warn with DOTDIR_MIGRATION_FAILED code when rename throws a non-EXDEV error", () => {
     const root = makeWorkspace();
     const legacy = path.join(root, ".meridianignore");
     fs.writeFileSync(legacy, "patterns\n");
@@ -81,7 +81,7 @@ describe("migrateLegacyIgnoreFile", () => {
     const renameSpy = vi
       .spyOn(fs, "renameSync")
       .mockImplementationOnce(() => {
-        throw new Error("EXDEV: simulated cross-device rename");
+        throw new Error("EACCES: simulated permission error");
       });
 
     try {
@@ -95,7 +95,43 @@ describe("migrateLegacyIgnoreFile", () => {
     expect(warn.mock.calls[0][0]).toContain("Relocation of .meridianignore failed");
     const errPayload = warn.mock.calls[0][2];
     expect(errPayload?.code).toBe("DOTDIR_MIGRATION_FAILED");
-    expect(errPayload?.message).toContain("EXDEV");
+    expect(errPayload?.message).toContain("EACCES");
     expect(info).not.toHaveBeenCalled();
+  });
+
+  it("falls back to copy+unlink when renameSync throws EXDEV (cross-device)", () => {
+    const root = makeWorkspace();
+    const legacy = path.join(root, ".meridianignore");
+    fs.writeFileSync(legacy, "cross-device patterns\n");
+    const { logger, info, warn } = makeLogger();
+
+    const renameSpy = vi
+      .spyOn(fs, "renameSync")
+      .mockImplementationOnce(() => {
+        throw new Error("EXDEV: cross-device link not permitted");
+      });
+
+    try {
+      migrateLegacyIgnoreFile(root, logger);
+    } finally {
+      renameSpy.mockRestore();
+    }
+
+    const target = path.join(root, ".meridian", ".meridianignore");
+    expect(fs.existsSync(legacy)).toBe(false);
+    expect(fs.existsSync(target)).toBe(true);
+    expect(fs.readFileSync(target, "utf-8")).toBe("cross-device patterns\n");
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls[0][0]).toContain("Relocated .meridianignore");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("no-op when workspaceRoot is undefined (no folder open)", () => {
+    const { logger, info, warn } = makeLogger();
+
+    migrateLegacyIgnoreFile(undefined, logger);
+
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -13,7 +13,25 @@ import { Logger } from "../types";
 const IGNORE_FILENAME = ".meridianignore";
 const DOTDIR = ".meridian";
 
-export function migrateLegacyIgnoreFile(workspaceRoot: string, logger: Logger): void {
+function relocate(legacy: string, target: string): void {
+  try {
+    fs.renameSync(legacy, target);
+  } catch (err) {
+    // EXDEV: workspace and dotdir on different mounts (Docker volume, overlay
+    // FS, bind mount). renameSync cannot cross devices; copy + unlink does.
+    if (err instanceof Error && /EXDEV/.test(err.message)) {
+      fs.copyFileSync(legacy, target);
+      fs.unlinkSync(legacy);
+      return;
+    }
+    throw err;
+  }
+}
+
+export function migrateLegacyIgnoreFile(workspaceRoot: string | undefined, logger: Logger): void {
+  // No workspace folder open — never migrate inside an arbitrary cwd.
+  if (!workspaceRoot) return;
+
   const legacy = path.join(workspaceRoot, IGNORE_FILENAME);
   const target = path.join(workspaceRoot, DOTDIR, IGNORE_FILENAME);
 
@@ -29,7 +47,7 @@ export function migrateLegacyIgnoreFile(workspaceRoot: string, logger: Logger): 
 
   try {
     fs.mkdirSync(path.join(workspaceRoot, DOTDIR), { recursive: true });
-    fs.renameSync(legacy, target);
+    relocate(legacy, target);
     logger.info(
       `Relocated ${IGNORE_FILENAME} → ${DOTDIR}/${IGNORE_FILENAME}`,
       "migrateLegacyIgnoreFile"

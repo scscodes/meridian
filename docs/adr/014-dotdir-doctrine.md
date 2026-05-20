@@ -94,18 +94,12 @@ format in the VS Code / TypeScript ecosystem (`tsconfig.json`,
 `package.json`, `settings.json` itself); no value added by YAML; adds a parser
 dependency.
 
-**Dual-read (read legacy `.meridianignore` AND `.meridian/.meridianignore`)
-for a deprecation window.** Rejected. Pre-1.0; no installed base owed a
-window. Dual-read code paths rot. Hard cut + auto-migrate is the cleaner
-contract.
+**Dual-read deprecation window.** Rejected per decision 5 — pre-1.0; no installed base owed a window.
 
 **File-watcher subscription on `.meridian/settings.json` for live reload.**
 Deferred. VS Code's `getConfiguration()` is re-resolved on each call with no
 push notification either; matching that semantics is sufficient until a
 consumer needs hot-swap.
-
-**Host-runtime artifacts (`run-log.v1.jsonl`) under `.meridian/`.** Rejected.
-See decision 6.
 
 ## Consequences
 

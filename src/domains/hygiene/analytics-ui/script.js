@@ -344,7 +344,7 @@ document.addEventListener("click", (e) => {
 });
 
 // Right-click on a .path-link → "Ignore file / Ignore folder" menu.
-// Sends an "ignorePath" message; extension appends to .meridianignore,
+// Sends an "ignorePath" message; extension appends to .meridian/.meridianignore,
 // invalidates the HygieneAnalyzer cache, and re-renders the report.
 installIgnoreContextMenu();
 

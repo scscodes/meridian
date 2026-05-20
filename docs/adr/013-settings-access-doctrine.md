@@ -94,6 +94,11 @@ caches internally. Revisit only if a consumer ends up in a hot path.
 - **Layering invariant.** `src/infrastructure/settings.ts` must not import
   from `src/domains/*`. Domain-specific shapes (like `PruneConfig`) live in
   their domain and consume `readSetting` rather than the other direction.
+- **Updated by [ADR 014](./014-dotdir-doctrine.md):** a sparse
+  `.meridian/settings.json` workspace-file overlay was layered on top of this
+  chokepoint. Workspace-file keys override VS Code config; absent keys fall
+  through. Runtime narrowing at the policy boundary (Rule 4) absorbs the new
+  untyped JSON trust boundary.
 
 ## Adoption checklist for new settings
 

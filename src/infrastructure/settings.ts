@@ -78,10 +78,25 @@ function readWorkspaceSettings(): Record<string, unknown> {
   }
 }
 
+// Shape check against the typed default. Rejects mismatched workspace-file
+// overrides so a malformed JSON value cannot silently downgrade a policy
+// callsite (e.g. a string supplied where a string[] is expected for
+// `security.gitNetwork.allowedHosts`). null/undefined are treated as "not
+// supplied" so the JSON `null` literal cannot clear a typed default.
+function overrideMatchesDefault<K extends SettingKey>(value: unknown, key: K): boolean {
+  if (value === null || value === undefined) return false;
+  const def: unknown = SETTING_DEFAULTS[key];
+  if (Array.isArray(def)) {
+    return Array.isArray(value) && value.every((v) => typeof v === "string");
+  }
+  return typeof value === typeof def;
+}
+
 export function readSetting<K extends SettingKey>(key: K): SettingValue<K> {
   const overrides = readWorkspaceSettings();
-  if (key in overrides) {
-    // Untyped boundary: trust narrowing at policy callsites (ADR 013 Rule 4).
+  if (key in overrides && overrideMatchesDefault(overrides[key], key)) {
+    // Shape-validated at this trust boundary; security-sensitive callsites
+    // additionally narrow at the policy boundary (ADR 013 Rule 4).
     return overrides[key] as SettingValue<K>;
   }
   // Single absorber for any vscode-side failure (incomplete test mocks, host

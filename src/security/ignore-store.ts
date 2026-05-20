@@ -21,7 +21,7 @@ import { resolveWorkspacePath } from "./path-guard";
 const IGNORE_FILE = path.join(".meridian", ".meridianignore");
 
 export interface IgnoreAppendResult {
-  /** The bare relative path written to (or already in) .meridianignore. */
+  /** The bare relative path written to (or already in) .meridian/.meridianignore. */
   readonly pattern: string;
   /** True if the pattern was already present and no write occurred. */
   readonly alreadyExists: boolean;

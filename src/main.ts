@@ -59,11 +59,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(outputChannel);
 
   const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceRoot = workspaceFolder ?? process.cwd();
 
   // ADR 014: hoist legacy .meridianignore into .meridian/ before any analyzer
-  // warms its cache against the new location.
-  migrateLegacyIgnoreFile(workspaceRoot, logger);
+  // warms its cache against the new location. No-op when no workspace folder
+  // is open — never migrate inside an arbitrary cwd.
+  migrateLegacyIgnoreFile(workspaceFolder, logger);
 
   const gitProvider = createGitProvider(workspaceRoot);
   const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);

@@ -142,5 +142,83 @@ describe("readSetting()", () => {
 
       expect(readSetting("startup.enableFileWatchers")).toBe(true);
     });
+
+    it("falls through when an overlay value is JSON null", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "hygiene.prune.minAgeDays": null })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => 30)
+      );
+
+      expect(readSetting("hygiene.prune.minAgeDays")).toBe(30);
+    });
+
+    it("falls through when an overlay value has the wrong primitive type", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "startup.enableFileWatchers": "true" })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, _fallback) => true)
+      );
+
+      expect(readSetting("startup.enableFileWatchers")).toBe(true);
+    });
+
+    it("falls through when an array-typed key receives a non-array overlay", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "security.gitNetwork.allowedHosts": "github.com" })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, fallback) => fallback)
+      );
+
+      expect(readSetting("security.gitNetwork.allowedHosts")).toEqual([]);
+    });
+
+    it("falls through when an array-typed key receives an array with non-string elements", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "security.gitNetwork.allowedHosts": ["github.com", 42] })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, fallback) => fallback)
+      );
+
+      expect(readSetting("security.gitNetwork.allowedHosts")).toEqual([]);
+    });
+
+    it("accepts a well-typed string[] overlay", () => {
+      const root = makeWorkspace();
+      fs.mkdirSync(path.join(root, ".meridian"));
+      fs.writeFileSync(
+        path.join(root, ".meridian", "settings.json"),
+        JSON.stringify({ "security.gitNetwork.allowedHosts": ["github.com", "gitlab.com"] })
+      );
+      setWorkspaceRoot(root);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+        mockCfg((_key, fallback) => fallback)
+      );
+
+      expect(readSetting("security.gitNetwork.allowedHosts")).toEqual([
+        "github.com",
+        "gitlab.com",
+      ]);
+    });
   });
 });

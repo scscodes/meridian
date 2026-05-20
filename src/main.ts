@@ -23,6 +23,7 @@ import { generateProse } from "./infrastructure/prose-generator";
 import { readSetting } from "./infrastructure/settings";
 import { getPruneConfig } from "./domains/hygiene/prune-config";
 import { createRunLog } from "./infrastructure/run-log";
+import { migrateLegacyIgnoreFile } from "./infrastructure/dotdir-migration";
 
 // Presentation layer
 import { registerCommands, COMMAND_MAP } from "./presentation/command-registry";
@@ -59,6 +60,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+
+  // ADR 014: hoist legacy .meridianignore into .meridian/ before any analyzer
+  // warms its cache against the new location.
+  migrateLegacyIgnoreFile(workspaceRoot, logger);
+
   const gitProvider = createGitProvider(workspaceRoot);
   const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);
   const runLog = createRunLog(workspaceRoot, logger);

@@ -123,6 +123,10 @@ export interface WorkspaceProvider {
   deleteFile(path: string): Promise<Result<void>>;
 }
 
+// Settings access intentionally bypasses CommandContext — see ADR 013.
+// readSetting() in src/infrastructure/settings.ts is the single chokepoint;
+// settings are stateless reads, no DI payoff vs the stateful adapters above.
+
 // ============================================================================
 // Domain Models & Responses
 // ============================================================================

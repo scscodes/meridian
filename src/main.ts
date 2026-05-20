@@ -75,10 +75,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Domain registration ─────────────────────────────────────────────
   const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse);
-  router.registerDomain(createGitDomain(
+  const gitDomain = createGitDomain(
     gitProvider, logger, workspaceRoot, generateProse,
     runLog, () => hygieneDomain.getLastScan()
-  ));
+  );
+  router.registerDomain(gitDomain);
   router.registerDomain(hygieneDomain);
 
   const validationResult = await router.validateDomains();
@@ -92,8 +93,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const dispatch = (cmd: Command, ctx: CommandContext) => router.dispatch(cmd, ctx);
   const cmdCtx = getCommandContext(context);
 
+  // Wire analyzer cache invalidators to webview providers so the right-click
+  // "Ignore" action drops stale entries before the post-write refresh.
   const { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = createWebviewPanels(
-    context, router, workspaceRoot, ctxFn, () => config.getPruneConfig()
+    context, router, workspaceRoot, ctxFn, () => config.getPruneConfig(),
+    {
+      invalidateGitAnalytics:     () => gitDomain.analyzer.clearCache(),
+      invalidateHygieneAnalytics: () => hygieneDomain.analyzer.clearCache(),
+    }
   );
 
   const trees = setupTreeProviders(

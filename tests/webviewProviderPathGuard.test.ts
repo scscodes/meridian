@@ -3,9 +3,10 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-const { executeCommandMock, showErrorMessageMock } = vi.hoisted(() => ({
+const { executeCommandMock, showErrorMessageMock, showInformationMessageMock } = vi.hoisted(() => ({
   executeCommandMock: vi.fn(),
   showErrorMessageMock: vi.fn(),
+  showInformationMessageMock: vi.fn(),
 }));
 
 vi.mock("vscode", () => ({
@@ -14,6 +15,7 @@ vi.mock("vscode", () => ({
   },
   window: {
     showErrorMessage: showErrorMessageMock,
+    showInformationMessage: showInformationMessageMock,
     createWebviewPanel: vi.fn(),
   },
   Uri: {
@@ -32,6 +34,7 @@ describe("WebviewProvider path boundary enforcement", () => {
   beforeEach(() => {
     executeCommandMock.mockReset();
     showErrorMessageMock.mockReset();
+    showInformationMessageMock.mockReset();
   });
 
   it("blocks openFile message for paths outside workspace", async () => {
@@ -52,5 +55,65 @@ describe("WebviewProvider path boundary enforcement", () => {
 
     expect(executeCommandMock).not.toHaveBeenCalled();
     expect(showErrorMessageMock).toHaveBeenCalled();
+  });
+
+  it("blocks ignorePath message for paths outside workspace and does not write .meridianignore", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-webview-ignore-root-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-webview-ignore-outside-"));
+    const outsideFile = path.join(outside, "secret.txt");
+    fs.writeFileSync(outsideFile, "secret");
+
+    const invalidate = vi.fn();
+    const refresh = vi.fn(async () => {
+      throw new Error("unused");
+    });
+
+    const provider = new AnalyticsWebviewProvider(
+      { fsPath: root } as unknown as vscode.Uri,
+      root,
+      refresh,
+      invalidate
+    );
+
+    await (provider as any).handleMessage({
+      type: "ignorePath",
+      payload: { path: outsideFile, kind: "file" },
+    });
+
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(showErrorMessageMock).toHaveBeenCalled();
+    expect(fs.existsSync(path.join(root, ".meridianignore"))).toBe(false);
+  });
+
+  it("ignorePath message inside workspace appends, invalidates cache, and refreshes report", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-webview-ignore-ok-"));
+    fs.mkdirSync(path.join(root, "src"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src", "noisy.ts"), "export {};\n");
+
+    const invalidate = vi.fn();
+    const refresh = vi.fn(async () => {
+      // Stand in for onFilter — return a minimal report shape.
+      return {} as any;
+    });
+
+    const provider = new AnalyticsWebviewProvider(
+      { fsPath: root } as unknown as vscode.Uri,
+      root,
+      refresh,
+      invalidate
+    );
+
+    await (provider as any).handleMessage({
+      type: "ignorePath",
+      payload: { path: "src/noisy.ts", kind: "file" },
+    });
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(showInformationMessageMock).toHaveBeenCalled();
+    expect(fs.readFileSync(path.join(root, ".meridianignore"), "utf-8")).toBe(
+      "src/noisy.ts\n"
+    );
   });
 });

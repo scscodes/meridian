@@ -19,6 +19,7 @@ import {
 import { DeadCodeScan } from "../../types";
 import { CACHE_SETTINGS, HYGIENE_ANALYTICS_EXCLUDE_PATTERNS } from "../../constants";
 import { TtlCache } from "../../infrastructure/cache";
+import { ignoreFileMtimeMs, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import {
   categorize,
   isLineCountable,
@@ -50,26 +51,6 @@ function countLines(filePath: string, ext: string, sizeBytes: number): number {
     return content.split("\n").length;
   } catch {
     return -1;
-  }
-}
-
-// ============================================================================
-// Ignore pattern helpers (mirrors handlers.ts)
-// ============================================================================
-
-function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
-  try {
-    const content = fs.readFileSync(path.join(workspaceRoot, ".meridianignore"), "utf-8");
-    return content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith("#"))
-      .map((l) => {
-        const stripped = l.endsWith("/") ? l.slice(0, -1) : l;
-        return stripped.startsWith("**/") ? stripped : `**/${stripped}`;
-      });
-  } catch {
-    return [];
   }
 }
 
@@ -125,7 +106,10 @@ export class HygieneAnalyzer {
     config: PruneConfig = PRUNE_DEFAULTS,
     deadCodeScan?: DeadCodeScan
   ): HygieneAnalyticsReport {
-    const cfgKey = pruneConfigKey(config);
+    // Cache key folds in .meridianignore mtime so an edit to the ignore file
+    // (e.g. from the webview right-click "Ignore" action) invalidates stale
+    // entries without an explicit clearCache() handoff.
+    const cfgKey = `${pruneConfigKey(config)}::ignore=${ignoreFileMtimeMs(workspaceRoot)}`;
     const cached = this.cache.get(workspaceRoot);
     if (cached && cached.configKey === cfgKey) {
       // Re-attach the latest dead code scan even on cache hit — the dead code

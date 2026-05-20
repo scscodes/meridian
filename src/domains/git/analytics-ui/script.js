@@ -385,6 +385,11 @@ document.addEventListener("click", (e) => {
   if (link) vscode?.postMessage({ type: "openFile", payload: link.dataset.path });
 });
 
+// Right-click on a .path-link → small "Ignore file / Ignore folder" menu.
+// Sends an "ignorePath" message; the extension appends to .meridianignore,
+// invalidates the analyzer cache, and re-renders the report.
+installIgnoreContextMenu();
+
 document.getElementById("applyFilters")?.addEventListener("click", () => {
   const period      = document.getElementById("period")?.value || "3mo";
   const author      = document.getElementById("authorFilter")?.value || "";
@@ -426,6 +431,68 @@ function setText(id, value) {
 function escapeHtml(text) {
   const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
   return String(text).replace(/[&<>"']/g, (m) => map[m]);
+}
+
+/**
+ * Right-click context menu for .path-link rows. Shared logic — kept inline
+ * because the three Meridian webviews don't currently share a JS module.
+ */
+function installIgnoreContextMenu() {
+  let activeMenu = null;
+  function dismiss() {
+    if (activeMenu && activeMenu.parentNode) {
+      activeMenu.parentNode.removeChild(activeMenu);
+    }
+    activeMenu = null;
+  }
+  function build(rawPath, x, y) {
+    dismiss();
+    const menu = document.createElement("div");
+    menu.className = "meridian-context-menu";
+    menu.setAttribute("role", "menu");
+
+    const header = document.createElement("div");
+    header.className = "menu-header";
+    header.textContent = rawPath;
+    menu.appendChild(header);
+
+    function addItem(label, kind) {
+      const item = document.createElement("div");
+      item.className = "menu-item";
+      item.setAttribute("role", "menuitem");
+      item.textContent = label;
+      item.addEventListener("click", () => {
+        vscode && vscode.postMessage({ type: "ignorePath", payload: { path: rawPath, kind: kind } });
+        dismiss();
+      });
+      menu.appendChild(item);
+    }
+    addItem("Ignore file", "file");
+    addItem("Ignore folder", "folder");
+
+    document.body.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width - 4;
+    const maxY = window.innerHeight - rect.height - 4;
+    menu.style.left = Math.min(x, Math.max(0, maxX)) + "px";
+    menu.style.top  = Math.min(y, Math.max(0, maxY)) + "px";
+    activeMenu = menu;
+  }
+
+  document.addEventListener("contextmenu", (e) => {
+    const link = e.target.closest && e.target.closest(".path-link");
+    if (!link || !link.dataset || !link.dataset.path) return;
+    e.preventDefault();
+    build(link.dataset.path, e.clientX, e.clientY);
+  });
+  document.addEventListener("click", (e) => {
+    if (activeMenu && !activeMenu.contains(e.target)) dismiss();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") dismiss();
+  });
+  window.addEventListener("blur", dismiss);
+  window.addEventListener("scroll", dismiss, true);
 }
 
 // Initialize on document load

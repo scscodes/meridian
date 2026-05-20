@@ -7,13 +7,13 @@
  */
 
 import * as vscode from "vscode";
-import * as fs from "fs";
 import * as nodePath from "path";
 import { CommandRouter } from "../router";
 import { CommandContext } from "../types";
 import { UI_SETTINGS } from "../constants";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 import { copyWithPolicy } from "../security/operation-policy";
+import { appendIgnorePattern } from "../security/ignore-store";
 
 const HR = "─".repeat(UI_SETTINGS.OUTPUT_HR_LENGTH);
 
@@ -53,16 +53,16 @@ export function registerSpecializedCommands(
         item instanceof vscode.Uri ? item.fsPath : item?.filePath;
       if (!filePath) return;
       const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-      const ignorePath = nodePath.join(wsRoot, ".meridianignore");
-      const pattern = nodePath.relative(wsRoot, filePath);
-      try {
-        fs.appendFileSync(ignorePath, `\n${pattern}\n`);
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        vscode.window.showErrorMessage(`Failed to update .meridianignore: ${errMsg}`);
+      const result = appendIgnorePattern(wsRoot, filePath, "file");
+      if (result.kind === "err") {
+        vscode.window.showErrorMessage(result.error.message);
         return;
       }
-      vscode.window.showInformationMessage(`Added to .meridianignore: ${pattern}`);
+      vscode.window.showInformationMessage(
+        result.value.alreadyExists
+          ? `Already in .meridianignore: ${result.value.pattern}`
+          : `Added to .meridianignore: ${result.value.pattern}`
+      );
       hygieneTree.refresh();
     }),
   );

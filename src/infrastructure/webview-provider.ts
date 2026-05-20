@@ -8,7 +8,19 @@ import { gitReportToCsv } from "../domains/git/analytics-service";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { SessionBriefingReport } from "../domains/git/types";
 import { resolveWorkspacePath } from "../security/path-guard";
+import { appendIgnorePattern } from "../security/ignore-store";
 import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
+
+/**
+ * Optional hook a provider can opt into for the webview right-click "Ignore"
+ * action. Subclasses pass the workspace root + a callback that invalidates the
+ * downstream analyzer cache so the report visibly updates on the next refresh.
+ */
+export interface IgnoreHooks {
+  readonly workspaceRoot: string;
+  /** Clear caches of any analyzer whose output this report consumes. */
+  readonly invalidateCaches: () => void;
+}
 
 // ============================================================================
 // Base Class
@@ -28,14 +40,78 @@ export abstract class BaseWebviewProvider<TReport> {
   protected abstract onMessage(msg: { type: string; [key: string]: unknown }): Promise<void>;
 
   /**
-   * Route messages: "export" handled centrally, everything else delegated to subclass.
+   * Subclasses that wire up IgnoreHooks return them here. The base routes the
+   * webview "ignorePath" message through this hook; subclasses that return
+   * null fall through to their own onMessage (or no-op).
+   */
+  protected getIgnoreHooks(): IgnoreHooks | null {
+    return null;
+  }
+
+  /**
+   * Subclasses override to regenerate-and-push their report after an ignore
+   * pattern is added. Default: no-op (report stays as it was; user-visible
+   * effect lands on next manual refresh).
+   */
+  protected async refreshReport(): Promise<void> {
+    // override
+  }
+
+  /**
+   * Route messages: "export" and "ignorePath" handled centrally, everything
+   * else delegated to subclass.
    */
   protected async handleMessage(msg: { type: string; [key: string]: unknown }): Promise<void> {
     if (msg.type === "export") {
       await this.handleExport(msg.format as string);
       return;
     }
+    if (msg.type === "ignorePath") {
+      await this.handleIgnorePath(msg.payload as { path?: string; kind?: string } | undefined);
+      return;
+    }
     await this.onMessage(msg);
+  }
+
+  /**
+   * Append a webview-triggered path to .meridianignore, invalidate caches,
+   * and trigger a refresh so the row visibly disappears (for reports whose
+   * data source consults .meridianignore). Path comes from a webview so
+   * appendIgnorePattern's path-guard is load-bearing.
+   */
+  protected async handleIgnorePath(
+    payload: { path?: string; kind?: string } | undefined
+  ): Promise<void> {
+    const hooks = this.getIgnoreHooks();
+    if (!hooks) return;
+
+    const rawPath = typeof payload?.path === "string" ? payload.path : "";
+    const kind = payload?.kind === "folder" ? "folder" : "file";
+    if (!rawPath) return;
+
+    const result = appendIgnorePattern(hooks.workspaceRoot, rawPath, kind);
+    if (result.kind === "err") {
+      vscode.window.showErrorMessage(result.error.message);
+      this.panel?.webview.postMessage({ type: "error", payload: result.error.message });
+      return;
+    }
+    if (result.value.alreadyExists) {
+      vscode.window.showInformationMessage(
+        `Already in .meridianignore: ${result.value.pattern}`
+      );
+      return;
+    }
+
+    hooks.invalidateCaches();
+    vscode.window.showInformationMessage(
+      `Added to .meridianignore: ${result.value.pattern}`
+    );
+
+    try {
+      await this.refreshReport();
+    } catch (e) {
+      this.handleError("Refresh after ignore failed", e);
+    }
   }
 
   /** True while a webview panel for this report is live. */
@@ -155,15 +231,33 @@ export abstract class BaseWebviewProvider<TReport> {
 export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsReport> {
   private readonly workspaceRoot: string;
   private readonly onFilter: (opts: AnalyticsOptions) => Promise<GitAnalyticsReport>;
+  private readonly invalidateAnalyticsCaches: (() => void) | undefined;
+  /** Period of the report currently displayed, captured at last filter/refresh. */
+  private currentPeriod = "3mo";
 
   constructor(
     extensionUri: vscode.Uri,
     workspaceRoot: string,
-    onFilter: (opts: AnalyticsOptions) => Promise<GitAnalyticsReport>
+    onFilter: (opts: AnalyticsOptions) => Promise<GitAnalyticsReport>,
+    invalidateAnalyticsCaches?: () => void
   ) {
     super(extensionUri);
     this.workspaceRoot = workspaceRoot;
     this.onFilter = onFilter;
+    this.invalidateAnalyticsCaches = invalidateAnalyticsCaches;
+  }
+
+  protected override getIgnoreHooks(): IgnoreHooks | null {
+    if (!this.invalidateAnalyticsCaches) return null;
+    return {
+      workspaceRoot: this.workspaceRoot,
+      invalidateCaches: this.invalidateAnalyticsCaches,
+    };
+  }
+
+  protected override async refreshReport(): Promise<void> {
+    const report = await this.onFilter({ period: this.currentPeriod } as AnalyticsOptions);
+    this.updateReport(report);
   }
 
   private openWorkspaceFile(candidatePath: string): void {
@@ -187,7 +281,9 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
   protected async onMessage(msg: { type: string; payload?: unknown }): Promise<void> {
     if (msg.type === "filter") {
       try {
-        const report = await this.onFilter(msg.payload as AnalyticsOptions);
+        const opts = (msg.payload as AnalyticsOptions) ?? ({ period: "3mo" } as AnalyticsOptions);
+        if (opts.period) this.currentPeriod = opts.period;
+        const report = await this.onFilter(opts);
         this.updateReport(report);
       } catch (e) {
         this.handleError("Git analytics filter failed", e);
@@ -195,6 +291,7 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
     } else if (msg.type === "refresh") {
       try {
         const period = (msg.payload as { period?: string })?.period ?? "3mo";
+        this.currentPeriod = period;
         const report = await this.onFilter({ period } as AnalyticsOptions);
         this.updateReport(report);
       } catch (e) {
@@ -222,19 +319,36 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
 
   private workspaceRoot = "";
   private readonly onRefresh: () => Promise<HygieneAnalyticsReport>;
+  private readonly invalidateAnalyticsCaches: (() => void) | undefined;
 
   constructor(
     extensionUri: vscode.Uri,
-    onRefresh: () => Promise<HygieneAnalyticsReport>
+    onRefresh: () => Promise<HygieneAnalyticsReport>,
+    invalidateAnalyticsCaches?: () => void
   ) {
     super(extensionUri);
     this.onRefresh = onRefresh;
+    this.invalidateAnalyticsCaches = invalidateAnalyticsCaches;
   }
 
   protected getViewId(): string { return "meridian.hygiene.analytics"; }
   protected getViewTitle(): string { return REPORT_LABELS.hygieneAnalytics; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "hygiene", "analytics-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-hygiene-analytics"; }
+
+  protected override getIgnoreHooks(): IgnoreHooks | null {
+    if (!this.workspaceRoot || !this.invalidateAnalyticsCaches) return null;
+    return {
+      workspaceRoot: this.workspaceRoot,
+      invalidateCaches: this.invalidateAnalyticsCaches,
+    };
+  }
+
+  protected override async refreshReport(): Promise<void> {
+    const report = await this.onRefresh();
+    this.workspaceRoot = report.workspaceRoot;
+    this.updateReport(report);
+  }
 
   override async openPanel(report: HygieneAnalyticsReport): Promise<void> {
     this.workspaceRoot = report.workspaceRoot;
@@ -302,21 +416,37 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
 
   private readonly workspaceRoot: string;
   private readonly onRefresh: () => Promise<SessionBriefingReport>;
+  private readonly invalidateAnalyticsCaches: (() => void) | undefined;
 
   constructor(
     extensionUri: vscode.Uri,
     workspaceRoot: string,
-    onRefresh: () => Promise<SessionBriefingReport>
+    onRefresh: () => Promise<SessionBriefingReport>,
+    invalidateAnalyticsCaches?: () => void
   ) {
     super(extensionUri);
     this.workspaceRoot = workspaceRoot;
     this.onRefresh = onRefresh;
+    this.invalidateAnalyticsCaches = invalidateAnalyticsCaches;
   }
 
   protected getViewId(): string { return "meridian.sessionBriefing"; }
   protected getViewTitle(): string { return REPORT_LABELS.sessionBriefing; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "git", "session-briefing-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-session-briefing"; }
+
+  protected override getIgnoreHooks(): IgnoreHooks | null {
+    if (!this.invalidateAnalyticsCaches) return null;
+    return {
+      workspaceRoot: this.workspaceRoot,
+      invalidateCaches: this.invalidateAnalyticsCaches,
+    };
+  }
+
+  protected override async refreshReport(): Promise<void> {
+    const report = await this.onRefresh();
+    this.updateReport(report);
+  }
 
   protected reportToCsv(report: SessionBriefingReport): string {
     const csvStr = (v: string) => `"${v.replace(/"/g, '""')}"`;

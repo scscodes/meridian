@@ -1,3 +1,15 @@
+# [2.4.0](https://github.com/scscodes/meridian/compare/v2.3.0...v2.4.0) (2026-05-20)
+
+
+### Bug Fixes
+
+* explicit Meridian settings cog on view section headings ([e6d1126](https://github.com/scscodes/meridian/commit/e6d112612fda0623e0f986c10f301b086b145d70))
+
+
+### Features
+
+* right-click "Ignore file / folder" in webview reports ([2548664](https://github.com/scscodes/meridian/commit/254866416779a72ac11c80fe45ac8d17e2cf3076))
+
 # [2.3.0](https://github.com/scscodes/meridian/compare/v2.2.0...v2.3.0) (2026-05-19)
 
 

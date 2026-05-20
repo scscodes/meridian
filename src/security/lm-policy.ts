@@ -1,18 +1,10 @@
 import * as vscode from "vscode";
-
-type LmEgressMode = "allow" | "prompt" | "deny";
+import { readSetting } from "../infrastructure/settings";
 
 const MAX_LM_PAYLOAD_LENGTH = 12000;
 
-function getLmEgressMode(): LmEgressMode {
-  const mode = vscode.workspace
-    .getConfiguration("meridian.security")
-    .get<string>("lmEgress.mode", "prompt");
-  return mode === "allow" || mode === "prompt" || mode === "deny" ? mode : "prompt";
-}
-
 export async function enforceLmEgressPolicy(featureLabel: string): Promise<boolean> {
-  const mode = getLmEgressMode();
+  const mode = readSetting("security.lmEgress.mode");
   if (mode === "allow") return true;
   if (mode === "deny") return false;
 

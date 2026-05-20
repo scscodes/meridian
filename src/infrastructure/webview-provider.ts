@@ -74,9 +74,9 @@ export abstract class BaseWebviewProvider<TReport> {
   }
 
   /**
-   * Append a webview-triggered path to .meridianignore, invalidate caches,
-   * and trigger a refresh so the row visibly disappears (for reports whose
-   * data source consults .meridianignore). Path comes from a webview so
+   * Append a webview-triggered path to .meridian/.meridianignore, invalidate
+   * caches, and trigger a refresh so the row visibly disappears (for reports
+   * whose data source consults the ignore file). Path comes from a webview so
    * appendIgnorePattern's path-guard is load-bearing.
    */
   protected async handleIgnorePath(
@@ -97,14 +97,14 @@ export abstract class BaseWebviewProvider<TReport> {
     }
     if (result.value.alreadyExists) {
       vscode.window.showInformationMessage(
-        `Already in .meridianignore: ${result.value.pattern}`
+        `Already in .meridian/.meridianignore: ${result.value.pattern}`
       );
       return;
     }
 
     hooks.invalidateCaches();
     vscode.window.showInformationMessage(
-      `Added to .meridianignore: ${result.value.pattern}`
+      `Added to .meridian/.meridianignore: ${result.value.pattern}`
     );
 
     try {

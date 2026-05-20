@@ -17,15 +17,16 @@ function makeWorkspace(): string {
 }
 
 describe("readMeridianIgnorePatterns", () => {
-  it("returns [] when .meridianignore is missing", () => {
+  it("returns [] when .meridian/.meridianignore is missing", () => {
     const root = makeWorkspace();
     expect(readMeridianIgnorePatterns(root)).toEqual([]);
   });
 
   it("skips blanks and comments, wraps bare patterns with **/", () => {
     const root = makeWorkspace();
+    fs.mkdirSync(path.join(root, ".meridian"), { recursive: true });
     fs.writeFileSync(
-      path.join(root, ".meridianignore"),
+      path.join(root, ".meridian", ".meridianignore"),
       "# header\n\nsrc/index.ts\nbuild/\n**/already-prefixed\n"
     );
     expect(readMeridianIgnorePatterns(root)).toEqual([
@@ -45,7 +46,7 @@ describe("appendIgnorePattern", () => {
       expect(result.value.pattern).toBe("src/index.ts");
       expect(result.value.alreadyExists).toBe(false);
     }
-    expect(fs.readFileSync(path.join(root, ".meridianignore"), "utf-8")).toBe(
+    expect(fs.readFileSync(path.join(root, ".meridian", ".meridianignore"), "utf-8")).toBe(
       "src/index.ts\n"
     );
   });
@@ -57,17 +58,18 @@ describe("appendIgnorePattern", () => {
     if (result.kind === "ok") {
       expect(result.value.pattern).toBe("src/domains");
     }
-    expect(fs.readFileSync(path.join(root, ".meridianignore"), "utf-8")).toBe(
+    expect(fs.readFileSync(path.join(root, ".meridian", ".meridianignore"), "utf-8")).toBe(
       "src/domains\n"
     );
   });
 
   it("preserves existing content and adds a separator newline when needed", () => {
     const root = makeWorkspace();
-    fs.writeFileSync(path.join(root, ".meridianignore"), "build");
+    fs.mkdirSync(path.join(root, ".meridian"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".meridian", ".meridianignore"), "build");
     const result = appendIgnorePattern(root, "src/index.ts", "file");
     expect(result.kind).toBe("ok");
-    expect(fs.readFileSync(path.join(root, ".meridianignore"), "utf-8")).toBe(
+    expect(fs.readFileSync(path.join(root, ".meridian", ".meridianignore"), "utf-8")).toBe(
       "build\nsrc/index.ts\n"
     );
   });
@@ -80,7 +82,7 @@ describe("appendIgnorePattern", () => {
     if (second.kind === "ok") {
       expect(second.value.alreadyExists).toBe(true);
     }
-    expect(fs.readFileSync(path.join(root, ".meridianignore"), "utf-8")).toBe(
+    expect(fs.readFileSync(path.join(root, ".meridian", ".meridianignore"), "utf-8")).toBe(
       "src/index.ts\n"
     );
   });
@@ -94,7 +96,7 @@ describe("appendIgnorePattern", () => {
     if (result.kind === "err") {
       expect(result.error.code).toBe("PATH_GUARD_BLOCKED");
     }
-    expect(fs.existsSync(path.join(root, ".meridianignore"))).toBe(false);
+    expect(fs.existsSync(path.join(root, ".meridian", ".meridianignore"))).toBe(false);
   });
 
   it("refuses to ignore the workspace root when kind=folder", () => {
@@ -112,5 +114,16 @@ describe("appendIgnorePattern", () => {
     expect(ignoreFileMtimeMs(root)).toBe(0);
     appendIgnorePattern(root, "src/index.ts", "file");
     expect(ignoreFileMtimeMs(root)).toBeGreaterThan(0);
+  });
+
+  it("creates .meridian/ on first append when the dotdir is missing", () => {
+    const root = makeWorkspace();
+    expect(fs.existsSync(path.join(root, ".meridian"))).toBe(false);
+    const result = appendIgnorePattern(root, "src/index.ts", "file");
+    expect(result.kind).toBe("ok");
+    expect(fs.existsSync(path.join(root, ".meridian"))).toBe(true);
+    expect(fs.readFileSync(path.join(root, ".meridian", ".meridianignore"), "utf-8")).toBe(
+      "src/index.ts\n"
+    );
   });
 });

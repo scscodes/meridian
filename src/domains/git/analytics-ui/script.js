@@ -386,7 +386,7 @@ document.addEventListener("click", (e) => {
 });
 
 // Right-click on a .path-link → small "Ignore file / Ignore folder" menu.
-// Sends an "ignorePath" message; the extension appends to .meridianignore,
+// Sends an "ignorePath" message; the extension appends to .meridian/.meridianignore,
 // invalidates the analyzer cache, and re-renders the report.
 installIgnoreContextMenu();
 

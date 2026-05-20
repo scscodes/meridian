@@ -338,7 +338,7 @@
   });
 
   // ── Right-click ignore menu ────────────────────────────────────────
-  // Sends an "ignorePath" message; the extension appends to .meridianignore
+  // Sends an "ignorePath" message; the extension appends to .meridian/.meridianignore
   // and invalidates both analyzer caches (briefing pulls from git +
   // hygiene) so the next refresh reflects the change for analytics-derived
   // rows (topChurnFiles, pendingChangeRisk's joined entries).

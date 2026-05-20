@@ -106,9 +106,9 @@ export class HygieneAnalyzer {
     config: PruneConfig = PRUNE_DEFAULTS,
     deadCodeScan?: DeadCodeScan
   ): HygieneAnalyticsReport {
-    // Cache key folds in .meridianignore mtime so an edit to the ignore file
-    // (e.g. from the webview right-click "Ignore" action) invalidates stale
-    // entries without an explicit clearCache() handoff.
+    // Cache key folds in .meridian/.meridianignore mtime so an edit to the
+    // ignore file (e.g. from the webview right-click "Ignore" action)
+    // invalidates stale entries without an explicit clearCache() handoff.
     const cfgKey = `${pruneConfigKey(config)}::ignore=${ignoreFileMtimeMs(workspaceRoot)}`;
     const cached = this.cache.get(workspaceRoot);
     if (cached && cached.configKey === cfgKey) {
@@ -124,7 +124,7 @@ export class HygieneAnalyzer {
     // coverage/, .cache/, .next/) are intentionally included so they can be
     // surfaced as prune candidates. Gitignore is not applied here because it
     // reflects what you don't want to commit, which is exactly what analytics
-    // wants to surface. Only .meridianignore allows explicit user overrides.
+    // wants to surface. Only .meridian/.meridianignore allows explicit user overrides.
     const excludePatterns = [
       ...HYGIENE_ANALYTICS_EXCLUDE_PATTERNS,
       ...readMeridianIgnorePatterns(workspaceRoot),

@@ -1,28 +1,10 @@
 import * as vscode from "vscode";
-
-type GitNetworkMode = "allow" | "prompt" | "deny";
+import { readSetting } from "../infrastructure/settings";
 
 const MAX_LOG_LENGTH = 4000;
 
-function getSecurityConfig() {
-  try {
-    const cfg = (vscode as unknown as {
-      workspace?: { getConfiguration?: (section: string) => { get<T>(key: string, fallback: T): T } };
-    }).workspace?.getConfiguration?.("meridian.security");
-    if (cfg) return cfg;
-  } catch {
-    // Test environments may not include vscode.workspace in mocks.
-  }
-  return {
-    get<T>(_key: string, fallback: T): T {
-      return fallback;
-    },
-  };
-}
-
 export function isSensitiveLoggingEnabled(): boolean {
-  const mode = getSecurityConfig().get<string>("logging.sensitive", "redact");
-  return mode === "allow";
+  return readSetting("security.logging.sensitive") === "allow";
 }
 
 export function sanitizeForLogs(input: unknown): string {
@@ -48,7 +30,7 @@ export function sanitizeForLogs(input: unknown): string {
 }
 
 export async function copyWithPolicy(text: string, label: string): Promise<boolean> {
-  const autoCopy = getSecurityConfig().get<boolean>("clipboard.autoCopy", false);
+  const autoCopy = readSetting("security.clipboard.autoCopy");
   if (autoCopy) {
     await vscode.env.clipboard.writeText(text);
     return true;
@@ -65,12 +47,13 @@ export async function copyWithPolicy(text: string, label: string): Promise<boole
   return false;
 }
 
-export function getGitNetworkMode(): GitNetworkMode {
-  const mode = getSecurityConfig().get<string>("gitNetwork.mode", "prompt");
+export function getGitNetworkMode(): "allow" | "prompt" | "deny" {
+  // Narrow at runtime: VS Code does not enforce enum membership on user-supplied values.
+  const mode = readSetting("security.gitNetwork.mode");
   return mode === "allow" || mode === "prompt" || mode === "deny" ? mode : "prompt";
 }
 
 export function getAllowedGitHosts(): string[] {
-  const configured = getSecurityConfig().get<string[]>("gitNetwork.allowedHosts", []);
+  const configured = readSetting("security.gitNetwork.allowedHosts");
   return configured.map((h) => h.trim().toLowerCase()).filter(Boolean);
 }

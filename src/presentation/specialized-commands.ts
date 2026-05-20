@@ -14,8 +14,16 @@ import { UI_SETTINGS } from "../constants";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 import { copyWithPolicy } from "../security/operation-policy";
 import { appendIgnorePattern } from "../security/ignore-store";
+import type { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
 
 const HR = "─".repeat(UI_SETTINGS.OUTPUT_HR_LENGTH);
+
+type FileActionItem = vscode.Uri | { filePath?: string } | undefined;
+
+function extractFilePath(item: FileActionItem): string | undefined {
+  if (item instanceof vscode.Uri) return item.fsPath;
+  return item?.filePath;
+}
 
 export function registerSpecializedCommands(
   context: vscode.ExtensionContext,
@@ -26,9 +34,8 @@ export function registerSpecializedCommands(
 ): void {
   // ── Hygiene file actions ──────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand("meridian.hygiene.deleteFile", async (item: any) => {
-      const filePath: string | undefined =
-        item instanceof vscode.Uri ? item.fsPath : item?.filePath;
+    vscode.commands.registerCommand("meridian.hygiene.deleteFile", async (item: FileActionItem) => {
+      const filePath = extractFilePath(item);
       if (!filePath) return;
       const filename = nodePath.basename(filePath);
       const confirm = await vscode.window.showWarningMessage(
@@ -48,9 +55,8 @@ export function registerSpecializedCommands(
       }
     }),
 
-    vscode.commands.registerCommand("meridian.hygiene.ignoreFile", async (item: any) => {
-      const filePath: string | undefined =
-        item instanceof vscode.Uri ? item.fsPath : item?.filePath;
+    vscode.commands.registerCommand("meridian.hygiene.ignoreFile", async (item: FileActionItem) => {
+      const filePath = extractFilePath(item);
       if (!filePath) return;
       const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
       const result = appendIgnorePattern(wsRoot, filePath, "file");
@@ -60,8 +66,8 @@ export function registerSpecializedCommands(
       }
       vscode.window.showInformationMessage(
         result.value.alreadyExists
-          ? `Already in .meridianignore: ${result.value.pattern}`
-          : `Added to .meridianignore: ${result.value.pattern}`
+          ? `Already in .meridian/.meridianignore: ${result.value.pattern}`
+          : `Added to .meridian/.meridianignore: ${result.value.pattern}`
       );
       hygieneTree.refresh();
     }),
@@ -69,10 +75,9 @@ export function registerSpecializedCommands(
 
   // ── hygiene.impactAnalysis ────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand("meridian.hygiene.impactAnalysis", async (item: any) => {
-      const filePath: string | undefined =
-        item instanceof vscode.Uri ? item.fsPath :
-        item?.filePath ??
+    vscode.commands.registerCommand("meridian.hygiene.impactAnalysis", async (item: FileActionItem) => {
+      const filePath =
+        extractFilePath(item) ??
         vscode.window.activeTextEditor?.document.uri.fsPath;
 
       if (!filePath) {
@@ -95,7 +100,7 @@ export function registerSpecializedCommands(
         () => router.dispatch({ name: "hygiene.impactAnalysis", params }, freshCtx)
       );
       if (result.kind === "ok") {
-        const val = result.value as any;
+        const val = result.value as ImpactAnalysisResult;
         outputChannel.show(true);
         outputChannel.appendLine(`\n${HR}`);
         outputChannel.appendLine(`[${new Date().toISOString()}] Impact Analysis: ${nodePath.basename(filePath)}`);

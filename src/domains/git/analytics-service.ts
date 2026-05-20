@@ -37,9 +37,9 @@ export class GitAnalyzer {
   constructor(private readonly workspaceRoot: string = process.cwd()) {}
 
   /**
-   * Generate cache key from options. Folds in the .meridianignore mtime so an
-   * edit to the ignore file (e.g. from a webview "Ignore" action) invalidates
-   * stale entries without an explicit clearCache() handoff.
+   * Generate cache key from options. Folds in the .meridian/.meridianignore
+   * mtime so an edit to the ignore file (e.g. from a webview "Ignore" action)
+   * invalidates stale entries without an explicit clearCache() handoff.
    */
   private getCacheKey(opts: AnalyticsOptions): string {
     const parts = [
@@ -51,7 +51,7 @@ export class GitAnalyzer {
     return parts.join("|");
   }
 
-  /** Patterns to exclude from file-level analytics — baseline + user .meridianignore. */
+  /** Patterns to exclude from file-level analytics — baseline + user .meridian/.meridianignore. */
   private getExcludePatterns(): string[] {
     return [...ANALYTICS_EXCLUDE_BASE, ...readMeridianIgnorePatterns(this.workspaceRoot)];
   }
@@ -285,7 +285,7 @@ export class GitAnalyzer {
       for (const fileChange of commit.files) {
         const { path, insertions, deletions } = fileChange;
 
-        // Skip build artifacts, deps, and user .meridianignore patterns.
+        // Skip build artifacts, deps, and user .meridian/.meridianignore patterns.
         if (micromatch.isMatch(path, excludePatterns)) {
           continue;
         }

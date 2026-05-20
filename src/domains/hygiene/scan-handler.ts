@@ -2,8 +2,6 @@
  * Hygiene Domain Scan Handler — workspace analysis for dead files, large files, and stale logs.
  */
 
-import * as fs from "fs";
-import * as path from "path";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const micromatch = require("micromatch");
 import {
@@ -19,47 +17,8 @@ import {
 } from "../../types";
 import { HYGIENE_SETTINGS } from "../../constants";
 import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
+import { readGitignorePatterns, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
-
-/**
- * Read and parse .gitignore patterns from the workspace root.
- * Returns an array of glob patterns safe to pass to micromatch.
- */
-function readGitignorePatterns(workspaceRoot: string): string[] {
-  try {
-    const gitignorePath = path.join(workspaceRoot, ".gitignore");
-    const content = fs.readFileSync(gitignorePath, "utf-8");
-    return content
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith("#"))
-      .map(line => {
-        // Strip trailing slash (directory marker), then always anchor with **/
-        // so patterns match against absolute paths from micromatch.isMatch()
-        const stripped = line.endsWith("/") ? line.slice(0, -1) : line;
-        return stripped.startsWith("**/") ? stripped : `**/${stripped}`;
-      });
-  } catch {
-    return [];
-  }
-}
-
-function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
-  try {
-    const meridianIgnorePath = path.join(workspaceRoot, ".meridianignore");
-    const content = fs.readFileSync(meridianIgnorePath, "utf-8");
-    return content
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith("#"))
-      .map(line => {
-        const stripped = line.endsWith("/") ? line.slice(0, -1) : line;
-        return stripped.startsWith("**/") ? stripped : `**/${stripped}`;
-      });
-  } catch {
-    return [];
-  }
-}
 
 function isExcluded(filePath: string, patterns: string[]): boolean {
   return patterns.length > 0 && micromatch.isMatch(filePath, patterns);

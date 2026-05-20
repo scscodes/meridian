@@ -30,13 +30,13 @@ export interface IgnoreAppendResult {
 }
 
 /**
- * Parse .meridianignore into a list of micromatch-ready glob patterns.
+ * Parse a line-oriented ignore file into micromatch-ready glob patterns.
  * Returns [] if the file is missing or unreadable. Blank/comment lines are
  * dropped; bare paths are wrapped as `** /<path>` so they match anywhere.
  */
-export function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
+function readIgnoreFilePatterns(filePath: string): string[] {
   try {
-    const content = fs.readFileSync(path.join(workspaceRoot, IGNORE_FILE), "utf-8");
+    const content = fs.readFileSync(filePath, "utf-8");
     return content
       .split("\n")
       .map((l) => l.trim())
@@ -48,6 +48,16 @@ export function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
   } catch {
     return [];
   }
+}
+
+/** Parse .meridianignore into micromatch-ready glob patterns. */
+export function readMeridianIgnorePatterns(workspaceRoot: string): string[] {
+  return readIgnoreFilePatterns(path.join(workspaceRoot, IGNORE_FILE));
+}
+
+/** Parse .gitignore into micromatch-ready glob patterns. Same shape/semantics as the meridian variant. */
+export function readGitignorePatterns(workspaceRoot: string): string[] {
+  return readIgnoreFilePatterns(path.join(workspaceRoot, ".gitignore"));
 }
 
 /**

@@ -50,8 +50,8 @@ describe("git provider network policy", () => {
 
   it("blocks fetch when git network mode is deny", async () => {
     getMock.mockImplementation((_key: string, fallback: unknown) => {
-      if (_key === "gitNetwork.mode") return "deny";
-      if (_key === "gitNetwork.allowedHosts") return [];
+      if (_key === "security.gitNetwork.mode") return "deny";
+      if (_key === "security.gitNetwork.allowedHosts") return [];
       return fallback;
     });
 
@@ -63,8 +63,8 @@ describe("git provider network policy", () => {
 
   it("blocks fetch when host is not in allowlist", async () => {
     getMock.mockImplementation((_key: string, fallback: unknown) => {
-      if (_key === "gitNetwork.mode") return "allow";
-      if (_key === "gitNetwork.allowedHosts") return ["gitlab.com"];
+      if (_key === "security.gitNetwork.mode") return "allow";
+      if (_key === "security.gitNetwork.allowedHosts") return ["gitlab.com"];
       return fallback;
     });
     mockGitCommandResponses({
@@ -78,8 +78,8 @@ describe("git provider network policy", () => {
 
   it("prompts and runs fetch when approved", async () => {
     getMock.mockImplementation((_key: string, fallback: unknown) => {
-      if (_key === "gitNetwork.mode") return "prompt";
-      if (_key === "gitNetwork.allowedHosts") return [];
+      if (_key === "security.gitNetwork.mode") return "prompt";
+      if (_key === "security.gitNetwork.allowedHosts") return [];
       return fallback;
     });
     showWarningMessageMock.mockResolvedValue("Continue");
@@ -96,8 +96,8 @@ describe("git provider network policy", () => {
 
   it("applies deny policy to pull as well", async () => {
     getMock.mockImplementation((_key: string, fallback: unknown) => {
-      if (_key === "gitNetwork.mode") return "deny";
-      if (_key === "gitNetwork.allowedHosts") return [];
+      if (_key === "security.gitNetwork.mode") return "deny";
+      if (_key === "security.gitNetwork.allowedHosts") return [];
       return fallback;
     });
     mockGitCommandResponses({
@@ -111,8 +111,8 @@ describe("git provider network policy", () => {
 
   it("fails closed when remote URL cannot be resolved and allowlist exists", async () => {
     getMock.mockImplementation((_key: string, fallback: unknown) => {
-      if (_key === "gitNetwork.mode") return "allow";
-      if (_key === "gitNetwork.allowedHosts") return ["github.com"];
+      if (_key === "security.gitNetwork.mode") return "allow";
+      if (_key === "security.gitNetwork.allowedHosts") return ["github.com"];
       return fallback;
     });
     execFileMock.mockImplementation(
@@ -133,8 +133,8 @@ describe("git provider network policy", () => {
 
   it("uses tracked branch remote for pull policy checks", async () => {
     getMock.mockImplementation((_key: string, fallback: unknown) => {
-      if (_key === "gitNetwork.mode") return "prompt";
-      if (_key === "gitNetwork.allowedHosts") return [];
+      if (_key === "security.gitNetwork.mode") return "prompt";
+      if (_key === "security.gitNetwork.allowedHosts") return [];
       return fallback;
     });
     showWarningMessageMock.mockResolvedValue("Continue");

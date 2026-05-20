@@ -18,6 +18,7 @@ import * as path from "path";
 vi.mock("vscode", () => ({}));
 
 import { COMMAND_MAP } from "../src/presentation/command-registry";
+import { SETTING_DEFAULTS } from "../src/infrastructure/settings";
 
 // ── Whitelists ────────────────────────────────────────────────────────────────
 
@@ -125,6 +126,20 @@ describe("Manifest — VS Code commands surface", () => {
       }
     }
     expect(unexpected, `Infrastructure commands (view lifecycle) must not be in commandPalette:\n  ${unexpected.join("\n  ")}`).toEqual([]);
+  });
+
+});
+
+// ── Suite B: settings surface ─────────────────────────────────────────────────
+
+describe("Manifest — settings surface", () => {
+
+  it("SETTING_DEFAULTS keys match contributes.configuration.properties exactly", () => {
+    const contributed = Object.keys(pkg.contributes.configuration.properties)
+      .map((k: string) => k.replace(/^meridian\./, ""))
+      .sort();
+    const code = Object.keys(SETTING_DEFAULTS).sort();
+    expect(code, "Drift between SETTING_DEFAULTS and package.json contributes.configuration.properties").toEqual(contributed);
   });
 
 });

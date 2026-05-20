@@ -82,14 +82,11 @@ Real-time Git status indicator (branch, dirty state, change counts). Click to op
 
 All features respect workspace settings under the `meridian.*` namespace, including:
 
-- `meridian.git.autofetch` — Auto-fetch on open (boolean, default: false)
-- `meridian.hygiene.enabled` — Enable scans and analytics (boolean, default: true)
 - `meridian.hygiene.prune.minAgeDays` — Minimum file age (days) before a file is a prune candidate (number, default: 30)
 - `meridian.hygiene.prune.maxSizeMB` — Files larger than this (MB) are flagged when also older than `minAgeDays` (number, default: 1)
 - `meridian.hygiene.prune.minLineCount` — Files with this many lines or more are flagged when also older than `minAgeDays`; 0 disables (number, default: 0)
 - `meridian.sessionBriefing.autoLaunch` — Open a Session Briefing on activation (boolean, default: false)
 - `meridian.startup.enableFileWatchers` — Register file watchers for auto tree/status refresh (boolean, default: true)
-- `meridian.log.level` — Logger verbosity: debug, info, warn, error (default: info)
 
 ---
 

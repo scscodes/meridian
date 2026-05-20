@@ -4,6 +4,7 @@
  */
 
 import * as vscode from "vscode";
+import { readSetting } from "./settings";
 
 export type ModelDomain = "hygiene" | "git" | "chat";
 
@@ -15,9 +16,12 @@ export type ModelDomain = "hygiene" | "git" | "chat";
 export async function selectModel(
   domain?: ModelDomain
 ): Promise<vscode.LanguageModelChat | null> {
-  const cfg = vscode.workspace.getConfiguration("meridian.model");
-  const domainFamily = domain ? cfg.get<string>(domain, "") : "";
-  const defaultFamily = cfg.get<string>("default", "gpt-4o");
+  // "chat" domain has no dedicated setting; only hygiene/git do.
+  const domainFamily =
+    domain === "hygiene" ? readSetting("model.hygiene") :
+    domain === "git"     ? readSetting("model.git") :
+    "";
+  const defaultFamily = readSetting("model.default");
   const family = domainFamily || defaultFamily;
 
   const models = await vscode.lm.selectChatModels({ family });

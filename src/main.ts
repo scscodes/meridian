@@ -20,7 +20,8 @@ import {
   ConsoleTelemetrySink,
 } from "./infrastructure/telemetry";
 import { generateProse } from "./infrastructure/prose-generator";
-import { Config } from "./infrastructure/config";
+import { readSetting } from "./infrastructure/settings";
+import { getPruneConfig } from "./domains/hygiene/prune-config";
 import { createRunLog } from "./infrastructure/run-log";
 
 // Presentation layer
@@ -56,12 +57,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const outputChannel = vscode.window.createOutputChannel("Meridian");
   context.subscriptions.push(outputChannel);
 
-  const config = new Config();
-  const configResult = await config.initialize();
-  if (configResult.kind === "err") {
-    logger.warn("Config initialization used defaults", "activate", configResult.error);
-  }
-
   const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   const gitProvider = createGitProvider(workspaceRoot);
@@ -96,7 +91,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Wire analyzer cache invalidators to webview providers so the right-click
   // "Ignore" action drops stale entries before the post-write refresh.
   const { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel } = createWebviewPanels(
-    context, router, workspaceRoot, ctxFn, () => config.getPruneConfig(),
+    context, router, workspaceRoot, ctxFn, getPruneConfig,
     {
       invalidateGitAnalytics:     () => gitDomain.analyzer.clearCache(),
       invalidateHygieneAnalytics: () => hygieneDomain.analyzer.clearCache(),
@@ -108,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     { analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel }
   );
 
-  registerCommands(context, router, outputChannel, ctxFn, () => config.getPruneConfig(), {
+  registerCommands(context, router, outputChannel, ctxFn, getPruneConfig, {
     outputChannel, analyticsPanel, hygieneAnalyticsPanel, sessionBriefingPanel,
   });
 
@@ -119,8 +114,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     trees.hygieneTree.refresh();
   });
 
-  const startupConfig = vscode.workspace.getConfiguration("meridian.startup");
-  const enableFileWatchers = startupConfig.get<boolean>("enableFileWatchers", true);
+  const enableFileWatchers = readSetting("startup.enableFileWatchers");
 
   if (!enableFileWatchers) {
     logger.info("Startup: file watchers disabled by config", "activate");
@@ -136,8 +130,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   statusBar.update();
 
   // Auto-launch session briefing if configured
-  const autoLaunch = vscode.workspace.getConfiguration("meridian")
-    .get<boolean>("sessionBriefing.autoLaunch", false);
+  const autoLaunch = readSetting("sessionBriefing.autoLaunch");
   if (autoLaunch) {
     void vscode.commands.executeCommand("meridian.git.sessionBriefing");
   }

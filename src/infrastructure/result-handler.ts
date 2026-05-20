@@ -37,10 +37,6 @@ export const ERROR_MESSAGES: Partial<Record<string, string>> = {
   VALIDATION_ERROR:          "Command parameter validation failed.",
   DOMAIN_INIT_ERROR:         "Domain service initialization failed.",
   // Infrastructure
-  CONFIG_INIT_ERROR:         "Configuration initialization failed.",
-  CONFIG_SET_ERROR:          "Failed to update configuration.",
-  CONFIG_READ_ERROR:         "Failed to read configuration.",
-  CONFIG_WRITE_ERROR:        "Failed to write configuration.",
   WORKSPACE_NOT_FOUND:       "No workspace folder is open.",
   WORKSPACE_READ_ERROR:      "Failed to read workspace files.",
   WORKSPACE_WRITE_ERROR:     "Failed to write workspace files.",

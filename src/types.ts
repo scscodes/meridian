@@ -123,11 +123,6 @@ export interface WorkspaceProvider {
   deleteFile(path: string): Promise<Result<void>>;
 }
 
-export interface ConfigProvider {
-  get<T>(key: string, defaultValue?: T): T | undefined;
-  set<T>(key: string, value: T): Promise<Result<void>>;
-}
-
 // ============================================================================
 // Domain Models & Responses
 // ============================================================================

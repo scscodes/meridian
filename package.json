@@ -269,27 +269,6 @@
           ],
           "description": "File categories that are automatically flagged as prune candidates when older than minAgeDays."
         },
-        "meridian.git.autofetch": {
-          "type": "boolean",
-          "default": false,
-          "description": "Automatically fetch from remote before git operations."
-        },
-        "meridian.git.branchClean": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically clean merged branches after pull."
-        },
-        "meridian.hygiene.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable workspace hygiene scanning."
-        },
-        "meridian.hygiene.scanInterval": {
-          "type": "number",
-          "default": 60,
-          "minimum": 1,
-          "description": "Interval in minutes between automatic hygiene scans."
-        },
         "meridian.sessionBriefing.autoLaunch": {
           "type": "boolean",
           "default": false,
@@ -299,17 +278,6 @@
           "type": "boolean",
           "default": true,
           "description": "Enable startup registration of file watchers for automatic tree/status refresh."
-        },
-        "meridian.log.level": {
-          "type": "string",
-          "default": "info",
-          "enum": [
-            "debug",
-            "info",
-            "warn",
-            "error"
-          ],
-          "description": "Minimum log level for the Meridian output channel."
         }
       }
     },

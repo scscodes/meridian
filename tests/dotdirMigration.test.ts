@@ -1,9 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { migrateLegacyIgnoreFile } from "../src/infrastructure/dotdir-migration";
 import { Logger } from "../src/types";
+
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    renameSync: vi.fn(actual.renameSync),
+  };
+});
 
 function makeWorkspace(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "meridian-dotdir-mig-"));
@@ -26,6 +34,11 @@ function makeLogger(): {
 }
 
 describe("migrateLegacyIgnoreFile", () => {
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof import("fs")>("fs");
+    vi.mocked(fs.renameSync).mockImplementation(actual.renameSync);
+  });
+
   it("no-op when no legacy file exists; does not create .meridian/", () => {
     const root = makeWorkspace();
     const { logger, info, warn } = makeLogger();
@@ -78,17 +91,11 @@ describe("migrateLegacyIgnoreFile", () => {
     fs.writeFileSync(legacy, "patterns\n");
     const { logger, info, warn } = makeLogger();
 
-    const renameSpy = vi
-      .spyOn(fs, "renameSync")
-      .mockImplementationOnce(() => {
-        throw new Error("EACCES: simulated permission error");
-      });
+    vi.mocked(fs.renameSync).mockImplementationOnce(() => {
+      throw new Error("EACCES: simulated permission error");
+    });
 
-    try {
-      migrateLegacyIgnoreFile(root, logger);
-    } finally {
-      renameSpy.mockRestore();
-    }
+    migrateLegacyIgnoreFile(root, logger);
 
     expect(fs.existsSync(legacy)).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1);
@@ -105,17 +112,11 @@ describe("migrateLegacyIgnoreFile", () => {
     fs.writeFileSync(legacy, "cross-device patterns\n");
     const { logger, info, warn } = makeLogger();
 
-    const renameSpy = vi
-      .spyOn(fs, "renameSync")
-      .mockImplementationOnce(() => {
-        throw new Error("EXDEV: cross-device link not permitted");
-      });
+    vi.mocked(fs.renameSync).mockImplementationOnce(() => {
+      throw new Error("EXDEV: cross-device link not permitted");
+    });
 
-    try {
-      migrateLegacyIgnoreFile(root, logger);
-    } finally {
-      renameSpy.mockRestore();
-    }
+    migrateLegacyIgnoreFile(root, logger);
 
     const target = path.join(root, ".meridian", ".meridianignore");
     expect(fs.existsSync(legacy)).toBe(false);

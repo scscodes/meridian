@@ -133,16 +133,6 @@
         "category": "Meridian"
       },
       {
-        "command": "meridian.git.exportJson",
-        "title": "Git: Export Analytics JSON",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.git.exportCsv",
-        "title": "Git: Export Analytics CSV",
-        "category": "Meridian"
-      },
-      {
         "command": "meridian.hygiene.showAnalytics",
         "title": "Hygiene Analytics",
         "icon": "$(graph)",
@@ -354,14 +344,6 @@
         },
         {
           "command": "meridian.git.showAnalytics",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
-          "command": "meridian.git.exportJson",
-          "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
-        },
-        {
-          "command": "meridian.git.exportCsv",
           "when": "workspaceFolderCount > 0 && gitOpenRepositoryCount > 0"
         },
         {

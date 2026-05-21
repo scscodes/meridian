@@ -10,11 +10,7 @@ export {
 } from "./handlers";
 export { createSessionBriefingHandler } from "./session-handler";
 export { aggregateSessionBriefing, SessionBriefingSources, HygieneScanGetter } from "./session-aggregator";
-export {
-  createShowAnalyticsHandler,
-  createExportJsonHandler,
-  createExportCsvHandler,
-} from "./analytics-handler";
+export { createShowAnalyticsHandler } from "./analytics-handler";
 export { GitAnalyzer, gitReportToCsv } from "./analytics-service";
 export {
   SessionBriefing,

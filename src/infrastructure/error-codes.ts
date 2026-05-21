@@ -34,7 +34,6 @@ export const GIT_ERROR_CODES = {
 
   // Analytics
   ANALYTICS_ERROR: "ANALYTICS_ERROR",
-  EXPORT_ERROR: "EXPORT_ERROR",
   INVALID_PERIOD: "INVALID_PERIOD",
 
   // Smart Commit

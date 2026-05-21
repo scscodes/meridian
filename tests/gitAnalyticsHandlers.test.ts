@@ -1,9 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  createShowAnalyticsHandler,
-  createExportJsonHandler,
-  createExportCsvHandler,
-} from "../src/domains/git/analytics-handler";
+import { createShowAnalyticsHandler } from "../src/domains/git/analytics-handler";
 import { MockLogger, createMockContext, assertSuccess, assertFailure } from "./fixtures";
 import { GitAnalyzer } from "../src/domains/git/analytics-service";
 import { GitAnalyticsReport } from "../src/domains/git/analytics-types";
@@ -99,78 +95,6 @@ describe("git analytics handlers", () => {
       expect(err.code).toBe("ANALYTICS_ERROR");
       expect(err.context).toBe("ShowAnalyticsHandler");
       expect(err.message).toContain("Failed to generate analytics");
-    });
-  });
-
-  describe("createExportJsonHandler", () => {
-    it("exports analytics report as JSON", async () => {
-      const logger = new MockLogger();
-      const analyzer = new GitAnalyzer();
-      const report = createFakeReport();
-
-      vi.spyOn(analyzer, "analyze").mockResolvedValueOnce(report);
-      const exportSpy = vi
-        .spyOn(analyzer, "exportToJSON")
-        .mockReturnValueOnce('{"ok":true}');
-
-      const handler = createExportJsonHandler(analyzer, logger as any);
-      const result = await handler(ctx, { period: "12mo" });
-      const json = assertSuccess(result);
-
-      expect(exportSpy).toHaveBeenCalledWith(report);
-      expect(json).toBe('{"ok":true}');
-    });
-
-    it("wraps errors from analyzer/export with EXPORT_ERROR", async () => {
-      const logger = new MockLogger();
-      const analyzer = new GitAnalyzer();
-
-      vi.spyOn(analyzer, "analyze").mockRejectedValueOnce(
-        new Error("boom")
-      );
-
-      const handler = createExportJsonHandler(analyzer, logger as any);
-      const result = await handler(ctx, { period: "3mo" });
-      const err = assertFailure(result);
-
-      expect(err.code).toBe("EXPORT_ERROR");
-      expect(err.context).toBe("ExportJsonHandler");
-    });
-  });
-
-  describe("createExportCsvHandler", () => {
-    it("exports analytics report as CSV", async () => {
-      const logger = new MockLogger();
-      const analyzer = new GitAnalyzer();
-      const report = createFakeReport();
-
-      vi.spyOn(analyzer, "analyze").mockResolvedValueOnce(report);
-      const exportSpy = vi
-        .spyOn(analyzer, "exportToCSV")
-        .mockReturnValueOnce("csv-data");
-
-      const handler = createExportCsvHandler(analyzer, logger as any);
-      const result = await handler(ctx, { period: "3mo" });
-      const csv = assertSuccess(result);
-
-      expect(exportSpy).toHaveBeenCalledWith(report);
-      expect(csv).toBe("csv-data");
-    });
-
-    it("wraps errors from analyzer/export with EXPORT_ERROR", async () => {
-      const logger = new MockLogger();
-      const analyzer = new GitAnalyzer();
-
-      vi.spyOn(analyzer, "analyze").mockRejectedValueOnce(
-        new Error("csv fail")
-      );
-
-      const handler = createExportCsvHandler(analyzer, logger as any);
-      const result = await handler(ctx, { period: "3mo" });
-      const err = assertFailure(result);
-
-      expect(err.code).toBe("EXPORT_ERROR");
-      expect(err.context).toBe("ExportCsvHandler");
     });
   });
 });

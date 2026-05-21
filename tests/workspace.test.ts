@@ -1,53 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fs from "fs";
-import { readJsonFile, listJsonFiles } from "../src/infrastructure/workspace";
+import { listJsonFiles } from "../src/infrastructure/workspace";
 
 vi.mock("fs");
 
 describe("workspace utilities", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-  });
-
-  // =========================================================================
-  // readJsonFile
-  // =========================================================================
-  describe("readJsonFile", () => {
-    // ---------------------------------------------------------------------
-    // 1. Valid JSON — returns parsed object
-    // ---------------------------------------------------------------------
-    it("returns parsed object for valid JSON", () => {
-      vi.mocked(fs.readFileSync).mockReturnValue('{"key": "value", "count": 42}');
-
-      const result = readJsonFile<{ key: string; count: number }>("/path/to/file.json");
-
-      expect(result).toEqual({ key: "value", count: 42 });
-      expect(fs.readFileSync).toHaveBeenCalledWith("/path/to/file.json", "utf8");
-    });
-
-    // ---------------------------------------------------------------------
-    // 2. Invalid JSON — returns null
-    // ---------------------------------------------------------------------
-    it("returns null for invalid JSON content", () => {
-      vi.mocked(fs.readFileSync).mockReturnValue("not valid json {{{");
-
-      const result = readJsonFile("/path/to/bad.json");
-
-      expect(result).toBeNull();
-    });
-
-    // ---------------------------------------------------------------------
-    // 3. Missing file (readFileSync throws) — returns null
-    // ---------------------------------------------------------------------
-    it("returns null when file does not exist", () => {
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
-        throw new Error("ENOENT: no such file or directory");
-      });
-
-      const result = readJsonFile("/path/to/missing.json");
-
-      expect(result).toBeNull();
-    });
   });
 
   // =========================================================================

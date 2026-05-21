@@ -508,25 +508,6 @@ export class GitAnalyzer {
   clearCache(): void {
     this.cacheMap.clear();
   }
-
-  /**
-   * Export analytics to JSON
-   */
-  exportToJSON(report: GitAnalyticsReport): string {
-    return JSON.stringify(report, (_key, value) => {
-      if (value instanceof Date) {
-        return value.toISOString();
-      }
-      return value;
-    }, 2);
-  }
-
-  /**
-   * Export analytics to CSV
-   */
-  exportToCSV(report: GitAnalyticsReport): string {
-    return gitReportToCsv(report);
-  }
 }
 
 /**

@@ -69,31 +69,3 @@ export function listJsonFiles(dirPath: string): string[] {
     return [];
   }
 }
-
-/**
- * Read and parse a JSON file synchronously.
- * Returns null if the file does not exist, is unreadable, or is invalid JSON.
- */
-export function readJsonFile<T = unknown>(filePath: string): T | null {
-  try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Write data as a formatted JSON file synchronously.
- * Returns true on success, false on failure.
- */
-export function writeJsonFile<T = unknown>(filePath: string, data: T): boolean {
-  try {
-    const dir = path.dirname(filePath);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
-    return true;
-  } catch {
-    return false;
-  }
-}

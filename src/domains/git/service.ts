@@ -27,11 +27,7 @@ import {
 } from "./handlers";
 import { createSessionBriefingHandler } from "./session-handler";
 import { SessionBriefingSources, HygieneScanGetter } from "./session-aggregator";
-import {
-  createShowAnalyticsHandler,
-  createExportJsonHandler,
-  createExportCsvHandler,
-} from "./analytics-handler";
+import { createShowAnalyticsHandler } from "./analytics-handler";
 import { GitAnalyzer } from "./analytics-service";
 
 // ============================================================================
@@ -43,8 +39,6 @@ export const GIT_COMMANDS: GitCommandName[] = [
   "git.pull",
   "git.commit",
   "git.showAnalytics",
-  "git.exportJson",
-  "git.exportCsv",
   "git.sessionBriefing",
 ];
 
@@ -83,8 +77,6 @@ export class GitDomainService implements DomainService {
       "git.pull": createPullHandler(gitProvider, logger),
       "git.commit": createCommitHandler(gitProvider, logger),
       "git.showAnalytics": createShowAnalyticsHandler(this.analyzer, logger),
-      "git.exportJson": createExportJsonHandler(this.analyzer, logger),
-      "git.exportCsv": createExportCsvHandler(this.analyzer, logger),
       // Always registered: prose is optional and the handler degrades to a
       // deterministic summary when generateProseFn is absent (ADR 012).
       "git.sessionBriefing": createSessionBriefingHandler(

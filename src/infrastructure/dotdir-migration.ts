@@ -9,9 +9,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { Logger } from "../types";
+import { MERIDIAN_DIR } from "../constants";
 
 const IGNORE_FILENAME = ".meridianignore";
-const DOTDIR = ".meridian";
 
 function relocate(legacy: string, target: string): void {
   try {
@@ -33,23 +33,23 @@ export function migrateLegacyIgnoreFile(workspaceRoot: string | undefined, logge
   if (!workspaceRoot) return;
 
   const legacy = path.join(workspaceRoot, IGNORE_FILENAME);
-  const target = path.join(workspaceRoot, DOTDIR, IGNORE_FILENAME);
+  const target = path.join(workspaceRoot, MERIDIAN_DIR, IGNORE_FILENAME);
 
   if (!fs.existsSync(legacy)) return;
 
   if (fs.existsSync(target)) {
     logger.warn(
-      `Legacy ${IGNORE_FILENAME} present at workspace root alongside ${DOTDIR}/${IGNORE_FILENAME} — leaving legacy untouched; new location wins. Delete the root copy when convenient.`,
+      `Legacy ${IGNORE_FILENAME} present at workspace root alongside ${MERIDIAN_DIR}/${IGNORE_FILENAME} — leaving legacy untouched; new location wins. Delete the root copy when convenient.`,
       "migrateLegacyIgnoreFile"
     );
     return;
   }
 
   try {
-    fs.mkdirSync(path.join(workspaceRoot, DOTDIR), { recursive: true });
+    fs.mkdirSync(path.join(workspaceRoot, MERIDIAN_DIR), { recursive: true });
     relocate(legacy, target);
     logger.info(
-      `Relocated ${IGNORE_FILENAME} → ${DOTDIR}/${IGNORE_FILENAME}`,
+      `Relocated ${IGNORE_FILENAME} → ${MERIDIAN_DIR}/${IGNORE_FILENAME}`,
       "migrateLegacyIgnoreFile"
     );
   } catch (err) {

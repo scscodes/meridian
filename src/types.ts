@@ -53,8 +53,6 @@ export type GitCommandName =
   | "git.pull"
   | "git.commit"
   | "git.showAnalytics"
-  | "git.exportJson"
-  | "git.exportCsv"
   | "git.sessionBriefing";
 export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics" | "hygiene.impactAnalysis";
 

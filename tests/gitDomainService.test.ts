@@ -23,8 +23,6 @@ describe("GitDomainService", () => {
 
     // Analytics commands are also expected
     expect(registeredCommands).toContain("git.showAnalytics");
-    expect(registeredCommands).toContain("git.exportJson");
-    expect(registeredCommands).toContain("git.exportCsv");
   });
 
   it("initialize() calls gitProvider.status and returns ok on success", async () => {

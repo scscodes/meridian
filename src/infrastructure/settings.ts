@@ -15,6 +15,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { MERIDIAN_DIR } from "../constants";
 
 export const SETTING_DEFAULTS = {
   "model.default":                    "gpt-4o" as string,
@@ -53,7 +54,7 @@ function vscodeWorkspaceRoot(): string | undefined {
 function readWorkspaceSettings(): Record<string, unknown> {
   const root = vscodeWorkspaceRoot();
   if (!root) return {};
-  const file = path.join(root, ".meridian", "settings.json");
+  const file = path.join(root, MERIDIAN_DIR, "settings.json");
   try {
     const stat = fs.statSync(file);
     if (

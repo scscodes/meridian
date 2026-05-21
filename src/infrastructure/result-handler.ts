@@ -17,7 +17,6 @@ export const ERROR_MESSAGES: Partial<Record<string, string>> = {
   GIT_RESET_ERROR:           "Git reset failed.",
   // Git — analytics
   ANALYTICS_ERROR:           "Git analytics generation failed.",
-  EXPORT_ERROR:              "Analytics export failed.",
   INVALID_PERIOD:            "Invalid time period for analytics.",
   // Hygiene
   HYGIENE_INIT_ERROR:        "Hygiene service initialization failed.",

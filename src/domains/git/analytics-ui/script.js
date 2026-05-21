@@ -417,6 +417,10 @@ document.getElementById("exportCsv")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "export", format: "csv" });
 });
 
+document.getElementById("exportAs")?.addEventListener("click", () => {
+  vscode?.postMessage({ type: "exportAs" });
+});
+
 /**
  * Helper: set text content of an element by id
  */

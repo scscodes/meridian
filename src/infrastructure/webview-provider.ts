@@ -10,6 +10,7 @@ import { SessionBriefingReport } from "../domains/git/types";
 import { resolveWorkspacePath } from "../security/path-guard";
 import { appendIgnorePattern } from "../security/ignore-store";
 import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
+import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
 
 /**
  * Optional hook a provider can opt into for the webview right-click "Ignore"
@@ -58,12 +59,16 @@ export abstract class BaseWebviewProvider<TReport> {
   }
 
   /**
-   * Route messages: "export" and "ignorePath" handled centrally, everything
-   * else delegated to subclass.
+   * Route messages: "export", "exportAs", and "ignorePath" handled centrally,
+   * everything else delegated to subclass.
    */
   protected async handleMessage(msg: { type: string; [key: string]: unknown }): Promise<void> {
     if (msg.type === "export") {
-      await this.handleExport(msg.format as string);
+      await this.handleQuickSave(msg.format as string);
+      return;
+    }
+    if (msg.type === "exportAs") {
+      await this.handleSaveAs();
       return;
     }
     if (msg.type === "ignorePath") {
@@ -168,19 +173,109 @@ export abstract class BaseWebviewProvider<TReport> {
     }, 2);
   }
 
-  protected async handleExport(format: string): Promise<void> {
-    if (!this.lastReport || (format !== "json" && format !== "csv")) return;
-
-    const content = format === "json"
+  /** Serialize the current report in the requested format, or null if absent/invalid. */
+  private serializeReport(format: string): string | null {
+    if (!this.lastReport || (format !== "json" && format !== "csv")) return null;
+    return format === "json"
       ? this.reportToJson(this.lastReport)
       : this.reportToCsv(this.lastReport);
+  }
 
-    const ts = new Date().toISOString().slice(0, 10);
-    const defaultName = `${this.getExportFilenamePrefix()}-${ts}.${format}`;
+  /** Timestamped, Windows-safe filename for this report (millisecond precision). */
+  private exportFileName(format: string): string {
+    // Raw ISO contains ':' and '.', invalid on NTFS — replace to a safe form.
+    // Keep milliseconds (slice 23, dropping the trailing 'Z') so two saves in
+    // the same second never collide and silently overwrite.
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23);
+    return `${this.getExportFilenamePrefix()}-${ts}.${format}`;
+  }
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
-    const defaultUri = workspaceFolder
-      ? vscode.Uri.joinPath(workspaceFolder, defaultName)
+  /** Pure path to the workspace's .meridian/artifacts/ dir (ADR 014), or null if none open. */
+  private artifactsDirPath(): string | null {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) return null;
+    return path.join(workspaceRoot, MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR);
+  }
+
+  /**
+   * Idempotently drop the self-ignoring `.gitignore` (`*`) into an existing
+   * artifacts dir so generated reports never enter git. Never clobbers a user
+   * edit; non-fatal on failure (logged, not thrown).
+   */
+  private writeArtifactsGitignore(artifactsDir: string): void {
+    try {
+      const gitignore = path.join(artifactsDir, ".gitignore");
+      if (!fs.existsSync(gitignore)) fs.writeFileSync(gitignore, "*\n", "utf-8");
+    } catch (e) {
+      console.error("[Meridian] artifacts .gitignore write failed:", e);
+    }
+  }
+
+  /**
+   * Materialize .meridian/artifacts/ (+ self-ignoring `.gitignore`) for a
+   * dialog-free write. Returns the path, or null when no workspace is open.
+   * Non-fatal: a setup failure is logged and the caller's write surfaces it.
+   */
+  private ensureArtifactsDir(): string | null {
+    const artifactsDir = this.artifactsDirPath();
+    if (!artifactsDir) return null;
+    try {
+      fs.mkdirSync(artifactsDir, { recursive: true });
+      this.writeArtifactsGitignore(artifactsDir);
+    } catch (e) {
+      console.error("[Meridian] artifacts dir setup failed:", e);
+    }
+    return artifactsDir;
+  }
+
+  /**
+   * Quick-save: write the report straight into .meridian/artifacts/ with a
+   * timestamped name — no dialog. The common case. Requires an open workspace.
+   */
+  protected async handleQuickSave(format: string): Promise<void> {
+    const content = this.serializeReport(format);
+    if (content === null) return;
+
+    const artifactsDir = this.ensureArtifactsDir();
+    if (!artifactsDir) {
+      vscode.window.showErrorMessage("Open a workspace folder to quick-save reports.");
+      return;
+    }
+
+    const fileName = this.exportFileName(format);
+    const target = vscode.Uri.file(path.join(artifactsDir, fileName));
+    try {
+      await vscode.workspace.fs.writeFile(target, Buffer.from(content, "utf-8"));
+    } catch (e) {
+      this.handleError("Quick-save failed", e);
+      return;
+    }
+    const rel = path.join(MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR, fileName);
+    vscode.window.showInformationMessage(`Saved to ${rel}`, "Reveal").then((choice) => {
+      if (choice === "Reveal") void vscode.commands.executeCommand("revealInExplorer", target);
+    });
+  }
+
+  /**
+   * Save as…: pick a format, then a location via the save dialog (default
+   * .meridian/artifacts/). The escape hatch for saving anywhere.
+   */
+  protected async handleSaveAs(): Promise<void> {
+    const picked = await vscode.window.showQuickPick(["JSON", "CSV"], {
+      placeHolder: "Export format",
+    });
+    if (!picked) return;
+    const format = picked.toLowerCase();
+
+    const content = this.serializeReport(format);
+    if (content === null) return;
+
+    const defaultName = this.exportFileName(format);
+    // Pure path only — don't materialize the dir just to seed the dialog, so a
+    // cancelled "Save as…" leaves no empty artifacts dir behind.
+    const artifactsDir = this.artifactsDirPath();
+    const defaultUri = artifactsDir
+      ? vscode.Uri.file(path.join(artifactsDir, defaultName))
       : vscode.Uri.file(defaultName);
 
     const filters: Record<string, string[]> = format === "json"
@@ -190,7 +285,16 @@ export abstract class BaseWebviewProvider<TReport> {
     const uri = await vscode.window.showSaveDialog({ defaultUri, filters });
     if (!uri) return;
 
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
+    try {
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
+    } catch (e) {
+      this.handleError("Save failed", e);
+      return;
+    }
+    // If the user kept the default artifacts location, keep that dir git-ignored.
+    if (artifactsDir && path.dirname(uri.fsPath) === artifactsDir) {
+      this.writeArtifactsGitignore(artifactsDir);
+    }
     vscode.window.showInformationMessage(`Exported to ${path.basename(uri.fsPath)}`);
   }
 

@@ -337,6 +337,10 @@ document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "export", format: "csv" });
 });
 
+document.getElementById("exportAsBtn")?.addEventListener("click", () => {
+  vscode?.postMessage({ type: "exportAs" });
+});
+
 // Event delegation for click-to-open paths
 document.addEventListener("click", (e) => {
   const link = e.target.closest(".path-link");

@@ -123,6 +123,35 @@ consumer needs hot-swap.
   resolver use `workspaceFolders[0]`. Matches the existing single-root
   assumption baked across the extension; no new gap introduced.
 
+## Addendum (2026-05-21) — `.meridian/artifacts/` realized
+
+Decision 7 promised `.meridian/artifacts/` as convention-only until a writer
+needed it. The webview report exporters are that first writer. Concretions:
+
+- **First writer is the webview export path.** `BaseWebviewProvider` gained a
+  **quick-save** (dialog-free, one click → timestamped file under
+  `.meridian/artifacts/`) and a **Save as…** escape hatch (format pick → save
+  dialog, defaulted to the same dir). Both reuse the existing pure serializers
+  (`gitReportToCsv`, `reportToJson`). All three report webviews inherit the
+  behavior. This is human-facing UX only — no agent/command surface (a dead
+  command-export path was removed in the same line of work).
+- **Self-ignoring dir, not a root-`.gitignore` edit.** On lazy creation the
+  writer drops `.meridian/artifacts/.gitignore` containing `*` (idempotent —
+  never clobbers a user edit). Generated reports therefore never enter git and
+  produce zero `git status` noise. A root-`.gitignore` rule was rejected:
+  Meridian owns `.meridian/` (layering invariant) but not the consumer's root
+  `.gitignore`, and the self-contained form is the only one that works in
+  arbitrary installed workspaces.
+- **Full-timestamp filenames.** `<prefix>-<YYYY-MM-DDTHH-MM-SS-mmm>.<fmt>`, with
+  `:`/`.` replaced (NTFS-invalid) and milliseconds retained. Replaces the prior
+  date-only stamp; removes silent-overwrite (two saves in the same second no
+  longer collide) and makes each export individually addressable.
+- **No path-guard on the write target.** `resolveWorkspacePath` realpaths its
+  argument and would throw on a not-yet-existent file. The artifacts dir is
+  `mkdir`-ed (so it exists) and the basename is fully self-generated (constant
+  prefix + generated timestamp, no external input) — no traversal vector to
+  guard against.
+
 ## Cross-references
 
 - [ADR 013](./013-settings-access-doctrine.md) — settings chokepoint and

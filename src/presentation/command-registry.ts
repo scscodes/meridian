@@ -56,8 +56,6 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   { vsCodeId: "meridian.git.pull",              commandName: "git.pull",             title: "Git: Pull",                      showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.commit",            commandName: "git.commit",           title: "Git: Commit",                    showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.showAnalytics",     commandName: "git.showAnalytics",    title: "Git Analytics",                  showInPalette: true,  requiresGit: true,  icon: "$(graph)" },
-  { vsCodeId: "meridian.git.exportJson",        commandName: "git.exportJson",       title: "Git: Export Analytics JSON",     showInPalette: true,  requiresGit: true  },
-  { vsCodeId: "meridian.git.exportCsv",         commandName: "git.exportCsv",        title: "Git: Export Analytics CSV",      showInPalette: true,  requiresGit: true  },
   { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Session Briefing",               showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
   // ── Hygiene ──────────────────────────────────────────────────────────────────
   { vsCodeId: "meridian.hygiene.scan",          commandName: "hygiene.scan",         title: "Hygiene: Scan Workspace",        showInPalette: true  },

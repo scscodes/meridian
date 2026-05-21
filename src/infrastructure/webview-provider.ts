@@ -178,10 +178,23 @@ export abstract class BaseWebviewProvider<TReport> {
     const ts = new Date().toISOString().slice(0, 10);
     const defaultName = `${this.getExportFilenamePrefix()}-${ts}.${format}`;
 
+    // Default the save dialog into .meridian/artifacts/ (ADR 014) so report
+    // exports land in a predictable, agent-discoverable home — while the dialog
+    // still lets the user redirect anywhere. The dir is materialized lazily here
+    // so the dialog opens in a real location rather than a phantom path.
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
-    const defaultUri = workspaceFolder
-      ? vscode.Uri.joinPath(workspaceFolder, defaultName)
-      : vscode.Uri.file(defaultName);
+    let defaultUri: vscode.Uri;
+    if (workspaceFolder) {
+      const artifactsDir = vscode.Uri.joinPath(workspaceFolder, ".meridian", "artifacts");
+      try {
+        fs.mkdirSync(artifactsDir.fsPath, { recursive: true });
+      } catch {
+        // Non-fatal: fall through to the dialog regardless; user can still pick.
+      }
+      defaultUri = vscode.Uri.joinPath(artifactsDir, defaultName);
+    } else {
+      defaultUri = vscode.Uri.file(defaultName);
+    }
 
     const filters: Record<string, string[]> = format === "json"
       ? { "JSON Files": ["json"] }

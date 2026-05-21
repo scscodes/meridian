@@ -22,11 +22,7 @@ Create a commit with a provided message. Validates the message, with comprehensi
 ### **git.showAnalytics**
 Open a full-screen dashboard displaying Git analytics: churn (commits per file), volatility (recent change frequency), authorship (commits per author), commit trends (over time), and top contributors. Includes a **Risk Hotspots** scatter — each file plotted by change frequency (x) against volatility (y), bubble size by total lines changed, colored by risk tier — so refactor candidates surface in the top-right at a glance. Real-time chart rendering with drill-down.
 
-### **git.exportJson**
-Export the current Git analytics report (churn, volatility, authorship, trends) as JSON for external processing, CI/CD integration, or archival.
-
-### **git.exportCsv**
-Export Git analytics to CSV (one row per file or author, with metrics columns) for spreadsheet analysis or reporting.
+**Export (all report dashboards).** Each report webview (Git Analytics, Hygiene Analytics, Session Briefing) offers two save paths: **↓ CSV / ↓ JSON** quick-save the report dialog-free to `.meridian/artifacts/` with a timestamped filename (per [ADR 014](./adr/014-dotdir-doctrine.md); the dir self-ignores so artifacts never enter git), and **Save as…** opens a dialog (format + location) for saving anywhere.
 
 ### **git.sessionBriefing**
 Generate a session-orientation summary. Aggregates git working-tree status, recent commits, run-log activity (`recentRuns`), git analytics (`activityWindow` — including momentum trends and a commit-frequency sparkline showing the shape behind the trend arrow), hygiene scan state (`hygieneSnapshot`), and a pending-change risk preview (`pendingChangeRisk` — each uncommitted file joined against the computed analytics risk model: churn, volatility, and risk tier, with files absent from the analytics window marked `new` (no history) or `cold` (changed but quiet — low, not unknown); a flag is raised when several high-risk files are in flight) into a deterministic `SessionBriefing` record, then layers optional AI prose on top. Optional slices degrade gracefully when data is unavailable; the prose layer degrades to the raw aggregate when no language model is available. Useful for standup notes, context switching, pre-commit risk triage, or morning orientation.

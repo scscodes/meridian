@@ -18,6 +18,16 @@ export const CACHE_SETTINGS = {
 } as const;
 
 // ============================================================================
+// Dotdir Layout (ADR 014)
+// ============================================================================
+
+/** Per-workspace Meridian dotdir root. */
+export const MERIDIAN_DIR = ".meridian";
+
+/** Generated-report / artifact subdir under the dotdir (self-ignored). */
+export const MERIDIAN_ARTIFACTS_DIR = "artifacts";
+
+// ============================================================================
 // Git Configuration Defaults
 // ============================================================================
 

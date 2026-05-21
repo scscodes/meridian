@@ -17,8 +17,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { Result, success, failure } from "../types";
 import { resolveWorkspacePath } from "./path-guard";
+import { MERIDIAN_DIR } from "../constants";
 
-const IGNORE_FILE = path.join(".meridian", ".meridianignore");
+const IGNORE_FILE = path.join(MERIDIAN_DIR, ".meridianignore");
 
 export interface IgnoreAppendResult {
   /** The bare relative path written to (or already in) .meridian/.meridianignore. */

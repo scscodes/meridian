@@ -142,9 +142,10 @@ needed it. The webview report exporters are that first writer. Concretions:
   Meridian owns `.meridian/` (layering invariant) but not the consumer's root
   `.gitignore`, and the self-contained form is the only one that works in
   arbitrary installed workspaces.
-- **Full-timestamp filenames.** `<prefix>-<YYYY-MM-DDTHH-MM-SS>.<fmt>`, with
-  `:`/`.` replaced (NTFS-invalid). Replaces the prior date-only stamp; removes
-  same-day silent-overwrite and makes each export individually addressable.
+- **Full-timestamp filenames.** `<prefix>-<YYYY-MM-DDTHH-MM-SS-mmm>.<fmt>`, with
+  `:`/`.` replaced (NTFS-invalid) and milliseconds retained. Replaces the prior
+  date-only stamp; removes silent-overwrite (two saves in the same second no
+  longer collide) and makes each export individually addressable.
 - **No path-guard on the write target.** `resolveWorkspacePath` realpaths its
   argument and would throw on a not-yet-existent file. The artifacts dir is
   `mkdir`-ed (so it exists) and the basename is fully self-generated (constant

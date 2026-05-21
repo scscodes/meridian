@@ -10,6 +10,7 @@ import { SessionBriefingReport } from "../domains/git/types";
 import { resolveWorkspacePath } from "../security/path-guard";
 import { appendIgnorePattern } from "../security/ignore-store";
 import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
+import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
 
 /**
  * Optional hook a provider can opt into for the webview right-click "Ignore"
@@ -58,8 +59,8 @@ export abstract class BaseWebviewProvider<TReport> {
   }
 
   /**
-   * Route messages: "export" and "ignorePath" handled centrally, everything
-   * else delegated to subclass.
+   * Route messages: "export", "exportAs", and "ignorePath" handled centrally,
+   * everything else delegated to subclass.
    */
   protected async handleMessage(msg: { type: string; [key: string]: unknown }): Promise<void> {
     if (msg.type === "export") {
@@ -180,29 +181,49 @@ export abstract class BaseWebviewProvider<TReport> {
       : this.reportToCsv(this.lastReport);
   }
 
-  /** Timestamped, Windows-safe filename for this report. */
+  /** Timestamped, Windows-safe filename for this report (millisecond precision). */
   private exportFileName(format: string): string {
     // Raw ISO contains ':' and '.', invalid on NTFS — replace to a safe form.
-    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    // Keep milliseconds (slice 23, dropping the trailing 'Z') so two saves in
+    // the same second never collide and silently overwrite.
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23);
     return `${this.getExportFilenamePrefix()}-${ts}.${format}`;
   }
 
-  /**
-   * Resolve (and lazily materialize) the .meridian/artifacts/ dir for the active
-   * workspace (ADR 014). Drops a self-ignoring `.gitignore` (`*`) on first
-   * creation so generated reports never enter git. Returns null when no
-   * workspace folder is open. Non-fatal: dir/gitignore failures are swallowed.
-   */
-  private ensureArtifactsDir(): string | null {
+  /** Pure path to the workspace's .meridian/artifacts/ dir (ADR 014), or null if none open. */
+  private artifactsDirPath(): string | null {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot) return null;
-    const artifactsDir = path.join(workspaceRoot, ".meridian", "artifacts");
+    return path.join(workspaceRoot, MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR);
+  }
+
+  /**
+   * Idempotently drop the self-ignoring `.gitignore` (`*`) into an existing
+   * artifacts dir so generated reports never enter git. Never clobbers a user
+   * edit; non-fatal on failure (logged, not thrown).
+   */
+  private writeArtifactsGitignore(artifactsDir: string): void {
     try {
-      fs.mkdirSync(artifactsDir, { recursive: true });
       const gitignore = path.join(artifactsDir, ".gitignore");
       if (!fs.existsSync(gitignore)) fs.writeFileSync(gitignore, "*\n", "utf-8");
-    } catch {
-      // Non-fatal — the caller handles a failed write below.
+    } catch (e) {
+      console.error("[Meridian] artifacts .gitignore write failed:", e);
+    }
+  }
+
+  /**
+   * Materialize .meridian/artifacts/ (+ self-ignoring `.gitignore`) for a
+   * dialog-free write. Returns the path, or null when no workspace is open.
+   * Non-fatal: a setup failure is logged and the caller's write surfaces it.
+   */
+  private ensureArtifactsDir(): string | null {
+    const artifactsDir = this.artifactsDirPath();
+    if (!artifactsDir) return null;
+    try {
+      fs.mkdirSync(artifactsDir, { recursive: true });
+      this.writeArtifactsGitignore(artifactsDir);
+    } catch (e) {
+      console.error("[Meridian] artifacts dir setup failed:", e);
     }
     return artifactsDir;
   }
@@ -229,7 +250,7 @@ export abstract class BaseWebviewProvider<TReport> {
       this.handleError("Quick-save failed", e);
       return;
     }
-    const rel = path.join(".meridian", "artifacts", fileName);
+    const rel = path.join(MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR, fileName);
     vscode.window.showInformationMessage(`Saved to ${rel}`, "Reveal").then((choice) => {
       if (choice === "Reveal") void vscode.commands.executeCommand("revealInExplorer", target);
     });
@@ -250,7 +271,9 @@ export abstract class BaseWebviewProvider<TReport> {
     if (content === null) return;
 
     const defaultName = this.exportFileName(format);
-    const artifactsDir = this.ensureArtifactsDir();
+    // Pure path only — don't materialize the dir just to seed the dialog, so a
+    // cancelled "Save as…" leaves no empty artifacts dir behind.
+    const artifactsDir = this.artifactsDirPath();
     const defaultUri = artifactsDir
       ? vscode.Uri.file(path.join(artifactsDir, defaultName))
       : vscode.Uri.file(defaultName);
@@ -267,6 +290,10 @@ export abstract class BaseWebviewProvider<TReport> {
     } catch (e) {
       this.handleError("Save failed", e);
       return;
+    }
+    // If the user kept the default artifacts location, keep that dir git-ignored.
+    if (artifactsDir && path.dirname(uri.fsPath) === artifactsDir) {
+      this.writeArtifactsGitignore(artifactsDir);
     }
     vscode.window.showInformationMessage(`Exported to ${path.basename(uri.fsPath)}`);
   }

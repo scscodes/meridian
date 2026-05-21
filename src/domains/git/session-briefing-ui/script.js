@@ -18,6 +18,9 @@
   document.getElementById("exportJson").addEventListener("click", function () {
     vscode.postMessage({ type: "export", format: "json" });
   });
+  document.getElementById("exportAs").addEventListener("click", function () {
+    vscode.postMessage({ type: "exportAs" });
+  });
 
   // ── Message handler ────────────────────────────────────────────────
   window.addEventListener("message", function (event) {

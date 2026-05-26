@@ -8,8 +8,8 @@ import { GitTreeProvider } from "../ui/tree-providers/git-tree-provider";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 import {
   ReportsTreeProvider,
-  ReportTreeItem,
   ReportId,
+  ReportOpenArg,
 } from "../ui/tree-providers/reports-tree-provider";
 
 export type Dispatch = (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>>;
@@ -62,14 +62,14 @@ export function setupTreeProviders(
     vscode.commands.registerCommand("meridian.git.refresh",     () => gitTree.refresh()),
     vscode.commands.registerCommand("meridian.hygiene.refresh", () => hygieneTree.refresh()),
     // View = reveal-or-compute: focus a live panel without recompute, else run it.
-    vscode.commands.registerCommand("meridian.reports.open", (item?: ReportTreeItem) => {
+    vscode.commands.registerCommand("meridian.reports.open", (item?: ReportOpenArg) => {
       if (!item) return;
       const r = reportMap[item.reportId];
       if (r.panel.isOpen()) r.panel.reveal();
       else void vscode.commands.executeCommand(r.cmd);
     }),
     // Refresh = always re-run/recompute.
-    vscode.commands.registerCommand("meridian.reports.refresh", (item?: ReportTreeItem) => {
+    vscode.commands.registerCommand("meridian.reports.refresh", (item?: ReportOpenArg) => {
       if (!item) return;
       void vscode.commands.executeCommand(reportMap[item.reportId].cmd);
     }),

@@ -7,6 +7,19 @@
 
   var currentCommits = [];
   var currentSort = { col: null, asc: true };
+  // Source arrays for the three client-side-filterable tables. Re-assigned on
+  // each render; read by the .path-filter input handler at every keystroke.
+  var currentChurn = [];
+  var currentPending = null; // PendingChangeRisk | null (need capped/counts on redraw)
+  var currentUncommitted = [];
+
+  function applyPathFilter(items, query) {
+    var q = (query || "").trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(function (it) {
+      return (it.path || "").toLowerCase().indexOf(q) !== -1;
+    });
+  }
 
   // ── Buttons ────────────────────────────────────────────────────────
   document.getElementById("refreshBtn").addEventListener("click", function () {
@@ -20,6 +33,23 @@
   });
   document.getElementById("exportAs").addEventListener("click", function () {
     vscode.postMessage({ type: "exportAs" });
+  });
+
+  // ── Client-side path filters ───────────────────────────────────────
+  // Pure DOM, no host round-trip. Re-reads currentChurn / currentPending /
+  // currentUncommitted on each keystroke; survives renderUI re-renders
+  // because input values live in the DOM and source arrays are kept in
+  // module-level state.
+  var FILTER_REDRAW = {
+    churn: function () { redrawChurn(); },
+    pending: function () { redrawPending(); },
+    uncommitted: function () { redrawUncommitted(); },
+  };
+  document.addEventListener("input", function (e) {
+    var input = e.target.closest && e.target.closest(".path-filter");
+    if (!input) return;
+    var redraw = FILTER_REDRAW[input.dataset.target];
+    if (redraw) redraw();
   });
 
   // ── Message handler ────────────────────────────────────────────────
@@ -38,6 +68,7 @@
     renderFlags(report.flags);
     renderActivity(report.activityWindow);
     renderHygiene(report.hygieneSnapshot);
+    renderRecentRuns(report.recentRuns);
     renderPendingRisk(report.pendingChangeRisk);
     currentCommits = report.recentCommits || [];
     currentSort = { col: null, asc: true };
@@ -66,7 +97,28 @@
   }
 
   function card(label, value) {
-    return '<div class="card"><h3>' + esc(label) + '</h3><p class="value">' + value + '</p></div>';
+    // All three summary cards open the Source Control view (single VS Code
+    // built-in command, no payload; handled host-side as type:"openScm").
+    return '<div class="card card-clickable" data-action="openScm" title="Open Source Control">' +
+      '<h3>' + esc(label) + '</h3><p class="value">' + value + '</p></div>';
+  }
+
+  // Map known flag prefixes to a section anchor for scroll-to. Flag strings
+  // live in session-aggregator.ts; if they change here without an update there
+  // the flag degrades to inert (no scroll, no error) — acceptable.
+  var FLAG_ANCHORS = [
+    { re: /^Recent run failures/i,             anchor: "recentRunsSection" },
+    { re: /^Modifying \d+ high-risk files/i,   anchor: "pendingRiskSection" },
+    { re: /^Hygiene: \d+ dead files/i,         anchor: "hygieneSection" },
+    { re: /^Hygiene: \d+ large files/i,        anchor: "hygieneSection" },
+    { re: /^Large number of uncommitted files/i, anchor: "uncommittedSection" },
+  ];
+
+  function flagAnchorFor(text) {
+    for (var i = 0; i < FLAG_ANCHORS.length; i++) {
+      if (FLAG_ANCHORS[i].re.test(text)) return FLAG_ANCHORS[i].anchor;
+    }
+    return null;
   }
 
   function renderFlags(flags) {
@@ -77,7 +129,22 @@
     }
     el.innerHTML = '<div class="flags-container">' +
       flags.map(function (f) {
-        return '<div class="flag"><span class="flag-icon">&#9888;</span>' + esc(f) + '</div>';
+        // Special-case: replace the "No hygiene scan yet" warning with an
+        // inline CTA — the flag is the affordance.
+        if (f === "No hygiene scan yet") {
+          return '<div class="flag">' +
+            '<span class="flag-icon">&#9888;</span>' +
+            'No hygiene scan yet &nbsp;' +
+            '<button class="flag-cta" data-action="runHygieneScan">Run scan</button>' +
+            '</div>';
+        }
+        var anchor = flagAnchorFor(f);
+        var attrs = anchor
+          ? ' data-anchor="' + esc(anchor) + '" title="Jump to section"'
+          : '';
+        var cls = anchor ? 'flag flag-clickable' : 'flag';
+        return '<div class="' + cls + '"' + attrs + '>' +
+          '<span class="flag-icon">&#9888;</span>' + esc(f) + '</div>';
       }).join("") +
       '</div>';
   }
@@ -130,6 +197,7 @@
     var section = document.getElementById("activitySection");
     if (!w) {
       section.style.display = "none";
+      currentChurn = [];
       return;
     }
     section.style.display = "";
@@ -157,23 +225,38 @@
       ? '<h3 class="sub">Commit Frequency</h3>' + spark
       : "";
 
-    var churn = w.topChurnFiles || [];
+    currentChurn = w.topChurnFiles || [];
     var cb = document.getElementById("churnBlock");
-    if (churn.length === 0) {
+    var filterRow = document.getElementById("churnFilterRow");
+    if (currentChurn.length === 0) {
       cb.innerHTML = "";
+      if (filterRow) filterRow.style.display = "none";
       return;
     }
+    if (filterRow) filterRow.style.display = "";
     cb.innerHTML =
       '<h3 class="sub">Top Churn Files</h3>' +
-      '<table><thead><tr><th>Path</th><th>Volatility</th><th>Risk</th></tr></thead><tbody>' +
-      churn.map(function (f) {
-        return '<tr>' +
-          '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
-          '<td>' + Number(f.volatility).toFixed(1) + '</td>' +
-          '<td><span class="risk risk-' + esc(f.risk) + '">' + esc(f.risk) + '</span></td>' +
-          '</tr>';
-      }).join("") +
-      '</tbody></table>';
+      '<table><thead><tr><th>Path</th><th>Volatility</th><th>Risk</th></tr></thead>' +
+      '<tbody id="churnTableBody"></tbody></table>';
+    redrawChurn();
+  }
+
+  function churnRow(f) {
+    return '<tr>' +
+      '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
+      '<td>' + Number(f.volatility).toFixed(1) + '</td>' +
+      '<td><span class="risk risk-' + esc(f.risk) + ' report-link" data-report="gitAnalytics" title="Open in Git Analytics">' + esc(f.risk) + '</span></td>' +
+      '</tr>';
+  }
+
+  function redrawChurn() {
+    var tbody = document.getElementById("churnTableBody");
+    if (!tbody) return;
+    var input = document.querySelector('.path-filter[data-target="churn"]');
+    var rows = applyPathFilter(currentChurn, input && input.value);
+    tbody.innerHTML = rows.length
+      ? rows.map(churnRow).join("")
+      : '<tr><td colspan="3" style="opacity:0.4">No matches</td></tr>';
   }
 
   function renderHygiene(h) {
@@ -202,15 +285,50 @@
     }
     db.innerHTML =
       '<h3 class="sub">Dead Code Sample</h3>' +
-      '<table><thead><tr><th>File</th><th>Line</th><th>Message</th></tr></thead><tbody>' +
+      '<table><thead><tr><th>File</th><th>Line</th><th>Message</th><th></th></tr></thead><tbody>' +
       sample.map(function (d) {
         return '<tr>' +
           '<td class="path-link" data-path="' + esc(d.filePath) + '">' + esc(d.filePath) + '</td>' +
           '<td>' + Number(d.line) + '</td>' +
           '<td class="commit-msg">' + esc(d.message) + '</td>' +
+          '<td><span class="report-link adornment" data-report="hygiene" title="Open in Hygiene Analytics">&#8599;</span></td>' +
           '</tr>';
       }).join("") +
       '</tbody></table>';
+  }
+
+  // ── Recent runs (run-log terminal events) ──────────────────────────
+
+  function renderRecentRuns(runs) {
+    var section = document.getElementById("recentRunsSection");
+    if (!runs || runs.length === 0) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+
+    var failCount = 0;
+    for (var i = 0; i < runs.length; i++) {
+      if (runs[i].phase === "fail") failCount++;
+    }
+    document.getElementById("recentRunsHint").textContent =
+      "(last " + runs.length + (failCount > 0 ? " · " + failCount + " failed" : "") + ")";
+
+    document.getElementById("recentRunsTableBody").innerHTML = runs.map(function (r) {
+      var time = r.timestampMs ? new Date(r.timestampMs).toLocaleTimeString() : "—";
+      // commandName is the live identifier post-2.0; workflowName / skillName
+      // are inert per ADR 011 but tolerated as fallbacks for older log entries.
+      var name = r.commandName || r.workflowName || r.skillName || "—";
+      var dur = r.durationMs != null ? r.durationMs + "ms" : "—";
+      var err = r.errorCode || "";
+      return '<tr>' +
+        '<td>' + esc(time) + '</td>' +
+        '<td>' + esc(name) + '</td>' +
+        '<td><span class="phase-badge phase-' + esc(r.phase) + '">' + esc(r.phase) + '</span></td>' +
+        '<td>' + esc(dur) + '</td>' +
+        '<td class="commit-msg">' + esc(err) + '</td>' +
+        '</tr>';
+    }).join("");
   }
 
   // ── Pending-change risk (dirty-set × analytics risk join) ──────────
@@ -219,9 +337,11 @@
     var section = document.getElementById("pendingRiskSection");
     if (!p || !p.files || p.files.length === 0) {
       section.style.display = "none";
+      currentPending = null;
       return;
     }
     section.style.display = "";
+    currentPending = p;
     document.getElementById("pendingRiskHint").textContent =
       "(" + p.totalChanged + " changed" +
       (p.capped ? ", showing top " + p.files.length : "") + ")";
@@ -233,17 +353,30 @@
 
     document.getElementById("pendingRiskBlock").innerHTML =
       '<table><thead><tr><th>Path</th><th>Status</th><th>Churn</th>' +
-      '<th>Volatility</th><th>Risk</th></tr></thead><tbody>' +
-      p.files.map(function (f) {
-        return '<tr>' +
-          '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
-          '<td>' + esc(f.status) + '</td>' +
-          '<td>' + (f.churn == null ? '&mdash;' : Number(f.churn)) + '</td>' +
-          '<td>' + (f.volatility == null ? '&mdash;' : Number(f.volatility).toFixed(1)) + '</td>' +
-          '<td><span class="risk risk-' + esc(f.risk) + '">' + esc(f.risk) + '</span></td>' +
-          '</tr>';
-      }).join("") +
-      '</tbody></table>';
+      '<th>Volatility</th><th>Risk</th><th></th></tr></thead>' +
+      '<tbody id="pendingRiskTableBody"></tbody></table>';
+    redrawPending();
+  }
+
+  function pendingRow(f) {
+    return '<tr>' +
+      '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
+      '<td>' + esc(f.status) + '</td>' +
+      '<td>' + (f.churn == null ? '&mdash;' : Number(f.churn)) + '</td>' +
+      '<td>' + (f.volatility == null ? '&mdash;' : Number(f.volatility).toFixed(1)) + '</td>' +
+      '<td><span class="risk risk-' + esc(f.risk) + ' report-link" data-report="gitAnalytics" title="Open in Git Analytics">' + esc(f.risk) + '</span></td>' +
+      '<td><span class="diff-link" data-path="' + esc(f.path) + '" title="Open diff against HEAD">&#8646;</span></td>' +
+      '</tr>';
+  }
+
+  function redrawPending() {
+    var tbody = document.getElementById("pendingRiskTableBody");
+    if (!tbody || !currentPending) return;
+    var input = document.querySelector('.path-filter[data-target="pending"]');
+    var rows = applyPathFilter(currentPending.files, input && input.value);
+    tbody.innerHTML = rows.length
+      ? rows.map(pendingRow).join("")
+      : '<tr><td colspan="6" style="opacity:0.4">No matches</td></tr>';
   }
 
   // ── Sortable commits table ─────────────────────────────────────────
@@ -307,24 +440,37 @@
   // ── Uncommitted files ──────────────────────────────────────────────
 
   function renderUncommitted(files) {
-    var tbody = document.getElementById("uncommittedTableBody");
     var countEl = document.getElementById("uncommittedCount");
     var section = document.getElementById("uncommittedSection");
 
     if (!files || files.length === 0) {
       section.style.display = "none";
+      currentUncommitted = [];
       return;
     }
 
     section.style.display = "";
+    currentUncommitted = files;
     countEl.textContent = "(" + files.length + " file" + (files.length === 1 ? "" : "s") + ")";
+    redrawUncommitted();
+  }
 
-    tbody.innerHTML = files.map(function (f) {
-      return '<tr>' +
-        '<td><span class="status-badge status-' + f.status + '">' + f.status + '</span></td>' +
-        '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
-        '</tr>';
-    }).join("");
+  function uncommittedRow(f) {
+    var s = esc(f.status);
+    return '<tr>' +
+      '<td><span class="status-badge status-' + s + '">' + s + '</span></td>' +
+      '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
+      '</tr>';
+  }
+
+  function redrawUncommitted() {
+    var tbody = document.getElementById("uncommittedTableBody");
+    if (!tbody) return;
+    var input = document.querySelector('.path-filter[data-target="uncommitted"]');
+    var rows = applyPathFilter(currentUncommitted, input && input.value);
+    tbody.innerHTML = rows.length
+      ? rows.map(uncommittedRow).join("")
+      : '<tr><td colspan="2" style="opacity:0.4">No matches</td></tr>';
   }
 
   function renderSummary(summary) {
@@ -333,7 +479,52 @@
   }
 
   // ── Click-to-open ──────────────────────────────────────────────────
+  // Single delegated dispatcher with explicit precedence. Two document-level
+  // listeners can't gate each other via stopPropagation (it stops bubbling,
+  // not sibling document delegates) — collapsing into one handler makes the
+  // precedence the only authority.
+  //
+  // Precedence (first match wins):
+  //   1. .diff-link          → openDiff   (pending-change diff icon)
+  //   2. .flag-cta           → runHygieneScan ("Run scan" inline CTA)
+  //   3. .report-link        → openReport (risk badges, dead-code adornment)
+  //   4. .card-clickable     → openScm    (summary cards)
+  //   5. .flag-clickable     → scroll-to  (flag → known section anchor)
+  //   6. .path-link          → openFile   (fallback)
   document.addEventListener("click", function (e) {
+    if (!e.target || !e.target.closest) return;
+
+    var diff = e.target.closest(".diff-link");
+    if (diff && diff.dataset.path) {
+      vscode.postMessage({ type: "openDiff", payload: diff.dataset.path });
+      return;
+    }
+
+    var cta = e.target.closest(".flag-cta");
+    if (cta && cta.dataset.action === "runHygieneScan") {
+      vscode.postMessage({ type: "runHygieneScan" });
+      return;
+    }
+
+    var rl = e.target.closest(".report-link");
+    if (rl && rl.dataset.report) {
+      vscode.postMessage({ type: "openReport", payload: { id: rl.dataset.report } });
+      return;
+    }
+
+    var c = e.target.closest(".card-clickable");
+    if (c && c.dataset.action === "openScm") {
+      vscode.postMessage({ type: "openScm" });
+      return;
+    }
+
+    var fl = e.target.closest(".flag-clickable");
+    if (fl && fl.dataset.anchor) {
+      var target = document.getElementById(fl.dataset.anchor);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     var link = e.target.closest(".path-link");
     if (link && link.dataset.path) {
       vscode.postMessage({ type: "openFile", payload: link.dataset.path });

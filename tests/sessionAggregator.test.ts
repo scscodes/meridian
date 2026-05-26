@@ -532,4 +532,29 @@ describe('aggregateSessionBriefing', () => {
     if (result.kind !== 'ok') throw new Error('expected ok');
     expect(result.value.pendingChangeRisk).toBeUndefined();
   });
+
+  // The session-briefing webview's FLAG_ANCHORS table couples to literal flag
+  // prefixes emitted from this aggregator. The webview JS isn't importable here
+  // (ES5 IIFE served as a static asset), so this test pins the contract from
+  // the aggregator side: any rewording must be paired with a script.js update.
+  it('emits flag strings the webview FLAG_ANCHORS table can match', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = await import('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = await import('path');
+    const src = fs.readFileSync(
+      path.join(__dirname, '../src/domains/git/session-aggregator.ts'),
+      'utf-8',
+    );
+    // Keep in sync with script.js FLAG_ANCHORS in session-briefing-ui/.
+    const expectedFlagPrefixes = [
+      'Recent run failures',
+      'Modifying ',                          // "Modifying N high-risk files"
+      'Hygiene: ',                           // dead/large hygiene flags
+      'Large number of uncommitted files',
+    ];
+    for (const prefix of expectedFlagPrefixes) {
+      expect(src).toContain(prefix);
+    }
+  });
 });

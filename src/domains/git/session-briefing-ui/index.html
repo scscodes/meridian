@@ -30,6 +30,9 @@
       <h3>Activity <span class="table-hint" id="activityPeriod"></span></h3>
       <div class="metrics" id="activityMetrics"></div>
       <div id="sparklineBlock"></div>
+      <div id="churnFilterRow" class="filter-row" style="display:none">
+        <input type="text" class="path-filter" data-target="churn" placeholder="filter path…" />
+      </div>
       <div id="churnBlock"></div>
     </div>
 
@@ -39,9 +42,28 @@
       <div id="deadCodeBlock"></div>
     </div>
 
+    <div class="table-container" id="recentRunsSection">
+      <h3>Recent Runs <span class="table-hint" id="recentRunsHint"></span></h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Command</th>
+            <th>Phase</th>
+            <th>Duration</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody id="recentRunsTableBody"></tbody>
+      </table>
+    </div>
+
     <div class="table-container" id="pendingRiskSection">
       <h3>Pending-Change Risk <span class="table-hint" id="pendingRiskHint"></span></h3>
       <div class="metrics" id="pendingRiskMetrics"></div>
+      <div class="filter-row">
+        <input type="text" class="path-filter" data-target="pending" placeholder="filter path…" />
+      </div>
       <div id="pendingRiskBlock"></div>
     </div>
 
@@ -62,7 +84,18 @@
     </div>
 
     <div class="table-container" id="uncommittedSection">
-      <h3>Uncommitted Changes <span class="table-hint" id="uncommittedCount"></span></h3>
+      <h3>Uncommitted Changes
+        <span class="table-hint" id="uncommittedCount"></span>
+        <span class="status-legend">
+          <span class="status-badge status-A">A</span> added
+          <span class="status-badge status-M">M</span> modified
+          <span class="status-badge status-D">D</span> deleted
+          <span class="status-badge status-R">R</span> renamed
+        </span>
+      </h3>
+      <div class="filter-row">
+        <input type="text" class="path-filter" data-target="uncommitted" placeholder="filter path…" />
+      </div>
       <table>
         <thead>
           <tr>
@@ -75,7 +108,7 @@
     </div>
 
     <div class="summary-section" id="summarySection">
-      <h3>AI Summary</h3>
+      <h3>Summary</h3>
       <div id="summaryContent" class="summary-content"></div>
     </div>
 

@@ -8,6 +8,7 @@ import { createSessionBriefingHandler } from '../src/domains/git/session-handler
 import { SessionBriefingSources } from '../src/domains/git/session-aggregator';
 import { success, failure } from '../src/types';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
+import { getPrompt } from '../src/infrastructure/prompt-registry';
 
 function makeSources(
   git: MockGitProvider,
@@ -167,6 +168,30 @@ describe('git.sessionBriefing', () => {
       expect(result.value.summary).toContain('uncommitted file');
       expect(result.value.uncommittedFiles).toHaveLength(2);
     }
+  });
+
+  describe('SESSION_BRIEFING prompt shape', () => {
+    const prompt = getPrompt('SESSION_BRIEFING');
+
+    it('instructs the model to emit plain text, not markdown', () => {
+      // The webview renders the summary via textContent (script.js renderSummary),
+      // so any '#' / '##' / backtick markers would appear literally. Regression
+      // guard against the original prompt shape, which said
+      //   "Output format (markdown): # Session Briefing — <branch name> ..."
+      expect(prompt).toMatch(/plain text/i);
+      expect(prompt).not.toMatch(/Output format[:\s]*\(?\s*markdown/i);
+      expect(prompt).not.toMatch(/^#{1,6}\s+<.*>/m);
+    });
+
+    it('names the expected sections', () => {
+      expect(prompt).toMatch(/Branch State/);
+      expect(prompt).toMatch(/Recent Commits/);
+      expect(prompt).toMatch(/Uncommitted/);
+      expect(prompt).toMatch(/Activity/);
+      expect(prompt).toMatch(/Hygiene/);
+      expect(prompt).toMatch(/Pending-Change Risk/);
+      expect(prompt).toMatch(/Flags/);
+    });
   });
 
   it('surfaces optional aggregate fields in the returned report', async () => {

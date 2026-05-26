@@ -11,6 +11,7 @@ import { resolveWorkspacePath } from "../security/path-guard";
 import { appendIgnorePattern } from "../security/ignore-store";
 import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
 import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
+import type { ReportOpenArg } from "../ui/tree-providers/reports-tree-provider";
 
 /**
  * Optional hook a provider can opt into for the webview right-click "Ignore"
@@ -654,6 +655,36 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
       }
     } else if (msg.type === "openFile") {
       this.openWorkspaceFile(String(msg.payload ?? ""));
+    } else if (msg.type === "openReport") {
+      // Deep-link into Git or Hygiene Analytics. The arg shape is ReportOpenArg
+      // (only `reportId` is dereferenced by meridian.reports.open) — using the
+      // type instead of ReportTreeItem keeps vscode.TreeItem out of this file's
+      // import graph for tests that mock `vscode` sparsely.
+      const payload = msg.payload as { id?: string } | undefined;
+      const id = payload?.id;
+      if (id === "gitAnalytics" || id === "hygiene") {
+        const arg: ReportOpenArg = { reportId: id };
+        await vscode.commands.executeCommand("meridian.reports.open", arg);
+      }
+    } else if (msg.type === "openScm") {
+      await vscode.commands.executeCommand("workbench.view.scm");
+    } else if (msg.type === "runHygieneScan") {
+      // Direct Meridian command id — only site in this file. The parallel
+      // openReport above goes through meridian.reports.open indirection; this
+      // one is direct because there is no equivalent dispatch surface for it.
+      await vscode.commands.executeCommand("meridian.hygiene.scan");
+    } else if (msg.type === "openDiff") {
+      // Dirty file → built-in git.openChange diff view. The catch fires only on
+      // resolveWorkspacePath rejection (path-guard); a missing Git extension
+      // makes executeCommand silently no-op, which is acceptable degradation.
+      const raw = String(msg.payload ?? "");
+      if (!raw) return;
+      try {
+        const abs = resolveWorkspacePath(this.workspaceRoot, raw);
+        await vscode.commands.executeCommand("git.openChange", vscode.Uri.file(abs));
+      } catch {
+        vscode.window.showErrorMessage("Blocked diff open outside workspace.");
+      }
     }
   }
 }

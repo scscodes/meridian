@@ -13,6 +13,15 @@ import { REPORT_LABELS } from "../../report-labels";
 
 export type ReportId = "sessionBriefing" | "gitAnalytics" | "hygiene";
 
+/**
+ * Minimal shape `meridian.reports.open` reads from its argument. `ReportTreeItem`
+ * satisfies this (extends `vscode.TreeItem`, carries `reportId`) — but a plain
+ * `{ reportId }` object satisfies it too, which lets the session-briefing webview
+ * deep-link without importing `ReportTreeItem` (and hence `vscode.TreeItem`) into
+ * a module whose tests mock `vscode` sparsely.
+ */
+export type ReportOpenArg = { readonly reportId: ReportId };
+
 /** Display order is the array order in REPORTS below. */
 const REPORTS: ReadonlyArray<{ id: ReportId; label: string }> = [
   { id: "sessionBriefing", label: REPORT_LABELS.sessionBriefing },

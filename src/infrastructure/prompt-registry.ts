@@ -15,34 +15,43 @@ const PROMPTS: Record<PromptId, string> = {
   SESSION_BRIEFING: `You are a developer assistant generating a morning session briefing.
 Given the current git branch state, recent commits, and uncommitted changes, produce a concise briefing.
 
-Output format (markdown):
-# Session Briefing — <branch name>
+Output format: PLAIN TEXT only — no markdown syntax. The text is rendered with
+textContent, so any '#' / '##' / '-' / '*' / backtick markers will appear
+literally. Use blank lines between sections and indented bullets like '  • '.
 
-## Branch State
-<1-2 sentences: branch name, whether it is dirty, staged/unstaged counts>
+Section order (omit any whose data is absent):
 
-## Recent Commits
-<bulleted list of last N commits with short hash and message>
+Branch State
+  One line: branch name, dirty/clean, staged/unstaged/untracked counts.
 
-## Uncommitted Changes
-<bulleted list of modified files, or "None" if clean>
+Recent Commits
+  Bullets: short hash and message, one per line.
 
-## Activity & Momentum
-<only if activityWindow is present: commits/files over the period, top
-contributors, and momentum from trends (commit direction + confidence,
-volatility direction); call out the highest-churn files from topChurnFiles.
-Omit this whole section if activityWindow is absent.>
+Uncommitted Changes
+  Bullets: status letter (A/M/D/R) and path. If clean, say "None".
 
-## Workspace Hygiene
-<only if hygieneSnapshot is present: dead/large/log file counts and dead-code
-item count; if deadCodeSample is present, list a few concrete file:line
-findings. Omit this whole section if hygieneSnapshot is absent.>
+Activity & Momentum
+  Only if activityWindow is present. One line for commits/files in the period;
+  one line for top contributors; one line for momentum (commit direction +
+  confidence, volatility direction). If topChurnFiles is present, list the
+  highest-churn files as indented bullets.
 
-## Flags
-<any notable issues: many uncommitted files, detached HEAD, etc. Omit section if none.>
+Workspace Hygiene
+  Only if hygieneSnapshot is present. One line for dead/large/log/dead-code
+  counts. If deadCodeSample is present, list a few concrete file:line findings
+  as indented bullets.
+
+Pending-Change Risk
+  Only if pendingChangeRisk is present and totalChanged > 0. One line for
+  totalChanged + hotspotCount. List high-risk files as indented bullets.
+
+Flags
+  Bulleted list of any notable issues (large dirty set, detached HEAD,
+  failed runs, hotspots). Omit the section if there are none.
 
 Guidelines:
-- Keep it scannable — bullets over prose
+- Plain text only — no '#', '##', '-', '*', or backtick markers
+- Keep it scannable — short lines and indented bullets ('  • ')
 - Flag anything that needs attention before starting work
 - Use only the data provided; never invent metrics or file names
 - If the workspace is clean, say so clearly`,

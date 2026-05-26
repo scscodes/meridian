@@ -144,6 +144,8 @@ button:hover {
   border-color: var(--vscode-focusBorder, #007acc);
 }
 
+.card-clickable { cursor: pointer; }
+
 .card h3 { margin: 0 0 6px; }
 
 .card .value {
@@ -176,6 +178,57 @@ button:hover {
 .flag-icon {
   font-size: 14px;
   flex-shrink: 0;
+}
+
+.flag-clickable { cursor: pointer; }
+.flag-clickable:hover {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.flag-cta {
+  padding: 2px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.flag-cta:hover {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+/* Pending-change diff icon */
+
+.diff-link {
+  cursor: pointer;
+  opacity: 0.45;
+  font-size: 14px;
+  transition: opacity 0.12s;
+}
+.diff-link:hover { opacity: 1; color: #06b6d4; }
+
+/* Filter row (path-substring filters above filterable tables) */
+
+.filter-row {
+  margin: 4px 0 8px;
+}
+
+.path-filter {
+  width: 220px;
+  padding: 4px 8px;
+  background: var(--vscode-input-background, rgba(0,0,0,0.2));
+  color: var(--vscode-input-foreground, #d4d4d4);
+  border: 1px solid var(--vscode-input-border, #555);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  outline: none;
+}
+.path-filter:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
 }
 
 /* Tables */
@@ -295,10 +348,57 @@ tbody tr:hover {
 .status-D { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 .status-R { background: rgba(6, 182, 212, 0.2); color: #06b6d4; }
 
+/* Status legend (Uncommitted section header) */
+
+.status-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.55;
+}
+
+.status-legend .status-badge {
+  margin-left: 6px;
+}
+
+.status-legend .status-badge:first-child {
+  margin-left: 0;
+}
+
+/* Run-log phase badges (Recent Runs table) */
+
+.phase-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  letter-spacing: 0.3px;
+}
+
+.phase-complete { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.phase-fail     { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
 /* Path link */
 
 .path-link { cursor: pointer; }
 .path-link:hover { color: #06b6d4; }
+
+/* Report deep-link (risk badges + dead-code adornment) */
+
+.report-link { cursor: pointer; }
+.report-link.adornment {
+  opacity: 0.45;
+  font-size: 13px;
+  transition: opacity 0.12s;
+}
+.report-link.adornment:hover { opacity: 1; color: #06b6d4; }
 
 /* Right-click ignore menu (shared structure across all three Meridian webviews) */
 

@@ -1,3 +1,10 @@
+# [2.7.0](https://github.com/scscodes/meridian/compare/v2.6.0...v2.7.0) (2026-05-26)
+
+
+### Features
+
+* session briefing UI/UX polish pass ([e8d7336](https://github.com/scscodes/meridian/commit/e8d733650e97e3e5958657050dc04dd37319b5e1))
+
 # [2.6.0](https://github.com/scscodes/meridian/compare/v2.5.0...v2.6.0) (2026-05-21)
 
 

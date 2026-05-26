@@ -2,8 +2,6 @@
  * Hygiene Domain Scan Handler — workspace analysis for dead files, large files, and stale logs.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const micromatch = require("micromatch");
 import {
   Handler,
   CommandContext,
@@ -17,12 +15,9 @@ import {
 } from "../../types";
 import { HYGIENE_SETTINGS } from "../../constants";
 import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
+import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { readGitignorePatterns, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
-
-function isExcluded(filePath: string, patterns: string[]): boolean {
-  return patterns.length > 0 && micromatch.isMatch(filePath, patterns);
-}
 
 /**
  * hygiene.scan — Analyze workspace for dead files, large files, and stale logs.
@@ -56,7 +51,7 @@ export function createScanHandler(
         const result = await workspaceProvider.findFiles(pattern);
         if (result.kind === "ok") {
           for (const f of result.value) {
-            if (!deadFiles.includes(f) && !isExcluded(f, excludePatterns)) {
+            if (!deadFiles.includes(f) && !pathMatchesAny(f, excludePatterns)) {
               deadFiles.push(f);
             }
           }
@@ -71,7 +66,7 @@ export function createScanHandler(
         const result = await workspaceProvider.findFiles(pattern);
         if (result.kind === "ok") {
           for (const f of result.value) {
-            if (!logFiles.includes(f) && !isExcluded(f, excludePatterns)) {
+            if (!logFiles.includes(f) && !pathMatchesAny(f, excludePatterns)) {
               logFiles.push(f);
             }
           }
@@ -84,7 +79,7 @@ export function createScanHandler(
 
       if (allFilesResult.kind === "ok") {
         for (const filePath of allFilesResult.value) {
-          if (isExcluded(filePath, excludePatterns)) {
+          if (pathMatchesAny(filePath, excludePatterns)) {
             continue;
           }
           const readResult = await workspaceProvider.readFile(filePath);
@@ -102,7 +97,7 @@ export function createScanHandler(
       const mdResult = await workspaceProvider.findFiles("**/*.md");
       if (mdResult.kind === "ok") {
         for (const filePath of mdResult.value) {
-          if (isExcluded(filePath, excludePatterns)) continue;
+          if (pathMatchesAny(filePath, excludePatterns)) continue;
           const readResult = await workspaceProvider.readFile(filePath);
           if (readResult.kind === "ok") {
             const sizeBytes = Buffer.byteLength(readResult.value, "utf8");

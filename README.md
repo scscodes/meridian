@@ -19,7 +19,7 @@ All four are computed surfaces — no model calls required to produce them. The 
 
 ## Getting started
 
-Open the Command Palette and search `Meridian`, or use the Meridian sidebar (Git and Hygiene views). Configure under **Settings** → `meridian.*`.
+Open the Command Palette and search `Meridian`, or use the Meridian sidebar (Reports, Git, and Hygiene views). Configure under **Settings** → `meridian.*`.
 
 - **Requires** VS Code 1.91+
 - **Works in** VS Code, Cursor, VSCodium, and compatible editors — via the VS Marketplace and Open VSX

@@ -2,15 +2,17 @@
  * .meridian/.meridianignore — read and append helpers.
  *
  * Canonical, security-gated I/O for the workspace's ignore file (located at
- * .meridian/.meridianignore per ADR 014). Centralizes:
- *   - pattern read + normalization (was duplicated in hygiene/analytics-service)
- *   - append-with-dedupe (was inline in specialized-commands.ts, no dedupe)
- *   - workspace-boundary enforcement via path-guard on every write
+ * .meridian/.meridianignore per ADR 014). Centralizes pattern read +
+ * normalization, append-with-dedupe, and workspace-boundary enforcement
+ * via path-guard on every write.
  *
- * File format: one bare relative path per line, blank lines and lines
- * beginning with `#` are ignored. Patterns are normalized at read time to
- * `**\/<pattern>` so micromatch matches both relative and absolute forms
- * (mirrors gitignore semantics).
+ * Pattern semantics per ADR 015. Match-time policy lives in
+ * `infrastructure/glob-match.ts`. Supported subset of gitignore: blank and
+ * `#` lines skipped; bare names match-anywhere; globstar-prefixed entries
+ * (already starting with two asterisks + slash) also match-anywhere;
+ * `/`-prefixed root-anchored; every entry auto-expands to also cover its
+ * children when it names a directory. Negation (`!foo`) is intentionally
+ * unsupported (order-aware, out of scope) and such lines are silently dropped.
  */
 
 import * as fs from "fs";
@@ -32,8 +34,11 @@ export interface IgnoreAppendResult {
 
 /**
  * Parse a line-oriented ignore file into micromatch-ready glob patterns.
- * Returns [] if the file is missing or unreadable. Blank/comment lines are
- * dropped; bare paths are wrapped as `** /<path>` so they match anywhere.
+ * Returns [] if the file is missing or unreadable. See ADR 015 for the
+ * full transform table. Briefly: blanks, `#`-comments, and `!`-negation
+ * lines are dropped; every other line emits both an entry pattern and a
+ * children pattern so a directory-shaped name covers its contents.
+ * `/`-prefixed entries are root-anchored; everything else matches anywhere.
  */
 function readIgnoreFilePatterns(filePath: string): string[] {
   try {
@@ -41,10 +46,17 @@ function readIgnoreFilePatterns(filePath: string): string[] {
     return content
       .split("\n")
       .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith("#"))
-      .map((l) => {
-        const stripped = l.endsWith("/") ? l.slice(0, -1) : l;
-        return stripped.startsWith("**/") ? stripped : `**/${stripped}`;
+      .filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("!"))
+      .flatMap((l) => {
+        const trailingStripped = l.endsWith("/") ? l.slice(0, -1) : l;
+        if (trailingStripped.startsWith("/")) {
+          const anchored = trailingStripped.slice(1);
+          return [anchored, `${anchored}/**`];
+        }
+        const base = trailingStripped.startsWith("**/")
+          ? trailingStripped
+          : `**/${trailingStripped}`;
+        return [base, `${base}/**`];
       });
   } catch {
     return [];

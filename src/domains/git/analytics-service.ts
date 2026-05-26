@@ -3,7 +3,6 @@
  */
 
 import { execFileSync } from "child_process";
-import micromatch from "micromatch";
 import {
   AnalyticsPeriod,
   AnalyticsOptions,
@@ -19,6 +18,7 @@ import { ANALYTICS_SETTINGS, CACHE_SETTINGS, WORKSPACE_EXCLUDE_BASE } from "../.
 import { REPORT_LABELS, reportCsvHeader } from "../../report-labels";
 import { normalizeRenamePath } from "./git-path";
 import { TtlCache } from "../../infrastructure/cache";
+import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { ignoreFileMtimeMs, readMeridianIgnorePatterns } from "../../security/ignore-store";
 
 /** Baseline glob patterns excluded from file-level analytics (build artifacts, deps). */
@@ -260,7 +260,7 @@ export class GitAnalyzer {
    * Must be called before matchesPathPattern().
    */
   private applyPathFilter(commit: CommitMetric, pattern: string): void {
-    const matched = commit.files.filter(f => micromatch.isMatch(f.path, pattern));
+    const matched = commit.files.filter(f => pathMatchesAny(f.path, pattern));
     commit.files        = matched;
     commit.filesChanged = matched.length;
     commit.insertions   = matched.reduce((s, f) => s + f.insertions, 0);
@@ -271,7 +271,7 @@ export class GitAnalyzer {
    * Check if commit matches path pattern filter
    */
   private matchesPathPattern(commit: CommitMetric, pattern: string): boolean {
-    return commit.files.some((f) => micromatch.isMatch(f.path, pattern));
+    return commit.files.some((f) => pathMatchesAny(f.path, pattern));
   }
 
   /**
@@ -286,7 +286,7 @@ export class GitAnalyzer {
         const { path, insertions, deletions } = fileChange;
 
         // Skip build artifacts, deps, and user .meridian/.meridianignore patterns.
-        if (micromatch.isMatch(path, excludePatterns)) {
+        if (pathMatchesAny(path, excludePatterns)) {
           continue;
         }
 

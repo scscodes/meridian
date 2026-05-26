@@ -22,18 +22,48 @@ describe("readMeridianIgnorePatterns", () => {
     expect(readMeridianIgnorePatterns(root)).toEqual([]);
   });
 
-  it("skips blanks and comments, wraps bare patterns with **/", () => {
+  it("skips blanks/comments and expands every entry to cover children", () => {
     const root = makeWorkspace();
     fs.mkdirSync(path.join(root, ".meridian"), { recursive: true });
     fs.writeFileSync(
       path.join(root, ".meridian", ".meridianignore"),
       "# header\n\nsrc/index.ts\nbuild/\n**/already-prefixed\n"
     );
-    expect(readMeridianIgnorePatterns(root)).toEqual([
-      "**/src/index.ts",
-      "**/build",
-      "**/already-prefixed",
-    ]);
+    const patterns = readMeridianIgnorePatterns(root);
+    expect(patterns).toHaveLength(6);
+    expect(patterns).toEqual(expect.arrayContaining([
+      "**/src/index.ts", "**/src/index.ts/**",
+      "**/build", "**/build/**",
+      "**/already-prefixed", "**/already-prefixed/**",
+    ]));
+  });
+
+  it("drops negation lines (!foo) — unsupported per ADR 015", () => {
+    const root = makeWorkspace();
+    fs.mkdirSync(path.join(root, ".meridian"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".meridian", ".meridianignore"),
+      "node_modules\n!keep-me.ts\n!src/important.ts\n"
+    );
+    const patterns = readMeridianIgnorePatterns(root);
+    expect(patterns.some((p) => p.includes("!"))).toBe(false);
+    expect(patterns.some((p) => p.includes("keep-me"))).toBe(false);
+    expect(patterns).toEqual(expect.arrayContaining([
+      "**/node_modules", "**/node_modules/**",
+    ]));
+  });
+
+  it("anchors `/foo` to workspace root (no **/ prefix)", () => {
+    const root = makeWorkspace();
+    fs.mkdirSync(path.join(root, ".meridian"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".meridian", ".meridianignore"),
+      "/dist\n/coverage/\n"
+    );
+    expect(readMeridianIgnorePatterns(root)).toEqual(expect.arrayContaining([
+      "dist", "dist/**",
+      "coverage", "coverage/**",
+    ]));
   });
 });
 

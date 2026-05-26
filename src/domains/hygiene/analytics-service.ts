@@ -4,8 +4,6 @@
 
 import * as fs from "fs";
 import * as path from "path";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const micromatch = require("micromatch");
 
 import {
   FileCategory,
@@ -19,6 +17,7 @@ import {
 import { DeadCodeScan } from "../../types";
 import { CACHE_SETTINGS, HYGIENE_ANALYTICS_EXCLUDE_PATTERNS } from "../../constants";
 import { TtlCache } from "../../infrastructure/cache";
+import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { ignoreFileMtimeMs, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import {
   categorize,
@@ -186,9 +185,9 @@ export class HygieneAnalyzer {
       const fullPath = path.join(dir, dirent.name);
       const relPath  = path.relative(workspaceRoot, fullPath);
 
-      const isExcluded =
-        micromatch.isMatch(fullPath, excludePatterns) ||
-        micromatch.isMatch(relPath, excludePatterns);
+      // All exclude patterns are `**/...` shaped (ADR 015), so workspace-
+      // relative form is sufficient; matches the scan-handler convention.
+      const isExcluded = pathMatchesAny(relPath, excludePatterns);
 
       if (isExcluded) {
         // Don't recurse into heavy dirs; just record existence (one stat) so they show as prune targets

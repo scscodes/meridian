@@ -30,7 +30,7 @@
         <p class="sub">excl. .git · node_modules · .vscode</p>
       </div>
       <div class="card">
-        <h3>Prune Candidates</h3>
+        <h3>Prune Candidates <span class="info-hint" title="Gitignored heavy-artifact dirs (node_modules, .venv, __pycache__, build/, etc.) appear here as 0-byte placeholders on purpose — they're the cleanup targets. .gitignore is intentionally not applied to this report.">&#9432;</span></h3>
         <p class="value" id="pruneCount">—</p>
         <p class="sub" id="pruneFilesSub"></p>
       </div>
@@ -64,7 +64,7 @@
     <!-- Prune Candidates -->
     <div class="prune-section">
       <div class="prune-header">
-        <h3>Prune Candidates</h3>
+        <h3>Prune Candidates <span class="info-hint" title="Gitignored heavy-artifact dirs (node_modules, .venv, __pycache__, build/, etc.) appear here as 0-byte placeholders on purpose — they're the cleanup targets. .gitignore is intentionally not applied to this report.">&#9432;</span></h3>
         <p class="prune-criteria" id="pruneCriteria"></p>
       </div>
       <div class="table-scroll">
@@ -85,7 +85,7 @@
 
     <!-- All Files Table -->
     <div class="table-container">
-      <h3>All Files <span class="table-hint">(first 100 · click header to sort)</span></h3>
+      <h3>All Files <span class="info-hint" title="Gitignored heavy-artifact dirs (node_modules, .venv, __pycache__, build/, etc.) appear here as 0-byte placeholders on purpose — they're the cleanup targets. .gitignore is intentionally not applied to this report.">&#9432;</span> <span class="table-hint">(first 100 · click header to sort)</span></h3>
       <table id="filesTable">
         <thead>
           <tr>

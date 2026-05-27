@@ -18,6 +18,7 @@ import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
 import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { readGitignorePatterns, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
+import { detectCollections } from "./collection-detector";
 
 /**
  * hygiene.scan — Analyze workspace for dead files, large files, and stale logs.
@@ -117,16 +118,22 @@ export function createScanHandler(
         deadCode = { items: [], tsconfigPath: null, durationMs: 0, fileCount: 0, error: errMsg };
       }
 
+      // Shallow heavy-artifact dir scan for sidebar Collections entries.
+      // Bounded depth (≤3) and short-circuits at the first matched bucket,
+      // so this stays cheap even on big monorepos.
+      const collections = detectCollections(workspaceRoot);
+
       const scan: WorkspaceScan = {
         deadFiles,
         largeFiles,
         logFiles,
         markdownFiles,
         deadCode,
+        collections,
       };
 
       logger.info(
-        `Found ${scan.deadFiles.length} dead, ${scan.largeFiles.length} large, ${scan.logFiles.length} log, ${scan.markdownFiles.length} markdown, ${scan.deadCode.items.length} dead-code items`,
+        `Found ${scan.deadFiles.length} dead, ${scan.largeFiles.length} large, ${scan.logFiles.length} log, ${scan.markdownFiles.length} markdown, ${scan.deadCode.items.length} dead-code items, ${collections.envs.length + collections.caches.length + collections.buildOutputs.length + collections.vendoredDeps.length} collection dirs`,
         "HygieneScanHandler"
       );
 

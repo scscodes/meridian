@@ -89,8 +89,13 @@ export const HYGIENE_SETTINGS = {
   /** Scan interval in minutes */
   SCAN_INTERVAL_MINUTES: 60,
 
-  /** Maximum file size to check in bytes (10 MB) */
-  MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024,
+  /**
+   * Threshold above which a file is flagged as "Large" in the sidebar.
+   * Matches PRUNE_DEFAULTS.maxSizeMB so the sidebar and webview prune
+   * criteria stay in sync. Lowered from 10 MB (2026-05) — at 10 MB the
+   * sidebar bucket was empty on realistic repos and provided no signal.
+   */
+  MAX_FILE_SIZE_BYTES: 1 * 1024 * 1024,
 
   /** File patterns to exclude from hygiene checks */
   EXCLUDE_PATTERNS: [

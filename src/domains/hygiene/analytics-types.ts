@@ -95,6 +95,31 @@ export interface TemporalData {
 }
 
 // ============================================================================
+// Collections — heavy-artifact dir buckets surfaced as cleanup targets
+// ============================================================================
+
+export interface CollectionsBreakdown {
+  /** Python/Node-style virtual env or env dirs */
+  envs: string[];
+  /** Tool caches, lock caches, framework build caches */
+  caches: string[];
+  /** Project build outputs (dist/, build/, target/, etc.) */
+  buildOutputs: string[];
+  /** Vendored or third-party dependency trees */
+  vendoredDeps: string[];
+}
+
+// ============================================================================
+// Duplicate basenames — files sharing the same filename across the tree
+// ============================================================================
+
+export interface DuplicateBasenameEntry {
+  basename: string;
+  count: number;
+  paths: string[];
+}
+
+// ============================================================================
 // Report
 // ============================================================================
 
@@ -116,4 +141,10 @@ export interface HygieneAnalyticsReport {
   pruneConfig: PruneConfig;
   /** Dead code scan results (unused imports, locals, type params) */
   deadCode?: DeadCodeScan;
+  /** Heavy-artifact dir buckets (envs/caches/build outputs/vendored deps) */
+  collections: CollectionsBreakdown;
+  /** Files sharing the same basename across the tree (min 3 occurrences) */
+  duplicateBasenames: DuplicateBasenameEntry[];
+  /** Sum of countable lines per category */
+  linesByCategory: Partial<Record<FileCategory, number>>;
 }

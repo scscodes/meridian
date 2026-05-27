@@ -5,6 +5,8 @@
  */
 
 import {
+  CollectionsBreakdown,
+  DuplicateBasenameEntry,
   FileCategory,
   HygieneFileEntry,
   PruneConfig,
@@ -77,6 +79,126 @@ export function isPruneCandidate(
   const sizeMatch     = sizeBytes > config.maxSizeMB * 1_048_576;
   const lineMatch     = config.minLineCount > 0 && lineCount >= config.minLineCount;
   return categoryMatch || sizeMatch || lineMatch;
+}
+
+// ============================================================================
+// Collections — heavy-artifact dir buckets surfaced as cleanup targets
+// ============================================================================
+
+/**
+ * Dir-name → bucket map for the Collections section. Broader than
+ * HEAVY_ARTIFACT_DIRS in analytics-service.ts: includes build-output dirs
+ * (dist/build/out/target) that the walker DOES recurse into, so they get
+ * surfaced as collections via their file paths, not via a placeholder row.
+ */
+export const COLLECTION_BUCKETS = {
+  envs: new Set(["venv", ".venv", "env"]),
+  caches: new Set([
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
+    ".yarn", ".pnpm-store", ".cache",
+    ".gradle", ".terraform", ".dart_tool", ".cpcache", ".stack-work", ".parcel-cache",
+    ".next", ".nuxt",
+  ]),
+  buildOutputs: new Set([
+    "dist", "build", "out", "target", "_build", "deps", "bundled",
+  ]),
+  vendoredDeps: new Set([
+    "node_modules", "vendor", "packages", ".bundle",
+  ]),
+} as const;
+
+type CollectionBucket = keyof typeof COLLECTION_BUCKETS;
+
+function bucketForDirName(name: string): CollectionBucket | null {
+  for (const bucket of Object.keys(COLLECTION_BUCKETS) as CollectionBucket[]) {
+    if ((COLLECTION_BUCKETS[bucket] as Set<string>).has(name)) return bucket;
+  }
+  return null;
+}
+
+/**
+ * Bucket the heavy-artifact dirs present in the workspace into named groups.
+ *
+ * Walks each file's path segments outermost-first; the first segment that
+ * matches a known dir name claims the file for that bucket (so a `dist/`
+ * inside `node_modules/` reports under vendoredDeps, not buildOutputs).
+ * The bucket's `string[]` is the deduplicated set of dir paths found.
+ */
+export function buildCollections(files: HygieneFileEntry[]): CollectionsBreakdown {
+  const seen: Record<CollectionBucket, Set<string>> = {
+    envs: new Set(),
+    caches: new Set(),
+    buildOutputs: new Set(),
+    vendoredDeps: new Set(),
+  };
+
+  for (const f of files) {
+    const segments = f.path.split(/[/\\]/);
+    for (let i = 0; i < segments.length; i++) {
+      const bucket = bucketForDirName(segments[i]);
+      if (bucket) {
+        seen[bucket].add(segments.slice(0, i + 1).join("/"));
+        break;
+      }
+    }
+  }
+
+  return {
+    envs:         [...seen.envs].sort(),
+    caches:       [...seen.caches].sort(),
+    buildOutputs: [...seen.buildOutputs].sort(),
+    vendoredDeps: [...seen.vendoredDeps].sort(),
+  };
+}
+
+// ============================================================================
+// Duplicate basenames — files sharing the same filename across the tree
+// ============================================================================
+
+/**
+ * Group files by basename and return groups meeting the minimum-occurrences
+ * threshold (default 3 — 2 fires on every routine `index.ts` pairing).
+ * Placeholder rows (lineCount === -1 && sizeBytes === 0) are excluded since
+ * they represent directories, not real files.
+ */
+export function findDuplicateBasenames(
+  files: HygieneFileEntry[],
+  minOccurrences: number = 3
+): DuplicateBasenameEntry[] {
+  const groups = new Map<string, string[]>();
+  for (const f of files) {
+    if (f.lineCount === -1 && f.sizeBytes === 0) continue;
+    const existing = groups.get(f.name) ?? [];
+    existing.push(f.path);
+    groups.set(f.name, existing);
+  }
+  const result: DuplicateBasenameEntry[] = [];
+  for (const [basename, paths] of groups) {
+    if (paths.length >= minOccurrences) {
+      result.push({ basename, count: paths.length, paths: [...paths].sort() });
+    }
+  }
+  return result.sort((a, b) => (b.count - a.count) || a.basename.localeCompare(b.basename));
+}
+
+// ============================================================================
+// Lines-by-category aggregate
+// ============================================================================
+
+/**
+ * Sum lineCount per FileCategory. Skips rows with lineCount <= 0 (binaries,
+ * unreadable files, placeholders). This is a raw line count, not the LOC
+ * metric — blanks and comments are included. UI labels should say so.
+ */
+export function sumLinesByCategory(
+  files: HygieneFileEntry[]
+): Partial<Record<FileCategory, number>> {
+  const out: Partial<Record<FileCategory, number>> = {};
+  for (const f of files) {
+    if (f.lineCount <= 0) continue;
+    out[f.category] = (out[f.category] ?? 0) + f.lineCount;
+  }
+  return out;
 }
 
 // ============================================================================

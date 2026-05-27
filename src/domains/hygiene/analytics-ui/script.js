@@ -45,9 +45,12 @@ function renderUI() {
   if (!report) return;
   updateSummary();
   renderCategoryBar();
+  renderLinesByCategory();
   renderCleanupChart();
+  renderCollections();
   renderPruneTable();
-  renderFilesTable();
+  renderTopTalkers();
+  renderDuplicates();
 }
 
 // ============================================================================
@@ -277,48 +280,107 @@ function renderPruneTable() {
 }
 
 // ============================================================================
-// All Files table — sortable, first 100
+// Lines-by-category strip (raw line counts — not LOC)
 // ============================================================================
 
-let sortCol = "sizeBytes";
-let sortAsc  = false;
+function renderLinesByCategory() {
+  const el = document.getElementById("linesStrip");
+  if (!el) return;
+  const lbc = report.linesByCategory || {};
+  const entries = Object.entries(lbc)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]);
 
-function renderFilesTable() {
-  const tbody = document.getElementById("filesTableBody");
+  if (entries.length === 0) {
+    el.innerHTML = `<span class="lines-empty">no countable files</span>`;
+    return;
+  }
+
+  el.innerHTML = entries.map(([cat, count]) => `
+    <span class="lines-pill">
+      <span class="legend-swatch" style="background:${CAT_COLORS[cat] || "#90a4ae"}"></span>
+      <span class="lines-cat">${esc(cat)}</span>
+      <span class="lines-count">${count.toLocaleString()}</span>
+    </span>
+  `).join("");
+}
+
+// ============================================================================
+// Collections — heavy-artifact dir buckets
+// ============================================================================
+
+function renderCollections() {
+  const c = report.collections || { envs: [], caches: [], buildOutputs: [], vendoredDeps: [] };
+  renderCollectionBucket("envs", c.envs);
+  renderCollectionBucket("caches", c.caches);
+  renderCollectionBucket("buildOutputs", c.buildOutputs);
+  renderCollectionBucket("vendoredDeps", c.vendoredDeps);
+}
+
+function renderCollectionBucket(key, paths) {
+  setText(`${key}Count`, String(paths.length));
+  const el = document.getElementById(`${key}Paths`);
+  if (!el) return;
+  if (paths.length === 0) {
+    el.innerHTML = `<span class="collection-empty">none found</span>`;
+    return;
+  }
+  el.innerHTML = paths.map((p) => `
+    <span class="path-link" data-path="${esc(p)}"><code title="${esc(p)}">${esc(p)}</code></span>
+  `).join("");
+}
+
+// ============================================================================
+// Top talkers — Largest + Oldest (top 10 each)
+// ============================================================================
+
+function renderTopTalkers() {
+  renderTopTable("largestTableBody", report.largestFiles || []);
+  renderTopTable("oldestTableBody", report.oldestFiles || []);
+}
+
+function renderTopTable(bodyId, rows) {
+  const tbody = document.getElementById(bodyId);
   if (!tbody) return;
-
-  document.querySelectorAll("#filesTable th[data-col]").forEach((th) => {
-    th.classList.remove("sort-asc", "sort-desc");
-    if (th.dataset.col === sortCol) {
-      th.classList.add(sortAsc ? "sort-asc" : "sort-desc");
-    }
-  });
-
-  const files = [...(report.files || [])].slice(0, 100);
-
-  files.sort((a, b) => {
-    const av = a[sortCol], bv = b[sortCol];
-    if (typeof av === "string")  return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-    if (typeof av === "boolean") return sortAsc ? (av ? 1 : -1) : (av ? -1 : 1);
-    const na = av === -1 ? 0 : av;
-    const nb = bv === -1 ? 0 : bv;
-    return sortAsc ? na - nb : nb - na;
-  });
-
-  tbody.innerHTML = "";
-
-  for (const f of files) {
-    const row = tbody.insertRow();
-    if (f.isPruneCandidate) row.className = "prune-row";
-    row.innerHTML = `
+  const slice = rows.slice(0, 10);
+  if (slice.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;opacity:0.5;padding:12px">No files</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = slice.map((f) => `
+    <tr${f.isPruneCandidate ? ' class="prune-row"' : ""}>
       <td><span class="path-link" data-path="${esc(f.path)}"><code title="${esc(f.path)}">${esc(f.path)}</code></span></td>
       <td>${fmtBytes(f.sizeBytes)}</td>
       <td>${f.lineCount >= 0 ? f.lineCount.toLocaleString() : "—"}</td>
       <td>${f.ageDays}</td>
-      <td><span class="cat-${f.category}">${f.category}</span></td>
-      <td>${f.isPruneCandidate ? '<span class="prune-yes">Yes</span>' : '<span class="prune-no">—</span>'}</td>
-    `;
+      <td><span class="cat-${f.category}">${esc(f.category)}</span></td>
+    </tr>
+  `).join("");
+}
+
+// ============================================================================
+// Duplicate basenames
+// ============================================================================
+
+function renderDuplicates() {
+  const tbody = document.getElementById("duplicatesTableBody");
+  if (!tbody) return;
+  const dupes = report.duplicateBasenames || [];
+  if (dupes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;opacity:0.5;padding:12px">No duplicates (min 3 occurrences)</td></tr>`;
+    return;
   }
+  tbody.innerHTML = dupes.map((d) => `
+    <tr>
+      <td><code>${esc(d.basename)}</code></td>
+      <td>${d.count}</td>
+      <td>
+        <div class="dup-paths">
+          ${d.paths.map((p) => `<span class="path-link" data-path="${esc(p)}"><code title="${esc(p)}">${esc(p)}</code></span>`).join("")}
+        </div>
+      </td>
+    </tr>
+  `).join("");
 }
 
 // ============================================================================
@@ -351,19 +413,6 @@ document.addEventListener("click", (e) => {
 // Sends an "ignorePath" message; extension appends to .meridian/.meridianignore,
 // invalidates the HygieneAnalyzer cache, and re-renders the report.
 installIgnoreContextMenu();
-
-document.querySelectorAll("#filesTable th[data-col]").forEach((th) => {
-  th.addEventListener("click", () => {
-    const col = th.dataset.col;
-    if (sortCol === col) {
-      sortAsc = !sortAsc;
-    } else {
-      sortCol = col;
-      sortAsc = col === "path" || col === "category";
-    }
-    if (report) renderFilesTable();
-  });
-});
 
 // ============================================================================
 // Helpers

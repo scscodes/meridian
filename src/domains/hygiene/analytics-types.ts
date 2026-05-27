@@ -2,7 +2,9 @@
  * Hygiene Analytics Types — Data model for workspace file analytics reporting.
  */
 
-import { DeadCodeScan } from "../../types";
+import { CollectionsBreakdown, DeadCodeScan } from "../../types";
+
+export type { CollectionsBreakdown };
 
 export type FileCategory =
   | "markdown"
@@ -95,6 +97,16 @@ export interface TemporalData {
 }
 
 // ============================================================================
+// Duplicate basenames — files sharing the same filename across the tree
+// ============================================================================
+
+export interface DuplicateBasenameEntry {
+  basename: string;
+  count: number;
+  paths: string[];
+}
+
+// ============================================================================
 // Report
 // ============================================================================
 
@@ -116,4 +128,10 @@ export interface HygieneAnalyticsReport {
   pruneConfig: PruneConfig;
   /** Dead code scan results (unused imports, locals, type params) */
   deadCode?: DeadCodeScan;
+  /** Heavy-artifact dir buckets (envs/caches/build outputs/vendored deps) */
+  collections: CollectionsBreakdown;
+  /** Files sharing the same basename across the tree (min 3 occurrences) */
+  duplicateBasenames: DuplicateBasenameEntry[];
+  /** Sum of countable lines per category */
+  linesByCategory: Partial<Record<FileCategory, number>>;
 }

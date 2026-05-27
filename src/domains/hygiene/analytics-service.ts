@@ -20,10 +20,13 @@ import { TtlCache } from "../../infrastructure/cache";
 import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { ignoreFileMtimeMs, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import {
+  buildCollections,
+  buildTemporalData,
   categorize,
+  findDuplicateBasenames,
   isLineCountable,
   isPruneCandidate,
-  buildTemporalData,
+  sumLinesByCategory,
 } from "./analytics-utils";
 
 /**
@@ -137,11 +140,14 @@ export class HygieneAnalyzer {
       ? buildDeadCodeRelPathMap(workspaceRoot, deadCodeScan)
       : undefined;
 
-    const summary       = this.buildSummary(files);
-    const pruneCandiates = files.filter((f) => f.isPruneCandidate);
-    const largestFiles  = [...files].sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 20);
-    const oldestFiles   = [...files].sort((a, b) => b.ageDays - a.ageDays).slice(0, 20);
-    const temporalData  = buildTemporalData(files, deadCodeByRelPath);
+    const summary            = this.buildSummary(files);
+    const pruneCandiates     = files.filter((f) => f.isPruneCandidate);
+    const largestFiles       = [...files].sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 20);
+    const oldestFiles        = [...files].sort((a, b) => b.ageDays - a.ageDays).slice(0, 20);
+    const temporalData       = buildTemporalData(files, deadCodeByRelPath);
+    const collections        = buildCollections(files);
+    const duplicateBasenames = findDuplicateBasenames(files);
+    const linesByCategory    = sumLinesByCategory(files);
 
     const report: HygieneAnalyticsReport = {
       generatedAt: new Date(),
@@ -154,6 +160,9 @@ export class HygieneAnalyzer {
       temporalData,
       pruneConfig: config,
       deadCode: deadCodeScan,
+      collections,
+      duplicateBasenames,
+      linesByCategory,
     };
 
     this.cache.set(workspaceRoot, { report, configKey: cfgKey });

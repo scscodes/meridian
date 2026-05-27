@@ -88,10 +88,10 @@ describe("hygiene.scan (createScanHandler)", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. Large file detection (> 10 MB)
+  // 4. Large file detection (> 1 MB — matches PRUNE_DEFAULTS.maxSizeMB)
   // -----------------------------------------------------------------------
   it("flags files larger than MAX_FILE_SIZE_BYTES", async () => {
-    const bigContent = "x".repeat(11 * 1024 * 1024); // ~11 MB
+    const bigContent = "x".repeat(2 * 1024 * 1024); // 2 MB
     workspace.setFiles({
       "assets/huge.bin": bigContent,
     });
@@ -101,7 +101,19 @@ describe("hygiene.scan (createScanHandler)", () => {
 
     expect(scan.largeFiles).toHaveLength(1);
     expect(scan.largeFiles[0].path).toBe("assets/huge.bin");
-    expect(scan.largeFiles[0].sizeBytes).toBeGreaterThan(10 * 1024 * 1024);
+    expect(scan.largeFiles[0].sizeBytes).toBeGreaterThan(1 * 1024 * 1024);
+  });
+
+  it("does not flag files at or just under the 1 MB threshold", async () => {
+    workspace.setFiles({
+      "assets/exact.bin":  "x".repeat(1 * 1024 * 1024),
+      "assets/under.bin":  "x".repeat(1 * 1024 * 1024 - 1),
+    });
+    const handler = buildHandler();
+    const result = await handler(ctx, {});
+    const scan = assertSuccess(result);
+
+    expect(scan.largeFiles).toEqual([]);
   });
 
   // -----------------------------------------------------------------------

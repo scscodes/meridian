@@ -204,6 +204,24 @@ export interface WorkspaceScan {
   logFiles: string[];
   markdownFiles: MarkdownFile[];
   deadCode: DeadCodeScan;
+  /**
+   * Heavy-artifact dir buckets (envs/caches/build outputs/vendored deps).
+   * Populated by a shallow fs walk (depth ≤ 3) in scan-handler so the
+   * sidebar tree taxonomy mirrors the webview Collections section.
+   */
+  collections: CollectionsBreakdown;
+}
+
+/**
+ * Heavy-artifact dir buckets surfaced as cleanup targets. Shared between
+ * the sidebar (WorkspaceScan.collections) and the webview report
+ * (HygieneAnalyticsReport.collections) — same shape, same vocabulary.
+ */
+export interface CollectionsBreakdown {
+  envs: string[];
+  caches: string[];
+  buildOutputs: string[];
+  vendoredDeps: string[];
 }
 
 // ============================================================================

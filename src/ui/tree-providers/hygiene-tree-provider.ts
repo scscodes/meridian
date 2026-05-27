@@ -2,11 +2,13 @@
  * Hygiene Tree Provider — displays workspace scan results in the sidebar.
  *
  * Categories (in order):
- *   Dead Code  — unused imports/locals/type-params, grouped by file, click → exact line
- *   Dead Files — temp/backup files
- *   Large Files
+ *   Dead Code     — unused imports/locals/type-params, grouped by file, click → exact line
+ *   Dead Files    — temp/backup files
+ *   Large Files   — files exceeding HYGIENE_SETTINGS.MAX_FILE_SIZE_BYTES (1 MB)
  *   Log Files
  *   Markdown Files
+ *   Envs / Caches / Build Outputs / Vendored Deps — heavy-artifact dir buckets
+ *     (parity with the Hygiene Analytics webview Collections section)
  */
 
 import * as vscode from "vscode";
@@ -18,7 +20,7 @@ type Dispatcher = (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>
 type HygieneItemKind =
   | "category" | "file" | "markdownFile" | "deadCodeFile" | "deadCodeIssue"
   | "impactCategory" | "impactTarget" | "impactMetricGroup" | "impactFile"
-  | "report";
+  | "collectionDir" | "report";
 
 class HygieneTreeItem extends vscode.TreeItem {
   constructor(
@@ -175,6 +177,29 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
       makeMarkdownItem(f.path, f.sizeBytes, f.lineCount)
     );
 
+    // Collections — sidebar parity with the webview Collections section
+    const workspaceRoot = this.ctx.workspaceFolders?.[0] ?? "";
+    const makeCollectionItems = (paths: string[]): HygieneTreeItem[] =>
+      paths.map((relPath) => {
+        const absPath = workspaceRoot ? `${workspaceRoot}/${relPath}` : relPath;
+        const it = new HygieneTreeItem(
+          relPath.split("/").pop() ?? relPath,
+          "collectionDir",
+          [],
+          vscode.TreeItemCollapsibleState.None,
+          relPath,
+          absPath
+        );
+        it.iconPath = new vscode.ThemeIcon("folder");
+        it.tooltip = absPath;
+        it.command = {
+          command: "revealInExplorer",
+          title: "Reveal in Explorer",
+          arguments: [vscode.Uri.file(absPath)],
+        };
+        return it;
+      });
+
     const items: HygieneTreeItem[] = [];
     if (this.lastImpactResult) {
       items.push(this.buildImpactSection());
@@ -185,6 +210,10 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
       makeCategory("Large Files", "database", largeItems),
       makeCategory("Log Files", "output", logItems),
       makeCategory("Markdown Files", "markdown", mdItems),
+      makeCategory("Envs",          "package",  makeCollectionItems(scan.collections.envs)),
+      makeCategory("Caches",        "archive",  makeCollectionItems(scan.collections.caches)),
+      makeCategory("Build Outputs", "tools",    makeCollectionItems(scan.collections.buildOutputs)),
+      makeCategory("Vendored Deps", "library",  makeCollectionItems(scan.collections.vendoredDeps)),
     );
     this.cachedItems = items;
     return this.cachedItems;

@@ -1,3 +1,12 @@
+# [2.9.0](https://github.com/scscodes/meridian/compare/v2.8.0...v2.9.0) (2026-05-27)
+
+
+### Features
+
+* **hygiene-sidebar:** collections taxonomy + Large Files threshold fix ([bf7eb9f](https://github.com/scscodes/meridian/commit/bf7eb9fedbce5d350112b30254a00dc12a2fb9fe))
+* **hygiene-ui:** replace All Files table with focused top-talker sections ([b705208](https://github.com/scscodes/meridian/commit/b705208953b9e8c8cadef259182c8bd7ce216552))
+* **hygiene:** aggregate collections, duplicate basenames, lines-by-category ([73214eb](https://github.com/scscodes/meridian/commit/73214eb5ad490f846363daf6c77a3a27f6f4b0e8))
+
 # [2.8.0](https://github.com/scscodes/meridian/compare/v2.7.1...v2.8.0) (2026-05-27)
 
 

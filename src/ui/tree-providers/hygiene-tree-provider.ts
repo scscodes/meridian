@@ -179,7 +179,6 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
 
     // Collections — sidebar parity with the webview Collections section
     const workspaceRoot = this.ctx.workspaceFolders?.[0] ?? "";
-    const collections = scan.collections ?? { envs: [], caches: [], buildOutputs: [], vendoredDeps: [] };
     const makeCollectionItems = (paths: string[]): HygieneTreeItem[] =>
       paths.map((relPath) => {
         const absPath = workspaceRoot ? `${workspaceRoot}/${relPath}` : relPath;
@@ -211,10 +210,10 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
       makeCategory("Large Files", "database", largeItems),
       makeCategory("Log Files", "output", logItems),
       makeCategory("Markdown Files", "markdown", mdItems),
-      makeCategory("Envs",          "package",  makeCollectionItems(collections.envs)),
-      makeCategory("Caches",        "archive",  makeCollectionItems(collections.caches)),
-      makeCategory("Build Outputs", "tools",    makeCollectionItems(collections.buildOutputs)),
-      makeCategory("Vendored Deps", "library",  makeCollectionItems(collections.vendoredDeps)),
+      makeCategory("Envs",          "package",  makeCollectionItems(scan.collections.envs)),
+      makeCategory("Caches",        "archive",  makeCollectionItems(scan.collections.caches)),
+      makeCategory("Build Outputs", "tools",    makeCollectionItems(scan.collections.buildOutputs)),
+      makeCategory("Vendored Deps", "library",  makeCollectionItems(scan.collections.vendoredDeps)),
     );
     this.cachedItems = items;
     return this.cachedItems;

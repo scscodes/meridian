@@ -85,13 +85,19 @@ export function isPruneCandidate(
 // Collections — heavy-artifact dir buckets surfaced as cleanup targets
 // ============================================================================
 
+export type CollectionBucket = keyof CollectionsBreakdown;
+
+const COLLECTION_BUCKET_KEYS: readonly CollectionBucket[] = [
+  "envs", "caches", "buildOutputs", "vendoredDeps",
+];
+
 /**
  * Dir-name → bucket map for the Collections section. Broader than
  * HEAVY_ARTIFACT_DIRS in analytics-service.ts: includes build-output dirs
  * (dist/build/out/target) that the walker DOES recurse into, so they get
  * surfaced as collections via their file paths, not via a placeholder row.
  */
-export const COLLECTION_BUCKETS = {
+export const COLLECTION_BUCKETS: Record<CollectionBucket, ReadonlySet<string>> = {
   envs: new Set(["venv", ".venv", "env"]),
   caches: new Set([
     "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
@@ -105,13 +111,12 @@ export const COLLECTION_BUCKETS = {
   vendoredDeps: new Set([
     "node_modules", "vendor", "packages", ".bundle",
   ]),
-} as const;
+};
 
-type CollectionBucket = keyof typeof COLLECTION_BUCKETS;
-
-function bucketForDirName(name: string): CollectionBucket | null {
-  for (const bucket of Object.keys(COLLECTION_BUCKETS) as CollectionBucket[]) {
-    if ((COLLECTION_BUCKETS[bucket] as Set<string>).has(name)) return bucket;
+/** Resolve a directory name to its Collections bucket, or null if it's not a known heavy-artifact dir. */
+export function bucketForDirName(name: string): CollectionBucket | null {
+  for (const bucket of COLLECTION_BUCKET_KEYS) {
+    if (COLLECTION_BUCKETS[bucket].has(name)) return bucket;
   }
   return null;
 }

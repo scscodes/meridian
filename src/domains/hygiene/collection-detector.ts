@@ -14,8 +14,8 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { WorkspaceScanCollections } from "../../types";
-import { COLLECTION_BUCKETS } from "./analytics-utils";
+import { CollectionsBreakdown } from "../../types";
+import { bucketForDirName } from "./analytics-utils";
 
 /** Walking past depth 3 starts to look like a full scan — bound it tight. */
 const MAX_DEPTH = 3;
@@ -23,26 +23,18 @@ const MAX_DEPTH = 3;
 /** Skip these dir names entirely during the walk (not collections, not interesting). */
 const SKIP_DIRS = new Set([".git", ".meridian", ".vscode", ".idea"]);
 
-type CollectionBucket = keyof WorkspaceScanCollections;
-
-function bucketForDirName(name: string): CollectionBucket | null {
-  for (const bucket of ["envs", "caches", "buildOutputs", "vendoredDeps"] as const) {
-    if ((COLLECTION_BUCKETS[bucket] as Set<string>).has(name)) return bucket;
-  }
-  return null;
-}
-
-export function detectCollections(workspaceRoot: string): WorkspaceScanCollections {
-  const result: WorkspaceScanCollections = {
+export function detectCollections(workspaceRoot: string): CollectionsBreakdown {
+  const result: CollectionsBreakdown = {
     envs: [],
     caches: [],
     buildOutputs: [],
     vendoredDeps: [],
   };
   walk(workspaceRoot, workspaceRoot, 0, result);
-  for (const key of ["envs", "caches", "buildOutputs", "vendoredDeps"] as const) {
-    result[key].sort();
-  }
+  result.envs.sort();
+  result.caches.sort();
+  result.buildOutputs.sort();
+  result.vendoredDeps.sort();
   return result;
 }
 
@@ -50,7 +42,7 @@ function walk(
   dir: string,
   root: string,
   depth: number,
-  result: WorkspaceScanCollections
+  result: CollectionsBreakdown
 ): void {
   if (depth > MAX_DEPTH) return;
   let entries: fs.Dirent[];

@@ -2,7 +2,9 @@
  * Hygiene Analytics Types — Data model for workspace file analytics reporting.
  */
 
-import { DeadCodeScan } from "../../types";
+import { CollectionsBreakdown, DeadCodeScan } from "../../types";
+
+export type { CollectionsBreakdown };
 
 export type FileCategory =
   | "markdown"
@@ -92,21 +94,6 @@ export interface TemporalData {
   buckets: TemporalBucket[];
   /** Top 2–3 extensions by total file count across all buckets */
   topExtensions: string[];
-}
-
-// ============================================================================
-// Collections — heavy-artifact dir buckets surfaced as cleanup targets
-// ============================================================================
-
-export interface CollectionsBreakdown {
-  /** Python/Node-style virtual env or env dirs */
-  envs: string[];
-  /** Tool caches, lock caches, framework build caches */
-  caches: string[];
-  /** Project build outputs (dist/, build/, target/, etc.) */
-  buildOutputs: string[];
-  /** Vendored or third-party dependency trees */
-  vendoredDeps: string[];
 }
 
 // ============================================================================

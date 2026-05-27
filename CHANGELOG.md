@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/scscodes/meridian/compare/v2.7.1...v2.8.0) (2026-05-27)
+
+
+### Features
+
+* **hygiene-ui:** clarify why gitignored heavy-dirs appear in reports ([6f967c0](https://github.com/scscodes/meridian/commit/6f967c0c877547c27877c1c1467d6bfb73b75bb2))
+
 ## [2.7.1](https://github.com/scscodes/meridian/compare/v2.7.0...v2.7.1) (2026-05-26)
 
 

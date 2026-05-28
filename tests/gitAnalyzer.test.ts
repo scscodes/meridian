@@ -324,4 +324,107 @@ describe('GitAnalyzer', () => {
     expect(report.commitFrequency.labels).toContain('2026-W01');
     expect(report.commitFrequency.labels).toContain('2026-W02');
   });
+
+  // ── Change Companions (co-change pairs) ──────────────────────────────────
+  describe('co-change', () => {
+    // Build one git-log commit block: header + numstat lines for each path.
+    const commit = (
+      hash: string,
+      date: string,
+      paths: string[]
+    ): string =>
+      [`${hash}\x00Alice\x00${date}\x00feat: change`, ...paths.map((p) => `3\t1\t${p}`)].join('\n');
+
+    it('surfaces a pair that co-changes, with correct count and rate', async () => {
+      const log = [
+        commit('c1', '2026-05-20T10:00:00Z', ['src/a.ts', 'src/b.ts']),
+        commit('c2', '2026-05-21T10:00:00Z', ['src/a.ts', 'src/b.ts']),
+      ].join('\n');
+      mockedExecFileSync.mockReturnValue(log);
+
+      const report = await analyzer.analyze({ period: '3mo' });
+
+      expect(report.coChange).toBeDefined();
+      const pair = report.coChange!.find((p) => p.a === 'src/a.ts' && p.b === 'src/b.ts');
+      expect(pair).toBeDefined();
+      expect(pair!.count).toBe(2);
+      // both files changed in both commits → rate = 2 / min(2, 2) = 1
+      expect(pair!.coChangeRate).toBe(1);
+    });
+
+    it('stores pair endpoints in ascending path order regardless of commit order', async () => {
+      const log = [
+        commit('c1', '2026-05-20T10:00:00Z', ['src/z.ts', 'src/a.ts']),
+        commit('c2', '2026-05-21T10:00:00Z', ['src/z.ts', 'src/a.ts']),
+      ].join('\n');
+      mockedExecFileSync.mockReturnValue(log);
+
+      const report = await analyzer.analyze({ period: '3mo' });
+      const pair = report.coChange!.find((p) => p.count === 2);
+      expect(pair).toEqual({ a: 'src/a.ts', b: 'src/z.ts', count: 2, coChangeRate: 1 });
+    });
+
+    it('dilutes the co-change rate when either file also changes on its own', async () => {
+      const log = [
+        commit('c1', '2026-05-20T10:00:00Z', ['src/a.ts', 'src/b.ts']),
+        commit('c2', '2026-05-21T10:00:00Z', ['src/a.ts', 'src/b.ts']),
+        commit('c3', '2026-05-22T10:00:00Z', ['src/a.ts']), // solo a
+        commit('c4', '2026-05-23T10:00:00Z', ['src/b.ts']), // solo b
+      ].join('\n');
+      mockedExecFileSync.mockReturnValue(log);
+
+      const report = await analyzer.analyze({ period: '3mo' });
+      const pair = report.coChange!.find((p) => p.a === 'src/a.ts' && p.b === 'src/b.ts');
+      // count = 2 co-changes; timesA = timesB = 3 → rate = 2 / min(3,3) = 0.666…
+      expect(pair!.count).toBe(2);
+      expect(pair!.coChangeRate).toBeCloseTo(2 / 3, 5);
+    });
+
+    it('drops pairs below CO_CHANGE.MIN_SUPPORT (single co-change is coincidental)', async () => {
+      const log = [
+        commit('c1', '2026-05-20T10:00:00Z', ['src/a.ts', 'src/b.ts']),
+        commit('c2', '2026-05-21T10:00:00Z', ['src/a.ts', 'src/c.ts']),
+      ].join('\n');
+      mockedExecFileSync.mockReturnValue(log);
+
+      const report = await analyzer.analyze({ period: '3mo' });
+      expect(report.coChange).toEqual([]);
+    });
+
+    it('never pairs excluded paths (e.g. package-lock.json)', async () => {
+      const log = [
+        commit('c1', '2026-05-20T10:00:00Z', ['src/a.ts', 'package-lock.json']),
+        commit('c2', '2026-05-21T10:00:00Z', ['src/a.ts', 'package-lock.json']),
+      ].join('\n');
+      mockedExecFileSync.mockReturnValue(log);
+
+      const report = await analyzer.analyze({ period: '3mo' });
+      expect(
+        report.coChange!.every(
+          (p) => !p.a.includes('package-lock') && !p.b.includes('package-lock')
+        )
+      ).toBe(true);
+      // src/a.ts has no eligible partner left → no pairs at all
+      expect(report.coChange).toEqual([]);
+    });
+
+    it('skips oversized commits (> CO_CHANGE.MAX_COMMIT_FILES) — merge/mass-rename noise', async () => {
+      const many = Array.from({ length: 26 }, (_, i) => `src/f${String(i).padStart(2, '0')}.ts`);
+      const log = [
+        commit('c1', '2026-05-20T10:00:00Z', many),
+        commit('c2', '2026-05-21T10:00:00Z', many),
+      ].join('\n');
+      mockedExecFileSync.mockReturnValue(log);
+
+      const report = await analyzer.analyze({ period: '3mo' });
+      // Both commits exceed the cap → no pairs are formed at all.
+      expect(report.coChange).toEqual([]);
+    });
+
+    it('returns an empty list for an empty history', async () => {
+      mockedExecFileSync.mockReturnValue('');
+      const report = await analyzer.analyze({ period: '3mo' });
+      expect(report.coChange).toEqual([]);
+    });
+  });
 });

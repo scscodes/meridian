@@ -11,6 +11,7 @@
   // each render; read by the .path-filter input handler at every keystroke.
   var currentChurn = [];
   var currentPending = null; // PendingChangeRisk | null (need capped/counts on redraw)
+  var currentCompanions = null; // PendingChangeCompanions | null
   var currentUncommitted = [];
 
   function applyPathFilter(items, query) {
@@ -43,6 +44,7 @@
   var FILTER_REDRAW = {
     churn: function () { redrawChurn(); },
     pending: function () { redrawPending(); },
+    companions: function () { redrawCompanions(); },
     uncommitted: function () { redrawUncommitted(); },
   };
   document.addEventListener("input", function (e) {
@@ -79,6 +81,7 @@
     renderHygiene(report.hygieneSnapshot);
     renderRecentRuns(report.recentRuns);
     renderPendingRisk(report.pendingChangeRisk);
+    renderCompanions(report.pendingChangeCompanions);
     currentCommits = report.recentCommits || [];
     currentSort = { col: null, asc: true };
     renderCommitsTable(currentCommits);
@@ -118,6 +121,7 @@
   var FLAG_ANCHORS = [
     { re: /^Recent run failures/i,             anchor: "recentRunsSection" },
     { re: /^Modifying \d+ high-risk files/i,   anchor: "pendingRiskSection" },
+    { re: /^Possibly missing \d+ companion/i,  anchor: "companionsSection" },
     { re: /^Hygiene: \d+ dead files/i,         anchor: "hygieneSection" },
     { re: /^Hygiene: \d+ large files/i,        anchor: "hygieneSection" },
     { re: /^Large number of uncommitted files/i, anchor: "uncommittedSection" },
@@ -386,6 +390,52 @@
     tbody.innerHTML = rows.length
       ? rows.map(pendingRow).join("")
       : '<tr><td colspan="6" style="opacity:0.4">No matches</td></tr>';
+  }
+
+  // ── Pending-change companions (dirty-set × co-change join) ─────────
+
+  function renderCompanions(c) {
+    var section = document.getElementById("companionsSection");
+    if (!c || !c.files || c.files.length === 0) {
+      section.style.display = "none";
+      currentCompanions = null;
+      return;
+    }
+    section.style.display = "";
+    currentCompanions = c;
+    document.getElementById("companionsHint").textContent =
+      "(" + c.count + " suggested" +
+      (c.capped ? ", showing top " + c.files.length : "") + ")";
+
+    document.getElementById("companionsMetrics").innerHTML = [
+      metricCard("Suggested", c.count),
+    ].join("");
+
+    document.getElementById("companionsBlock").innerHTML =
+      '<table><thead><tr><th>Path</th><th>Co-Changes</th>' +
+      '<th>Co-change %</th><th>Ships with</th></tr></thead>' +
+      '<tbody id="companionsTableBody"></tbody></table>';
+    redrawCompanions();
+  }
+
+  function companionRow(f) {
+    var because = (f.becauseOf || []).map(esc).join(", ");
+    return '<tr>' +
+      '<td class="path-link" data-path="' + esc(f.path) + '">' + esc(f.path) + '</td>' +
+      '<td>' + Number(f.count) + '</td>' +
+      '<td>' + Math.round((Number(f.coChangeRate) || 0) * 100) + '%</td>' +
+      '<td class="companion-because">' + because + '</td>' +
+      '</tr>';
+  }
+
+  function redrawCompanions() {
+    var tbody = document.getElementById("companionsTableBody");
+    if (!tbody || !currentCompanions) return;
+    var input = document.querySelector('.path-filter[data-target="companions"]');
+    var rows = applyPathFilter(currentCompanions.files, input && input.value);
+    tbody.innerHTML = rows.length
+      ? rows.map(companionRow).join("")
+      : '<tr><td colspan="4" style="opacity:0.4">No matches</td></tr>';
   }
 
   // ── Sortable commits table ─────────────────────────────────────────

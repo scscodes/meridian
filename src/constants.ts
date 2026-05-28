@@ -347,6 +347,68 @@ export const PENDING_RISK = {
 } as const;
 
 // ============================================================================
+// Change Coupling (co-change)
+// ============================================================================
+
+/**
+ * Bounds for the deterministic co-change computation surfaced as "Change
+ * Companions" in Git Analytics (`GitAnalyticsReport.coChange`). Pure
+ * post-processing of the already-parsed `commits[].files`; no new I/O. A pair's
+ * `count` is the number of in-window commits that touched both files (support);
+ * `coChangeRate = count / min(timesA, timesB)` is the conditional co-change rate
+ * of the rarer file (0–1). Not a probabilistic heuristic — plain arithmetic.
+ */
+export const CO_CHANGE = {
+  /**
+   * Commits touching more than this many files are skipped: merges and sweeping
+   * renames couple everything-with-everything (coupling noise) and the pair
+   * count is O(files²), so the cap also bounds compute.
+   */
+  MAX_COMMIT_FILES: 25,
+
+  /** A pair must co-change in at least this many commits to surface (noise floor). */
+  MIN_SUPPORT: 2,
+
+  /** Max ranked pairs retained on the report (bounds wire/JSON payload). */
+  MAX_PAIRS: 100,
+
+  /** Pairs rendered in the Git Analytics panel (top slice of the stored list). */
+  PANEL_PAIRS: 15,
+
+  /** Max pair rows written to a CSV export. */
+  CSV_MAX_PAIRS: 50,
+} as const;
+
+// ============================================================================
+// Pending-Change Companions
+// ============================================================================
+
+/**
+ * Bounds for the additive `SessionBriefing.pendingChangeCompanions` slice — the
+ * deterministic join of the dirty-set against the already-computed analytics
+ * `coChange` list. Surfaces files that historically ship with your current
+ * changes but are NOT in the dirty set ("possibly forgotten"). Pure
+ * post-processing; no new I/O (ADR 011 additive-slice rule).
+ */
+export const COMPANIONS = {
+  /** A pair's co-change rate must be at least this for the untouched side to qualify. */
+  MIN_CONFIDENCE: 0.4,
+
+  /** Max companion files surfaced after the rate→count→path sort. */
+  MAX_FILES: 10,
+
+  /** Max triggering dirty files listed per companion ("ships with …"). */
+  BECAUSE_OF_LIMIT: 3,
+
+  /**
+   * Number of suggested companions at or above which a visible
+   * "Possibly missing N companion file(s)" flag is raised, consistent with the
+   * other SESSION_BRIEFING flag thresholds.
+   */
+  FLAG_THRESHOLD: 2,
+} as const;
+
+// ============================================================================
 // UI Settings
 // ============================================================================
 

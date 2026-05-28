@@ -10,11 +10,12 @@ import {
   AuthorMetric,
   CommitMetric,
   CommitFileChange,
+  CoChangePair,
   FileMetric,
   GitAnalyticsReport,
   TrendData,
 } from "./analytics-types";
-import { ANALYTICS_SETTINGS, CACHE_SETTINGS, WORKSPACE_EXCLUDE_BASE } from "../../constants";
+import { ANALYTICS_SETTINGS, CACHE_SETTINGS, CO_CHANGE, WORKSPACE_EXCLUDE_BASE } from "../../constants";
 import { REPORT_LABELS, reportCsvHeader } from "../../report-labels";
 import { normalizeRenamePath } from "./git-path";
 import { TtlCache } from "../../infrastructure/cache";
@@ -96,6 +97,9 @@ export class GitAnalyzer {
       .sort((a, b) => b.commits - a.commits)
       .slice(0, ANALYTICS_SETTINGS.TOP_AUTHORS_COUNT);
 
+    // Change companions (co-change pairs)
+    const coChange = this.computeCoChange(commits);
+
     const report: GitAnalyticsReport = {
       period: opts.period,
       generatedAt: new Date(),
@@ -107,6 +111,7 @@ export class GitAnalyzer {
       commitFrequency,
       churnFiles,
       topAuthors,
+      coChange,
     };
 
     // Cache result
@@ -339,6 +344,70 @@ export class GitAnalyzer {
   }
 
   /**
+   * Compute co-change pairs: files that change together in the same commit.
+   * Pure over the already-parsed commits — no new I/O. Applies the same exclude
+   * set as file-level analytics so build artifacts / lockfiles never dominate.
+   * Commits touching more than CO_CHANGE.MAX_COMMIT_FILES files are skipped
+   * (merges / sweeping renames are coupling noise and quadratic in pair count).
+   * Pairs below CO_CHANGE.MIN_SUPPORT are dropped; the rest are ranked
+   * support→rate→path and capped at CO_CHANGE.MAX_PAIRS.
+   */
+  private computeCoChange(commits: CommitMetric[]): CoChangePair[] {
+    const excludePatterns = this.getExcludePatterns();
+    const timesByFile = new Map<string, number>();
+    // Pair key is "a\u0000b" with a < b so co-occurrence is order-independent.
+    const pairCount = new Map<string, number>();
+
+    for (const commit of commits) {
+      // Unique, non-excluded paths in this commit (paths are already
+      // rename-normalized by aggregateCommitFiles).
+      const paths = Array.from(
+        new Set(
+          commit.files
+            .map((f) => f.path)
+            .filter((p) => p && !pathMatchesAny(p, excludePatterns))
+        )
+      );
+      // Oversized commits are ignored entirely — they neither pair nor count
+      // toward file-change totals, so a merge can't dilute a real pair's rate.
+      if (paths.length > CO_CHANGE.MAX_COMMIT_FILES) continue;
+
+      // Count every appearance (including solo commits): a focused change to a
+      // file WITHOUT its companion correctly lowers their co-change rate.
+      for (const p of paths) timesByFile.set(p, (timesByFile.get(p) || 0) + 1);
+
+      if (paths.length < 2) continue; // counted above, but yields no pair
+
+      paths.sort();
+      for (let i = 0; i < paths.length; i++) {
+        for (let j = i + 1; j < paths.length; j++) {
+          const key = `${paths[i]}\u0000${paths[j]}`;
+          pairCount.set(key, (pairCount.get(key) || 0) + 1);
+        }
+      }
+    }
+
+    const pairs: CoChangePair[] = [];
+    for (const [key, count] of pairCount) {
+      if (count < CO_CHANGE.MIN_SUPPORT) continue;
+      const [a, b] = key.split("\u0000");
+      const denom = Math.min(timesByFile.get(a) || count, timesByFile.get(b) || count);
+      const coChangeRate = denom > 0 ? count / denom : 0;
+      pairs.push({ a, b, count, coChangeRate });
+    }
+
+    pairs.sort(
+      (x, y) =>
+        y.count - x.count ||
+        y.coChangeRate - x.coChangeRate ||
+        (x.a < y.a ? -1 : x.a > y.a ? 1 : 0) ||
+        (x.b < y.b ? -1 : x.b > y.b ? 1 : 0)
+    );
+
+    return pairs.slice(0, CO_CHANGE.MAX_PAIRS);
+  }
+
+  /**
    * Aggregate author-level statistics
    */
   private aggregateAuthors(commits: CommitMetric[]): AuthorMetric[] {
@@ -551,6 +620,18 @@ export function gitReportToCsv(report: GitAnalyticsReport): string {
     lines.push(
       `${csvStr(author.name)},${author.commits},${author.insertions},${author.deletions},${author.filesChanged},${author.lastActive.toISOString()}`
     );
+  }
+
+  const coChange = report.coChange ?? [];
+  if (coChange.length > 0) {
+    lines.push("");
+    lines.push("Change Companions");
+    lines.push("File A,File B,Co-Changes,Co-change %");
+    for (const pair of coChange.slice(0, CO_CHANGE.CSV_MAX_PAIRS)) {
+      lines.push(
+        `${csvStr(pair.a)},${csvStr(pair.b)},${pair.count},${(pair.coChangeRate * 100).toFixed(0)}`
+      );
+    }
   }
 
   return lines.join("\n");

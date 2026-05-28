@@ -8,7 +8,7 @@ import { aggregateSessionBriefing, SessionBriefingSources } from '../src/domains
 import { success, failure, RunEventV1, RUN_EVENT_SCHEMA_VERSION } from '../src/types';
 import { GitAnalyzer } from '../src/domains/git/analytics-service';
 import type { GitAnalyticsReport } from '../src/domains/git/analytics-types';
-import { SESSION_BRIEFING, PENDING_RISK } from '../src/constants';
+import { SESSION_BRIEFING, PENDING_RISK, COMPANIONS } from '../src/constants';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -533,6 +533,127 @@ describe('aggregateSessionBriefing', () => {
     expect(result.value.pendingChangeRisk).toBeUndefined();
   });
 
+  // ── 18. Pending-change companions — dirty-set × co-change join ───────────
+  const pair = (a: string, b: string, count: number, coChangeRate: number) => ({
+    a, b, count, coChangeRate,
+  });
+
+  it('suggests an untouched file that historically co-changes with a dirty file', async () => {
+    git.setAllChanges([createMockChange({ path: 'src/handler.ts', status: 'M' })]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          coChange: [pair('src/handler.ts', 'src/handler.test.ts', 6, 0.9)],
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const c = result.value.pendingChangeCompanions!;
+    expect(c.count).toBe(1);
+    expect(c.files).toEqual([
+      { path: 'src/handler.test.ts', count: 6, coChangeRate: 0.9, becauseOf: ['src/handler.ts'] },
+    ]);
+  });
+
+  it('excludes pairs where both sides are already dirty (nothing forgotten)', async () => {
+    git.setAllChanges([
+      createMockChange({ path: 'src/handler.ts', status: 'M' }),
+      createMockChange({ path: 'src/handler.test.ts', status: 'M' }),
+    ]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          coChange: [pair('src/handler.ts', 'src/handler.test.ts', 6, 0.9)],
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pendingChangeCompanions).toBeUndefined();
+  });
+
+  it('ignores pairs below COMPANIONS.MIN_CONFIDENCE', async () => {
+    git.setAllChanges([createMockChange({ path: 'src/a.ts', status: 'M' })]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({ coChange: [pair('src/a.ts', 'src/weak.ts', 3, 0.2)] }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pendingChangeCompanions).toBeUndefined();
+  });
+
+  it('aggregates a companion linked to several dirty files (max strength, becauseOf list)', async () => {
+    git.setAllChanges([
+      createMockChange({ path: 'src/a.ts', status: 'M' }),
+      createMockChange({ path: 'src/b.ts', status: 'M' }),
+    ]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          coChange: [
+            pair('src/a.ts', 'src/shared.ts', 4, 0.6),
+            pair('src/b.ts', 'src/shared.ts', 7, 0.8),
+          ],
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const c = result.value.pendingChangeCompanions!;
+    expect(c.files).toHaveLength(1);
+    expect(c.files[0]).toEqual({
+      path: 'src/shared.ts',
+      count: 7,
+      coChangeRate: 0.8,
+      becauseOf: ['src/a.ts', 'src/b.ts'],
+    });
+  });
+
+  it('raises a flag at COMPANIONS.FLAG_THRESHOLD suggested companions', async () => {
+    const n = COMPANIONS.FLAG_THRESHOLD;
+    git.setAllChanges([createMockChange({ path: 'src/a.ts', status: 'M' })]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          coChange: Array.from({ length: n }, (_, i) =>
+            pair('src/a.ts', `src/c${i}.ts`, 5, 0.9)),
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pendingChangeCompanions!.count).toBe(n);
+    expect(result.value.flags).toContain(
+      `Possibly missing ${n} companion file${n === 1 ? '' : 's'}`
+    );
+  });
+
+  it('caps companions at COMPANIONS.MAX_FILES but counts the full pre-cap set', async () => {
+    const n = COMPANIONS.MAX_FILES + 3;
+    git.setAllChanges([createMockChange({ path: 'src/a.ts', status: 'M' })]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          coChange: Array.from({ length: n }, (_, i) =>
+            pair('src/a.ts', `src/c${String(i).padStart(2, '0')}.ts`, 5, 0.9)),
+        }),
+      })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const c = result.value.pendingChangeCompanions!;
+    expect(c.count).toBe(n);
+    expect(c.capped).toBe(true);
+    expect(c.files).toHaveLength(COMPANIONS.MAX_FILES);
+  });
+
+  it('omits pendingChangeCompanions when analytics is unavailable (fail-soft)', async () => {
+    git.setAllChanges([createMockChange({ path: 'src/a.ts', status: 'M' })]);
+    const brokenAnalyzer = { analyze: vi.fn().mockRejectedValue(new Error('no repo')) } as unknown as GitAnalyzer;
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { gitAnalyzer: brokenAnalyzer })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pendingChangeCompanions).toBeUndefined();
+  });
+
   // The session-briefing webview's FLAG_ANCHORS table couples to literal flag
   // prefixes emitted from this aggregator. The webview JS isn't importable here
   // (ES5 IIFE served as a static asset), so this test pins the contract from
@@ -550,6 +671,7 @@ describe('aggregateSessionBriefing', () => {
     const expectedFlagPrefixes = [
       'Recent run failures',
       'Modifying ',                          // "Modifying N high-risk files"
+      'Possibly missing ',                   // "Possibly missing N companion file(s)"
       'Hygiene: ',                           // dead/large hygiene flags
       'Large number of uncommitted files',
     ];

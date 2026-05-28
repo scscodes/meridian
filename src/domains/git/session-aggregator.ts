@@ -17,7 +17,7 @@ import {
 } from "../../types";
 import { RunLog } from "../../infrastructure/run-log";
 import { GitAnalyzer } from "./analytics-service";
-import { FileMetric } from "./analytics-types";
+import { CoChangePair, FileMetric } from "./analytics-types";
 import { normalizeRenamePath } from "./git-path";
 import {
   SessionBriefing,
@@ -26,8 +26,10 @@ import {
   HygieneSnapshot,
   PendingChangeRisk,
   PendingChangeFile,
+  PendingChangeCompanions,
+  PendingCompanion,
 } from "./types";
-import { SESSION_BRIEFING, PENDING_RISK } from "../../constants";
+import { SESSION_BRIEFING, PENDING_RISK, COMPANIONS } from "../../constants";
 
 export type HygieneScanGetter = () => { scan: WorkspaceScan; scannedAt: string } | undefined;
 
@@ -115,6 +117,72 @@ function computePendingChangeRisk(
   };
 }
 
+/**
+ * Join the dirty-set against the already-computed analytics `coChange` list to
+ * surface files that historically ship with the current changes but are not
+ * themselves dirty ("possibly forgotten"). Pure, no I/O. For each pair with
+ * exactly one side dirty and a rate at/above COMPANIONS.MIN_CONFIDENCE, the
+ * non-dirty side is a companion; entries are aggregated by companion (max
+ * count/rate, dirty triggers collected into `becauseOf`), sorted
+ * rate→count→path, and capped at COMPANIONS.MAX_FILES. Returns undefined when
+ * no companion qualifies, so the briefing omits the slice (and its section).
+ */
+function computePendingChangeCompanions(
+  uncommitted: ReadonlyArray<{ path: string; status: PendingChangeFile["status"] }>,
+  coChange: ReadonlyArray<CoChangePair>
+): PendingChangeCompanions | undefined {
+  const dirty = new Set<string>();
+  for (const c of uncommitted) dirty.add(normalizeRenamePath(c.path));
+
+  // companion path → aggregated link strength + triggering dirty files
+  const byCompanion = new Map<
+    string,
+    { count: number; coChangeRate: number; becauseOf: Set<string> }
+  >();
+
+  for (const pair of coChange) {
+    const aDirty = dirty.has(pair.a);
+    const bDirty = dirty.has(pair.b);
+    if (aDirty === bDirty) continue; // both or neither → not a suggestion
+    if (pair.coChangeRate < COMPANIONS.MIN_CONFIDENCE) continue;
+
+    const companion = aDirty ? pair.b : pair.a;
+    const trigger = aDirty ? pair.a : pair.b;
+
+    const entry = byCompanion.get(companion) ?? {
+      count: 0,
+      coChangeRate: 0,
+      becauseOf: new Set<string>(),
+    };
+    entry.count = Math.max(entry.count, pair.count);
+    entry.coChangeRate = Math.max(entry.coChangeRate, pair.coChangeRate);
+    entry.becauseOf.add(trigger);
+    byCompanion.set(companion, entry);
+  }
+
+  if (byCompanion.size === 0) return undefined;
+
+  const files: PendingCompanion[] = Array.from(byCompanion, ([path, e]) => ({
+    path,
+    count: e.count,
+    coChangeRate: e.coChangeRate,
+    becauseOf: Array.from(e.becauseOf).sort().slice(0, COMPANIONS.BECAUSE_OF_LIMIT),
+  }));
+
+  files.sort(
+    (a, b) =>
+      b.coChangeRate - a.coChangeRate ||
+      b.count - a.count ||
+      (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+  );
+
+  return {
+    count: files.length,
+    capped: files.length > COMPANIONS.MAX_FILES,
+    files: files.slice(0, COMPANIONS.MAX_FILES),
+  };
+}
+
 export async function aggregateSessionBriefing(
   sources: SessionBriefingSources
 ): Promise<Result<SessionBriefing>> {
@@ -193,6 +261,7 @@ export async function aggregateSessionBriefing(
   // ── Git analytics — fail-soft ────────────────────────────────────────────
   let activityWindow: ActivityWindow | undefined;
   let pendingChangeRisk: PendingChangeRisk | undefined;
+  let pendingChangeCompanions: PendingChangeCompanions | undefined;
   const analyticsReport = await analyticsFetch;
   if (!analyticsReport) {
     logger.warn("Session briefing: analytics unavailable", "aggregateSessionBriefing");
@@ -226,6 +295,19 @@ export async function aggregateSessionBriefing(
     pendingChangeRisk = computePendingChangeRisk(uncommitted, analyticsReport.files);
     if (pendingChangeRisk.hotspotCount >= PENDING_RISK.HOTSPOT_FLAG_THRESHOLD) {
       flags.push(`Modifying ${pendingChangeRisk.hotspotCount} high-risk files`);
+    }
+
+    pendingChangeCompanions = computePendingChangeCompanions(
+      uncommitted,
+      analyticsReport.coChange ?? []
+    );
+    if (
+      pendingChangeCompanions &&
+      pendingChangeCompanions.count >= COMPANIONS.FLAG_THRESHOLD
+    ) {
+      flags.push(
+        `Possibly missing ${pendingChangeCompanions.count} companion file${pendingChangeCompanions.count === 1 ? "" : "s"}`
+      );
     }
   }
 
@@ -269,5 +351,6 @@ export async function aggregateSessionBriefing(
     activityWindow,
     hygieneSnapshot,
     pendingChangeRisk,
+    pendingChangeCompanions,
   });
 }

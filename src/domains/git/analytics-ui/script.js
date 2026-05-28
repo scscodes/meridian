@@ -376,12 +376,53 @@ function renderFilesTable() {
   }
 }
 
+// Co-change pairs rendered in the panel; mirrors CO_CHANGE.PANEL_PAIRS host-side.
+const CO_CHANGE_PANEL_PAIRS = 15;
+
 /**
- * Render both tables
+ * Render Change Companions (co-change pairs). Hides the section when there are
+ * no pairs — a young repo or one with no recurring coupling shows nothing
+ * rather than an empty table. Both paths are .path-link so click-to-open and
+ * the ignore context menu work exactly as in the Files table.
+ */
+function renderCoChange() {
+  const section = document.getElementById("coChangeSection");
+  const tbody = document.getElementById("coChangeTableBody");
+  if (!section || !tbody) return;
+
+  const pairs = (analyticsData.coChange || []).slice(0, CO_CHANGE_PANEL_PAIRS);
+  if (pairs.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+
+  const hint = document.getElementById("coChangeHint");
+  if (hint) {
+    const total = (analyticsData.coChange || []).length;
+    hint.textContent = total > pairs.length
+      ? "(top " + pairs.length + " of " + total + ")"
+      : "(" + pairs.length + ")";
+  }
+
+  tbody.innerHTML = "";
+  for (const p of pairs) {
+    const row = tbody.insertRow();
+    row.innerHTML =
+      '<td><span class="path-link" data-path="' + escapeHtml(p.a) + '"><code>' + escapeHtml(p.a) + '</code></span></td>' +
+      '<td><span class="path-link" data-path="' + escapeHtml(p.b) + '"><code>' + escapeHtml(p.b) + '</code></span></td>' +
+      '<td>' + p.count + '</td>' +
+      '<td>' + Math.round((p.coChangeRate || 0) * 100) + '%</td>';
+  }
+}
+
+/**
+ * Render all tables
  */
 function renderTables() {
   renderCommitsTable();
   renderFilesTable();
+  renderCoChange();
 }
 
 /**

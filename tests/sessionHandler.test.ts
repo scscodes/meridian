@@ -125,6 +125,46 @@ describe('git.sessionBriefing', () => {
     );
   });
 
+  it('passes pendingChangeCompanions through the prose data allowlist', async () => {
+    // Minimal analytics report carrying a co-change pair that links the dirty
+    // src/main.ts to an untouched companion.
+    const report = {
+      period: '3mo',
+      generatedAt: new Date(),
+      summary: {
+        totalCommits: 1, totalAuthors: 1, totalFilesModified: 2,
+        totalLinesAdded: 0, totalLinesDeleted: 0, commitFrequency: 0,
+        averageCommitSize: 0, churnRate: 0,
+      },
+      commits: [], files: [], authors: [],
+      trends: {
+        commitTrend: { slope: 0, direction: 'stable', confidence: 0.75 },
+        volatilityTrend: { slope: 0, direction: 'stable' },
+      },
+      commitFrequency: { labels: [], data: [] },
+      churnFiles: [], topAuthors: [],
+      coChange: [{ a: 'src/main.test.ts', b: 'src/main.ts', count: 5, coChangeRate: 0.9 }],
+    };
+    const sources = makeSources(git, logger, runLog, {
+      gitAnalyzer: { analyze: vi.fn().mockResolvedValue(report) } as unknown as GitAnalyzer,
+    });
+
+    const handler = createSessionBriefingHandler(sources, generateProseFn);
+    await handler(createMockContext(), {} as any);
+
+    expect(generateProseFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          pendingChangeCompanions: expect.objectContaining({
+            files: [
+              { path: 'src/main.test.ts', count: 5, coChangeRate: 0.9, becauseOf: ['src/main.ts'] },
+            ],
+          }),
+        }),
+      })
+    );
+  });
+
   it('flags detached HEAD when branch is "HEAD"', async () => {
     git.setStatus({ branch: 'HEAD', isDirty: false, staged: 0, unstaged: 0, untracked: 0 });
 

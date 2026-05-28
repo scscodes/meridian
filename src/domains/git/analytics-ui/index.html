@@ -100,6 +100,24 @@
       </table>
     </div>
 
+    <div class="table-container" id="coChangeSection">
+      <h3>Change Companions
+        <span class="info-hint" title="Files that change together in the same commit. Co-Changes = commits touching both; Co-change % = of the rarer file's changes, the share that also touched the other. High pairs reveal hidden coupling — candidates to refactor together or split apart.">&#9432;</span>
+        <span class="table-hint" id="coChangeHint"></span>
+      </h3>
+      <table id="coChangeTable">
+        <thead>
+          <tr>
+            <th>File A</th>
+            <th>File B</th>
+            <th title="Commits in which both files changed">Co-Changes</th>
+            <th title="count / min(changes of A, changes of B)">Co-change %</th>
+          </tr>
+        </thead>
+        <tbody id="coChangeTableBody"></tbody>
+      </table>
+    </div>
+
   </div>
 
   <script src="script.js" nonce="{{NONCE}}"></script>

@@ -650,6 +650,21 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
       }
     }
 
+    const pc = report.pendingChangeCompanions;
+    if (pc && pc.files.length > 0) {
+      lines.push("");
+      lines.push("Pending-Change Companions");
+      lines.push(`Suggested,${pc.count}`);
+      lines.push(`Capped,${pc.capped}`);
+      lines.push("");
+      lines.push("Path,Co-Changes,Co-change %,Ships With");
+      for (const f of pc.files) {
+        lines.push(
+          `${csvStr(f.path)},${f.count},${(f.coChangeRate * 100).toFixed(0)},${csvStr(f.becauseOf.join(";"))}`
+        );
+      }
+    }
+
     return lines.join("\n");
   }
 

@@ -67,6 +67,18 @@
       <div id="pendingRiskBlock"></div>
     </div>
 
+    <div class="table-container" id="companionsSection">
+      <h3>Change Companions
+        <span class="info-hint" title="Files that historically change in the same commit as your current edits, but are not in your changes yet — possible forgotten siblings (tests, types, docs). Co-change % = of the companion's changes, the share that also touched one of your files.">&#9432;</span>
+        <span class="table-hint" id="companionsHint"></span>
+      </h3>
+      <div class="metrics" id="companionsMetrics"></div>
+      <div class="filter-row">
+        <input type="text" class="path-filter" data-target="companions" placeholder="filter path&#8230;" />
+      </div>
+      <div id="companionsBlock"></div>
+    </div>
+
     <div class="table-container">
       <h3>Recent Commits <span class="table-hint">(last 10)</span></h3>
       <table id="commitsTable">

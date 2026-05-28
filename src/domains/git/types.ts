@@ -98,6 +98,34 @@ export interface PendingChangeRisk {
   files: PendingChangeFile[];
 }
 
+/**
+ * One file that historically ships with the current dirty set but is NOT itself
+ * dirty — a "possibly forgotten" companion. `count` / `coChangeRate` are the
+ * strongest (max) co-change link to any dirty file; `becauseOf` names the dirty
+ * file(s) it commonly changes with, bounded by COMPANIONS.BECAUSE_OF_LIMIT.
+ */
+export interface PendingCompanion {
+  path: string;
+  count: number;
+  coChangeRate: number;
+  becauseOf: string[];
+}
+
+/**
+ * Deterministic join of the dirty-set against the already-computed analytics
+ * `coChange` list — surfaces files you usually change alongside your current
+ * edits but have not touched yet. Optional top-level slice (parallel to
+ * `pendingChangeRisk`): present iff the analytics peripheral is available AND
+ * at least one companion clears COMPANIONS.MIN_CONFIDENCE; otherwise omitted.
+ * `files` is sorted rate→count→path and capped at COMPANIONS.MAX_FILES;
+ * `count` is the full pre-cap total and `capped` signals truncation.
+ */
+export interface PendingChangeCompanions {
+  count: number;
+  capped: boolean;
+  files: PendingCompanion[];
+}
+
 export interface SessionBriefing {
   generatedAt: string;
   branch: string;
@@ -112,6 +140,7 @@ export interface SessionBriefing {
   activityWindow?: ActivityWindow;
   hygieneSnapshot?: HygieneSnapshot;
   pendingChangeRisk?: PendingChangeRisk;
+  pendingChangeCompanions?: PendingChangeCompanions;
 }
 
 export type SessionBriefingReport = SessionBriefing & { summary: string };

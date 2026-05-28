@@ -89,6 +89,19 @@ function deterministicSummary(agg: SessionBriefing): string {
     }
   }
 
+  if (agg.pendingChangeCompanions && agg.pendingChangeCompanions.files.length > 0) {
+    const c = agg.pendingChangeCompanions;
+    lines.push(
+      `Possibly forgotten companions: ${c.count} file${c.count === 1 ? "" : "s"} ` +
+        `usually change with your current edits.`
+    );
+    for (const f of c.files) {
+      const pct = Math.round(f.coChangeRate * 100);
+      const because = f.becauseOf.length > 0 ? ` (with ${f.becauseOf.join(", ")}, ${pct}%)` : ` (${pct}%)`;
+      lines.push(`  • ${f.path}${because}`);
+    }
+  }
+
   if (agg.flags.length > 0) {
     lines.push("");
     lines.push("Flags:");
@@ -140,6 +153,7 @@ export function createSessionBriefingHandler(
         activityWindow: agg.activityWindow,
         hygieneSnapshot: agg.hygieneSnapshot,
         pendingChangeRisk: agg.pendingChangeRisk,
+        pendingChangeCompanions: agg.pendingChangeCompanions,
       },
     });
 

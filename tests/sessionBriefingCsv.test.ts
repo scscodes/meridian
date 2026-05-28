@@ -104,12 +104,36 @@ describe("SessionBriefingWebviewProvider.reportToCsv", () => {
     expect(csv).toContain('"src/quiet.ts",M,,,cold');
   });
 
+  it("emits a Pending-Change Companions section, comma-escaped, with becauseOf joined", () => {
+    const report: SessionBriefingReport = {
+      ...base,
+      pendingChangeCompanions: {
+        count: 2,
+        capped: false,
+        files: [
+          { path: "src/a,b.ts", count: 6, coChangeRate: 0.9, becauseOf: ["src/handler.ts", "src/x.ts"] },
+          { path: "src/c.ts", count: 3, coChangeRate: 0.5, becauseOf: ["src/handler.ts"] },
+        ],
+      },
+    };
+
+    const csv = (makeProvider() as unknown as { reportToCsv(r: SessionBriefingReport): string }).reportToCsv(report);
+
+    expect(csv).toContain("\nPending-Change Companions\n");
+    expect(csv).toContain("Suggested,2");
+    expect(csv).toContain("Capped,false");
+    expect(csv).toContain("Path,Co-Changes,Co-change %,Ships With");
+    expect(csv).toContain('"src/a,b.ts",6,90,"src/handler.ts;src/x.ts"');
+    expect(csv).toContain('"src/c.ts",3,50,"src/handler.ts"');
+  });
+
   it("omits Activity/Hygiene/Pending-Change sections when those slices are absent (fail-soft)", () => {
     const csv = (makeProvider() as unknown as { reportToCsv(r: SessionBriefingReport): string }).reportToCsv(base);
 
     expect(csv).not.toContain("\nActivity\n");
     expect(csv).not.toContain("\nHygiene\n");
     expect(csv).not.toContain("\nPending-Change Risk\n");
+    expect(csv).not.toContain("\nPending-Change Companions\n");
     expect(csv).toContain("Recent Commits");
   });
 });

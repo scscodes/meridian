@@ -97,6 +97,20 @@ export interface AnalyticsSummary {
 }
 
 /**
+ * One file pair that historically changes together. `count` is the number of
+ * in-window commits that touched both files (support); `coChangeRate` is
+ * `count / min(timesA, timesB)` — the conditional co-change rate of the rarer
+ * file (0–1). `a` and `b` are stored in ascending path order so the pair is
+ * order-independent and the listing is deterministic.
+ */
+export interface CoChangePair {
+  a: string;
+  b: string;
+  count: number;
+  coChangeRate: number;
+}
+
+/**
  * Complete analytics report
  */
 export interface GitAnalyticsReport {
@@ -113,6 +127,13 @@ export interface GitAnalyticsReport {
   };
   churnFiles: FileMetric[]; // Top 10 by volatility
   topAuthors: AuthorMetric[]; // Top 5 by commits
+  /**
+   * File pairs that change together, ranked by support then co-change rate and
+   * capped at CO_CHANGE.MAX_PAIRS. Optional for backward-compatibility across
+   * the export paths and existing test fixtures; always populated (possibly
+   * empty) by the analyzer, like `deadCode?` on the hygiene report.
+   */
+  coChange?: CoChangePair[];
 }
 
 /**

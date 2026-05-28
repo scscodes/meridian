@@ -55,8 +55,17 @@
   // ── Message handler ────────────────────────────────────────────────
   window.addEventListener("message", function (event) {
     var msg = event.data;
+    if (msg.type === "loading") {
+      document.body.classList.add("meridian-loading");
+      return;
+    }
     if (msg.type === "init" && msg.payload) {
+      document.body.classList.remove("meridian-loading");
       renderUI(msg.payload);
+      return;
+    }
+    if (msg.type === "error") {
+      document.body.classList.remove("meridian-loading");
     }
   });
 

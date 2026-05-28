@@ -373,3 +373,19 @@ td code {
 }
 
 /* Temporary screenshot-seed marker; remove after capture. */
+
+/* Loading overlay — applied to body while a refresh is in flight.
+   Above .meridian-context-menu (z-index 9999) by intent. */
+.meridian-loading::before {
+  content: ""; position: fixed; inset: 0;
+  background: var(--vscode-editor-background); opacity: 0.4;
+  pointer-events: none; z-index: 100000;
+}
+.meridian-loading::after {
+  content: ""; position: fixed; top: 50%; left: 50%;
+  width: 32px; height: 32px; margin: -16px 0 0 -16px;
+  border: 3px solid var(--vscode-foreground); border-top-color: transparent;
+  border-radius: 50%; animation: meridian-spin 0.8s linear infinite;
+  pointer-events: none; z-index: 100001;
+}
+@keyframes meridian-spin { to { transform: rotate(360deg); } }

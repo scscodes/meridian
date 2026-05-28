@@ -33,6 +33,8 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private cached: GitStatus | null = null;
+  private busy = false;
+  private generation = 0;
 
   constructor(
     private readonly gitProvider: GitProvider,
@@ -41,8 +43,31 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
   ) {}
 
   refresh(): void {
+    const myGen = ++this.generation;
+    this.busy = true;
     this.cached = null;
     this._onDidChangeTreeData.fire();
+    void this.prefetchRoots(myGen);
+  }
+
+  private async prefetchRoots(gen: number): Promise<void> {
+    let result: Awaited<ReturnType<GitProvider["status"]>> | undefined;
+    try {
+      result = await this.gitProvider.status();
+    } catch (e) {
+      this.logger.warn(`GitTreeProvider: status threw — ${e instanceof Error ? e.message : String(e)}`, "GitTreeProvider");
+    }
+    if (gen !== this.generation) return;
+    if (result?.kind === "ok") this.cached = result.value;
+    this.busy = false;
+    this._onDidChangeTreeData.fire();
+  }
+
+  private getPlaceholder(): GitTreeItem {
+    const it = new GitTreeItem("Refreshing…", "changeGroup", vscode.TreeItemCollapsibleState.None);
+    it.iconPath = new vscode.ThemeIcon("loading~spin");
+    it.contextValue = "loading";
+    return it;
   }
 
   getTreeItem(element: TreeElement): vscode.TreeItem {
@@ -57,6 +82,7 @@ export class GitTreeProvider implements vscode.TreeDataProvider<TreeElement> {
   }
 
   private async getRootItems(): Promise<TreeElement[]> {
+    if (this.busy) return [this.getPlaceholder()];
     if (!this.cached) {
       const result = await this.gitProvider.status();
       if (result.kind === "err") {

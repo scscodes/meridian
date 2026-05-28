@@ -389,17 +389,17 @@
         {
           "command": "meridian.openSettings",
           "when": "view == meridian.reports.view",
-          "group": "navigation@99"
+          "group": "1_settings@1"
         },
         {
           "command": "meridian.openSettings",
           "when": "view == meridian.git.view",
-          "group": "navigation@99"
+          "group": "1_settings@1"
         },
         {
           "command": "meridian.openSettings",
           "when": "view == meridian.hygiene.view",
-          "group": "navigation@99"
+          "group": "1_settings@1"
         }
       ],
       "view/item/context": [

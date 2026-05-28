@@ -82,7 +82,44 @@ export function setupTreeProviders(
     vscode.commands.registerCommand("meridian.openSettings", () => {
       void vscode.commands.executeCommand("workbench.action.openSettings", "@ext:scscodes.meridian");
     }),
+    // Meridian Actions kebab — one per view. Distinct $(kebab-vertical) glyph
+    // (not gear) so it doesn't visually duplicate the host-synthesized settings
+    // cog on either VS Code or Cursor. See ADR 016.
+    vscode.commands.registerCommand("meridian.reports.showActions",
+      () => showActionsQuickPick("reports")),
+    vscode.commands.registerCommand("meridian.git.showActions",
+      () => showActionsQuickPick("git")),
+    vscode.commands.registerCommand("meridian.hygiene.showActions",
+      () => showActionsQuickPick("hygiene")),
   );
 
   return { gitTree, hygieneTree, reportsTree };
+}
+
+type ViewKey = "reports" | "git" | "hygiene";
+
+interface ActionItem extends vscode.QuickPickItem {
+  command: string;
+}
+
+const VIEW_ACTIONS: Record<ViewKey, ActionItem[]> = {
+  reports: [
+    { label: "$(gear) Open Settings", command: "meridian.openSettings" },
+  ],
+  git: [
+    { label: "$(refresh) Refresh Git View", command: "meridian.git.refresh" },
+    { label: "$(gear) Open Settings",       command: "meridian.openSettings" },
+  ],
+  hygiene: [
+    { label: "$(refresh) Refresh Hygiene View", command: "meridian.hygiene.refresh" },
+    { label: "$(gear) Open Settings",           command: "meridian.openSettings" },
+  ],
+};
+
+/** Exported for unit testing; not intended as a public surface. */
+export async function showActionsQuickPick(viewKey: ViewKey): Promise<void> {
+  const pick = await vscode.window.showQuickPick(VIEW_ACTIONS[viewKey], {
+    placeHolder: `Meridian — ${viewKey} actions`,
+  });
+  if (pick) await vscode.commands.executeCommand(pick.command);
 }

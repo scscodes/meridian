@@ -30,9 +30,19 @@ const CAT_COLORS = {
 
 if (vscode) {
   window.addEventListener("message", (event) => {
-    if (event.data.type === "init") {
-      report = event.data.payload;
+    const msg = event.data;
+    if (msg.type === "loading") {
+      document.body.classList.add("meridian-loading");
+      return;
+    }
+    if (msg.type === "init") {
+      document.body.classList.remove("meridian-loading");
+      report = msg.payload;
       renderUI();
+      return;
+    }
+    if (msg.type === "error") {
+      document.body.classList.remove("meridian-loading");
     }
   });
 }

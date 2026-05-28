@@ -77,9 +77,18 @@ if (vscode) {
   window.addEventListener("message", (event) => {
     const msg = event.data;
 
+    if (msg.type === "loading") {
+      document.body.classList.add("meridian-loading");
+      return;
+    }
     if (msg.type === "init") {
+      document.body.classList.remove("meridian-loading");
       analyticsData = msg.payload;
       renderUI();
+      return;
+    }
+    if (msg.type === "error") {
+      document.body.classList.remove("meridian-loading");
     }
   });
 

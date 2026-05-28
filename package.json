@@ -164,6 +164,24 @@
         "title": "Open Settings",
         "icon": "$(settings-gear)",
         "category": "Meridian"
+      },
+      {
+        "command": "meridian.reports.showActions",
+        "title": "Meridian: Reports Actions",
+        "icon": "$(kebab-vertical)",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.git.showActions",
+        "title": "Meridian: Git View Actions",
+        "icon": "$(kebab-vertical)",
+        "category": "Meridian"
+      },
+      {
+        "command": "meridian.hygiene.showActions",
+        "title": "Meridian: Hygiene View Actions",
+        "icon": "$(kebab-vertical)",
+        "category": "Meridian"
       }
     ],
     "configuration": {
@@ -387,19 +405,19 @@
           "group": "navigation"
         },
         {
-          "command": "meridian.openSettings",
+          "command": "meridian.reports.showActions",
           "when": "view == meridian.reports.view",
-          "group": "1_settings@1"
+          "group": "navigation@99"
         },
         {
-          "command": "meridian.openSettings",
+          "command": "meridian.git.showActions",
           "when": "view == meridian.git.view",
-          "group": "1_settings@1"
+          "group": "navigation@99"
         },
         {
-          "command": "meridian.openSettings",
+          "command": "meridian.hygiene.showActions",
           "when": "view == meridian.hygiene.view",
-          "group": "1_settings@1"
+          "group": "navigation@99"
         }
       ],
       "view/item/context": [

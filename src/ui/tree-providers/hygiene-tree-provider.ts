@@ -44,6 +44,8 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
   private cachedScan: WorkspaceScan | null = null;
   private cachedItems: HygieneTreeItem[] | null = null;
   private lastImpactResult: ImpactAnalysisResult | null = null;
+  private busy = false;
+  private generation = 0;
 
   constructor(
     private readonly dispatch: Dispatcher,
@@ -52,9 +54,32 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
   ) {}
 
   refresh(): void {
+    const myGen = ++this.generation;
+    this.busy = true;
     this.cachedScan = null;
     this.cachedItems = null;
     this._onDidChangeTreeData.fire();
+    void this.prefetchRoots(myGen);
+  }
+
+  private async prefetchRoots(gen: number): Promise<void> {
+    let result: Awaited<ReturnType<Dispatcher>> | undefined;
+    try {
+      result = await this.dispatch({ name: "hygiene.scan", params: {} }, this.ctx);
+    } catch (e) {
+      this.logger.warn(`HygieneTreeProvider: scan threw — ${e instanceof Error ? e.message : String(e)}`, "HygieneTreeProvider");
+    }
+    if (gen !== this.generation) return;
+    if (result?.kind === "ok") this.cachedScan = result.value as WorkspaceScan;
+    this.busy = false;
+    this._onDidChangeTreeData.fire();
+  }
+
+  private getPlaceholder(): HygieneTreeItem {
+    const it = new HygieneTreeItem("Refreshing…", "category", [], vscode.TreeItemCollapsibleState.None);
+    it.iconPath = new vscode.ThemeIcon("loading~spin");
+    it.contextValue = "loading";
+    return it;
   }
 
   /** Store last impact analysis result for tree expansion. */
@@ -76,6 +101,7 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
   }
 
   private async getRootItems(): Promise<HygieneTreeItem[]> {
+    if (this.busy) return [this.getPlaceholder()];
     if (this.cachedItems) return this.cachedItems;
 
     if (!this.cachedScan) {

@@ -61,7 +61,10 @@ export abstract class BaseWebviewProvider<TReport> {
 
   /**
    * Route messages: "export", "exportAs", and "ignorePath" handled centrally,
-   * everything else delegated to subclass.
+   * everything else delegated to subclass. "refresh" is bracketed with a
+   * "loading" ping so the webview can render an overlay during the round-trip
+   * (subclass onMessage posts "init" on success or "error" via handleError on
+   * failure — either clears the overlay).
    */
   protected async handleMessage(msg: { type: string; [key: string]: unknown }): Promise<void> {
     if (msg.type === "export") {
@@ -74,6 +77,11 @@ export abstract class BaseWebviewProvider<TReport> {
     }
     if (msg.type === "ignorePath") {
       await this.handleIgnorePath(msg.payload as { path?: string; kind?: string } | undefined);
+      return;
+    }
+    if (msg.type === "refresh" || msg.type === "filter") {
+      this.panel?.webview.postMessage({ type: "loading", payload: { label: "Refreshing…" } });
+      await this.onMessage(msg);
       return;
     }
     await this.onMessage(msg);

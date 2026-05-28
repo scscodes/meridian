@@ -38,6 +38,9 @@ const INFRASTRUCTURE_COMMANDS = new Set([
   "meridian.reports.open",
   "meridian.reports.refresh",
   "meridian.openSettings",
+  "meridian.reports.showActions",
+  "meridian.git.showActions",
+  "meridian.hygiene.showActions",
 ]);
 
 // ── Load package.json ─────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 # ADR 006 — Rendering Surface Decision Matrix
 
 **Date**: 2026-03-09
-**Status**: Accepted — matrix current as revised by [ADR 012](./012-product-reanchor.md)
+**Status**: Accepted — matrix current as revised by [ADR 012](./012-product-reanchor.md); host-portability lens added by [ADR 016](./016-host-portable-ui-affordances.md)
 
 ## Current state (post-2.0, authoritative)
 
@@ -38,7 +38,9 @@ Note: session briefing was originally classified as long-form prose. ADRs 011 an
 
 4. **"Show Output" error button is mandatory** whenever the command's happy path writes to the output channel. If the output channel contains the diagnostic detail, errors must offer to reveal it. Fixed centrally in `command-registry.ts` — not per-command.
 
-5. **Webview panels are their own success feedback — no toast on open.** A specialized presenter case in `result-presenters.ts` must not call `showInformationMessage` after `openPanel`: the panel coming forward *is* the acknowledgement, and a redundant toast is the asymmetry that prompted this rule. Errors during in-panel refresh/filter post a `type:"error"` banner via `BaseWebviewProvider.handleError` and do **not** raise a modal toast; the panel is already focused. Progress notifications during initial compute are governed separately by `PROGRESS_COMMANDS` (membership rule documented in `command-registry.ts`). Enforced by `tests/presenter-parity.test.ts`.
+5. **Webview panels are their own success feedback — no toast on open.** A specialized presenter case in `result-presenters.ts` must not call `showInformationMessage` after `openPanel`: the panel coming forward *is* the acknowledgement, and a redundant toast is the asymmetry that prompted this rule. Errors during in-panel refresh/filter post a `type:"error"` banner via `BaseWebviewProvider.handleError` and do **not** raise a modal toast; the panel is already focused. Progress notifications during initial compute are governed separately by `PROGRESS_COMMANDS` (membership rule documented in `command-registry.ts`); in-panel refresh/filter progress renders as a panel overlay per [ADR 016](./016-host-portable-ui-affordances.md) Rule 2. Enforced by `tests/presenter-parity.test.ts`.
+
+6. **Busy/loading state renders inside the chosen surface.** When a surface from the matrix above needs to indicate "work in flight" (tree refresh, webview refilter, scan dispatch), the indicator lives on that surface — placeholder rows for trees, DOM overlays for webviews — not in host chrome. Surface *choice* remains 006's matrix; busy-state *rendering* on that surface follows [ADR 016](./016-host-portable-ui-affordances.md). Toasts continue to acknowledge palette-triggered work (`PROGRESS_COMMANDS`); they are not the busy indicator for surfaces already open.
 
 ### Scope
 

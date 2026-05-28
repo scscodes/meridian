@@ -1,3 +1,10 @@
+# [2.10.0](https://github.com/scscodes/meridian/compare/v2.9.1...v2.10.0) (2026-05-28)
+
+
+### Features
+
+* Cursor-first UI parity — Meridian Actions kebab + busy/loading states ([b6ef89a](https://github.com/scscodes/meridian/commit/b6ef89a3c23379ada53d66f982e7cfc1840684e7))
+
 ## [2.9.1](https://github.com/scscodes/meridian/compare/v2.9.0...v2.9.1) (2026-05-28)
 
 

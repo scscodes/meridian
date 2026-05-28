@@ -30,7 +30,7 @@
         <p class="sub">excl. .git · node_modules · .vscode</p>
       </div>
       <div class="card">
-        <h3>Prune Candidates</h3>
+        <h3>Prune Candidates <span class="info-hint" title="Gitignored heavy-artifact dirs (node_modules, .venv, __pycache__, build/, etc.) appear here as 0-byte placeholders on purpose — they're the cleanup targets. .gitignore is intentionally not applied to this report.">&#9432;</span></h3>
         <p class="value" id="pruneCount">—</p>
         <p class="sub" id="pruneFilesSub"></p>
       </div>
@@ -53,6 +53,12 @@
         <canvas id="categoryChart"></canvas>
       </div>
       <div id="categoryLegend" class="category-legend"></div>
+
+      <!-- Lines by category — raw line count, not LOC (blanks/comments included) -->
+      <div class="lines-strip-wrap">
+        <span class="lines-strip-label">Lines by category <span class="info-hint" title="Raw line count from countable text files (source, config, markdown, log). Blanks and comments are included — this is not the LOC metric. Binaries and unreadable files contribute zero.">&#9432;</span></span>
+        <div id="linesStrip" class="lines-strip"></div>
+      </div>
     </div>
 
     <!-- Cleanup Activity chart — prune candidates + dead code, 14-day rolling -->
@@ -61,10 +67,45 @@
       <canvas id="temporalChart"></canvas>
     </div>
 
+    <!-- Collections — heavy-artifact dir buckets (envs/caches/builds/vendored) -->
+    <div class="collections-section">
+      <h3>Collections <span class="info-hint" title="Heavy-artifact directories grouped by purpose. Envs and caches are surfaced as 0-byte placeholders (the walker doesn't recurse into them). Build outputs and vendored deps may have walked contents. .gitignore is intentionally not applied — these are exactly the cleanup targets.">&#9432;</span></h3>
+      <div class="collections-grid">
+        <div class="collection-bucket" data-bucket="envs">
+          <div class="collection-head">
+            <span class="collection-name">Envs</span>
+            <span class="collection-count" id="envsCount">0</span>
+          </div>
+          <div class="collection-paths" id="envsPaths"></div>
+        </div>
+        <div class="collection-bucket" data-bucket="caches">
+          <div class="collection-head">
+            <span class="collection-name">Caches</span>
+            <span class="collection-count" id="cachesCount">0</span>
+          </div>
+          <div class="collection-paths" id="cachesPaths"></div>
+        </div>
+        <div class="collection-bucket" data-bucket="buildOutputs">
+          <div class="collection-head">
+            <span class="collection-name">Build outputs</span>
+            <span class="collection-count" id="buildOutputsCount">0</span>
+          </div>
+          <div class="collection-paths" id="buildOutputsPaths"></div>
+        </div>
+        <div class="collection-bucket" data-bucket="vendoredDeps">
+          <div class="collection-head">
+            <span class="collection-name">Vendored deps</span>
+            <span class="collection-count" id="vendoredDepsCount">0</span>
+          </div>
+          <div class="collection-paths" id="vendoredDepsPaths"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Prune Candidates -->
     <div class="prune-section">
       <div class="prune-header">
-        <h3>Prune Candidates</h3>
+        <h3>Prune Candidates <span class="info-hint" title="Gitignored heavy-artifact dirs (node_modules, .venv, __pycache__, build/, etc.) appear here as 0-byte placeholders on purpose — they're the cleanup targets. .gitignore is intentionally not applied to this report.">&#9432;</span></h3>
         <p class="prune-criteria" id="pruneCriteria"></p>
       </div>
       <div class="table-scroll">
@@ -83,22 +124,56 @@
       </div>
     </div>
 
-    <!-- All Files Table -->
-    <div class="table-container">
-      <h3>All Files <span class="table-hint">(first 100 · click header to sort)</span></h3>
-      <table id="filesTable">
-        <thead>
-          <tr>
-            <th data-col="path">Path</th>
-            <th data-col="sizeBytes">Size</th>
-            <th data-col="lineCount">Lines</th>
-            <th data-col="ageDays">Age (d)</th>
-            <th data-col="category">Category</th>
-            <th data-col="isPruneCandidate">Prune?</th>
-          </tr>
-        </thead>
-        <tbody id="filesTableBody"></tbody>
-      </table>
+    <!-- Top talkers — Largest + Oldest side-by-side -->
+    <div class="top-talkers-row">
+      <div class="top-talkers-section">
+        <h3>Largest Files <span class="table-hint">(top 10 by size)</span></h3>
+        <table class="top-talkers-table">
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Size</th>
+              <th>Lines</th>
+              <th>Age (d)</th>
+              <th>Category</th>
+            </tr>
+          </thead>
+          <tbody id="largestTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="top-talkers-section">
+        <h3>Oldest Files <span class="table-hint">(top 10 by age)</span></h3>
+        <table class="top-talkers-table">
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Size</th>
+              <th>Lines</th>
+              <th>Age (d)</th>
+              <th>Category</th>
+            </tr>
+          </thead>
+          <tbody id="oldestTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Duplicate basenames -->
+    <div class="duplicates-section">
+      <h3>Duplicate Basenames <span class="info-hint" title="Files sharing the same filename across the tree (min 3 occurrences). Common copy-paste sprawl signal — e.g. multiple utils.ts or config.json copies. Naming overlap isn't always bad (per-module index.ts is normal), but worth a glance.">&#9432;</span> <span class="table-hint">(min 3 occurrences)</span></h3>
+      <div class="table-scroll">
+        <table id="duplicatesTable">
+          <thead>
+            <tr>
+              <th>Basename</th>
+              <th>Count</th>
+              <th>Paths</th>
+            </tr>
+          </thead>
+          <tbody id="duplicatesTableBody"></tbody>
+        </table>
+      </div>
     </div>
 
   </div>

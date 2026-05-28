@@ -22,6 +22,7 @@ const emptyScan: WorkspaceScan = {
   largeFiles: [],
   logFiles: [],
   markdownFiles: [],
+  collections: { envs: [], caches: [], buildOutputs: [], vendoredDeps: [] },
 } as unknown as WorkspaceScan;
 
 function makeProvider(dispatch: () => Promise<{ kind: "ok"; value: WorkspaceScan } | { kind: "err"; error: { code: string; message: string } }>): HygieneTreeProvider {

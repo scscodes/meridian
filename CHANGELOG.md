@@ -1,3 +1,10 @@
+## [2.9.1](https://github.com/scscodes/meridian/compare/v2.9.0...v2.9.1) (2026-05-28)
+
+
+### Bug Fixes
+
+* **ui:** move explicit Settings entry off view title bar to overflow menu ([0f483ff](https://github.com/scscodes/meridian/commit/0f483ff7a3c69ec14110be7083a340a0ff0abff9))
+
 # [2.9.0](https://github.com/scscodes/meridian/compare/v2.8.0...v2.9.0) (2026-05-27)
 
 

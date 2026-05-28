@@ -2,7 +2,7 @@
   "name": "meridian",
   "displayName": "Meridian",
   "description": "Repository insights that are deterministic and inspectable: start with a session briefing, or review git analytics, workspace hygiene, and surface problems early with dead-code and blast-radius metrics. No model required, but allows for AI summarization when one is available.",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "publisher": "scscodes",
   "license": "MIT",
   "icon": "media/icon.png",

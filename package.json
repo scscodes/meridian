@@ -161,26 +161,11 @@
       },
       {
         "command": "meridian.openSettings",
-        "title": "Open Settings",
-        "icon": "$(settings-gear)",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.reports.showActions",
-        "title": "Meridian: Reports Actions",
-        "icon": "$(kebab-vertical)",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.git.showActions",
-        "title": "Meridian: Git View Actions",
-        "icon": "$(kebab-vertical)",
-        "category": "Meridian"
-      },
-      {
-        "command": "meridian.hygiene.showActions",
-        "title": "Meridian: Hygiene View Actions",
-        "icon": "$(kebab-vertical)",
+        "title": "Meridian Settings",
+        "icon": {
+          "light": "media/glyph-light.svg",
+          "dark": "media/glyph-dark.svg"
+        },
         "category": "Meridian"
       }
     ],
@@ -397,27 +382,27 @@
         {
           "command": "meridian.git.refresh",
           "when": "view == meridian.git.view",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "meridian.hygiene.refresh",
           "when": "view == meridian.hygiene.view",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
-          "command": "meridian.reports.showActions",
+          "command": "meridian.openSettings",
           "when": "view == meridian.reports.view",
-          "group": "navigation@99"
+          "group": "navigation@1"
         },
         {
-          "command": "meridian.git.showActions",
+          "command": "meridian.openSettings",
           "when": "view == meridian.git.view",
-          "group": "navigation@99"
+          "group": "navigation@2"
         },
         {
-          "command": "meridian.hygiene.showActions",
+          "command": "meridian.openSettings",
           "when": "view == meridian.hygiene.view",
-          "group": "navigation@99"
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [

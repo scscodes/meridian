@@ -38,9 +38,6 @@ const INFRASTRUCTURE_COMMANDS = new Set([
   "meridian.reports.open",
   "meridian.reports.refresh",
   "meridian.openSettings",
-  "meridian.reports.showActions",
-  "meridian.git.showActions",
-  "meridian.hygiene.showActions",
 ]);
 
 // ── Load package.json ─────────────────────────────────────────────────────────
@@ -49,7 +46,7 @@ const pkg = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf-8")
 );
 
-const manifestCommands = pkg.contributes.commands as { command: string; title: string; icon?: string }[];
+const manifestCommands = pkg.contributes.commands as { command: string; title: string; icon?: string | { light: string; dark: string } }[];
 const manifestCommandIds = new Set(manifestCommands.map(c => c.command));
 const manifestCommandMap = new Map(manifestCommands.map(c => [c.command, c]));
 
@@ -129,6 +126,15 @@ describe("Manifest — VS Code commands surface", () => {
       }
     }
     expect(unexpected, `Infrastructure commands (view lifecycle) must not be in commandPalette:\n  ${unexpected.join("\n  ")}`).toEqual([]);
+  });
+
+  it("meridian.openSettings is wired into view/title for all three views", () => {
+    const viewTitle = pkg.contributes.menus["view/title"] as { command: string; when: string }[];
+    const views = ["meridian.reports.view", "meridian.git.view", "meridian.hygiene.view"];
+    const missing = views.filter(
+      v => !viewTitle.some(e => e.command === "meridian.openSettings" && e.when.includes(v))
+    );
+    expect(missing, `openSettings missing from view/title for: ${missing.join(", ")}`).toEqual([]);
   });
 
 });

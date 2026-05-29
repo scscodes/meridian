@@ -126,4 +126,37 @@ sharing cost is larger, and a future parity test
     as a panel overlay, per Rule 2 above.
   - [ADR 013](./013-settings-access-doctrine.md) — settings access (read
     side) is unaffected. This ADR governs the UI affordance that *invokes*
-    settings access (the Meridian Actions kebab).
+    settings access (see the Update below for its current form).
+
+## Update (2026-05-29) — branded title action supersedes the kebab
+
+Rule 1's *implementation* evolved. The `$(kebab-vertical)` "Meridian Actions"
+quick-pick was replaced by a **dedicated, branded title-bar action**: each view
+now contributes `meridian.openSettings` directly to its `view/title` with the
+Meridian brand glyph (themed `media/glyph-{light,dark}.svg`) and the label
+"Meridian Settings". The quick-pick indirection in `tree-setup.ts` and its
+redundant in-menu Refresh entry were removed (Git and Hygiene already carry an
+inline Refresh).
+
+This preserves Rule 1's principle — a visually distinct, non-gear glyph that
+does not duplicate the host cog — and strengthens it: the affordance now also
+*names its owner*, so on Cursor, where the host cog mis-resolves to Cursor's
+top-level settings, the Meridian-labeled action is unmistakably the correct
+target.
+
+Residual, unchanged: the host-synthesized cog cannot be suppressed and still
+mis-routes on Cursor. The branded action mitigates but does not eliminate a
+muscle-memory click on the host cog; that remains a host defect to report
+upstream.
+
+Themed glyph note: contributed command icons given as file paths are *not*
+auto-tinted by the host (unlike the activity-bar container icon, which is
+rendered as a mask — that is why the bare-fill `media/icon.svg` works there but
+the command needs explicit `{ light, dark }` colour variants). The variants
+reuse `icon.svg`'s path verbatim; its cube reads as edges because the inner
+faces are wound opposite the outer silhouette (nonzero fill-rule cuts them
+out), so the path and fill-rule must not be altered when re-colouring.
+
+Earlier references in this ADR to the "`$(kebab-vertical)`" glyph (Rule 1) and
+the "Meridian Actions kebab" (Decision/Consequences) describe the superseded
+implementation; the doctrine they illustrate is unchanged.

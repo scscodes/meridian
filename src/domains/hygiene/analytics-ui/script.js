@@ -4,7 +4,6 @@
  * Message protocol:
  *   extension → webview:  { type: "init", payload: HygieneAnalyticsReport }
  *   webview → extension:  { type: "refresh" }
- *                         { type: "openSettings" }
  */
 
 const vscode = typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi() : null;

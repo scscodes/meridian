@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {{WEBVIEW_CSP_SOURCE}} 'nonce-{{NONCE}}'; style-src {{WEBVIEW_CSP_SOURCE}} 'unsafe-inline'; img-src {{WEBVIEW_CSP_SOURCE}} data:;">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Session Briefing</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="briefing-panel">
+
+    <div class="header-row">
+      <h1>Session Briefing</h1>
+      <div class="header-actions">
+        <button id="exportCsv" class="btn-secondary" title="Quick-save CSV to .meridian/artifacts/">&#8595; CSV</button>
+        <button id="exportJson" class="btn-secondary" title="Quick-save JSON to .meridian/artifacts/">&#8595; JSON</button>
+        <button id="exportAs" class="btn-secondary" title="Choose format and location&#8230;">Save as&#8230;</button>
+        <button id="refreshBtn">&#8634; Refresh</button>
+      </div>
+    </div>
+
+    <div class="branch-bar" id="branchBar"></div>
+
+    <div class="summary-cards" id="summaryCards"></div>
+
+    <div id="flagsSection"></div>
+
+    <div class="table-container" id="activitySection">
+      <h3>Activity <span class="table-hint" id="activityPeriod"></span></h3>
+      <div class="metrics" id="activityMetrics"></div>
+      <div id="sparklineBlock"></div>
+      <div id="churnFilterRow" class="filter-row" style="display:none">
+        <input type="text" class="path-filter" data-target="churn" placeholder="filter path…" />
+      </div>
+      <div id="churnBlock"></div>
+    </div>
+
+    <div class="table-container" id="hygieneSection">
+      <h3>Workspace Hygiene <span class="table-hint" id="hygieneScannedAt"></span></h3>
+      <div class="metrics" id="hygieneMetrics"></div>
+      <div id="deadCodeBlock"></div>
+    </div>
+
+    <div class="table-container" id="recentRunsSection">
+      <h3>Recent Runs <span class="table-hint" id="recentRunsHint"></span></h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Command</th>
+            <th>Phase</th>
+            <th>Duration</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody id="recentRunsTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="table-container" id="pendingRiskSection">
+      <h3>Pending-Change Risk <span class="table-hint" id="pendingRiskHint"></span></h3>
+      <div class="metrics" id="pendingRiskMetrics"></div>
+      <div class="filter-row">
+        <input type="text" class="path-filter" data-target="pending" placeholder="filter path…" />
+      </div>
+      <div id="pendingRiskBlock"></div>
+    </div>
+
+    <div class="table-container" id="companionsSection">
+      <h3>Change Companions
+        <span class="info-hint" title="Files that historically change in the same commit as your current edits, but are not in your changes yet — possible forgotten siblings (tests, types, docs). Co-change % = of the companion's changes, the share that also touched one of your files.">&#9432;</span>
+        <span class="table-hint" id="companionsHint"></span>
+      </h3>
+      <div class="metrics" id="companionsMetrics"></div>
+      <div class="filter-row">
+        <input type="text" class="path-filter" data-target="companions" placeholder="filter path&#8230;" />
+      </div>
+      <div id="companionsBlock"></div>
+    </div>
+
+    <div class="table-container">
+      <h3>Recent Commits <span class="table-hint">(last 10)</span></h3>
+      <table id="commitsTable">
+        <thead>
+          <tr>
+            <th data-col="shortHash">Hash <span class="sort-arrow"></span></th>
+            <th data-col="author">Author <span class="sort-arrow"></span></th>
+            <th data-col="message">Message <span class="sort-arrow"></span></th>
+            <th data-col="insertions">+ Lines <span class="sort-arrow"></span></th>
+            <th data-col="deletions">- Lines <span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="commitsTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="table-container" id="uncommittedSection">
+      <h3>Uncommitted Changes
+        <span class="table-hint" id="uncommittedCount"></span>
+        <span class="status-legend">
+          <span class="status-badge status-A">A</span> added
+          <span class="status-badge status-M">M</span> modified
+          <span class="status-badge status-D">D</span> deleted
+          <span class="status-badge status-R">R</span> renamed
+        </span>
+      </h3>
+      <div class="filter-row">
+        <input type="text" class="path-filter" data-target="uncommitted" placeholder="filter path…" />
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Path</th>
+          </tr>
+        </thead>
+        <tbody id="uncommittedTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary-section" id="summarySection">
+      <h3>Summary</h3>
+      <div id="summaryContent" class="summary-content"></div>
+    </div>
+
+  </div>
+
+  <script src="script.js" nonce="{{NONCE}}"></script>
+</body>
+</html>

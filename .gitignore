@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+node_modules/.package-lock.json
+
+# Build output
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Logs and runtime
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Test and coverage
+coverage/
+.nyc_output/
+*.lcov
+.vitest/
+
+# Local agent state (Claude Code / worktrees)
+.claude/
+
+# IDE and editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional npm cache
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Turbo
+.turbo
+
+# Vite
+*.local
+
+# Misc
+*.tgz
+.cache/
+
+# Local scratch artifacts (keep dir, ignore contents)
+docs/artifacts/*
+!docs/artifacts/.gitkeep

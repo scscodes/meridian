@@ -1,0 +1,101 @@
+import { describe, it, expect, vi } from "vitest";
+import { createShowAnalyticsHandler } from "../src/domains/git/analytics-handler";
+import { MockLogger, createMockContext, assertSuccess, assertFailure } from "./fixtures";
+import { GitAnalyzer } from "../src/domains/git/analytics-service";
+import { GitAnalyticsReport } from "../src/domains/git/analytics-types";
+
+describe("git analytics handlers", () => {
+  const ctx = createMockContext();
+
+  function createFakeReport(): GitAnalyticsReport {
+    const now = new Date();
+    return {
+      period: "3mo",
+      generatedAt: now,
+      summary: {
+        totalCommits: 10,
+        totalAuthors: 2,
+        totalFilesModified: 5,
+        totalLinesAdded: 100,
+        totalLinesDeleted: 20,
+        commitFrequency: 1,
+        averageCommitSize: 12,
+        churnRate: 5,
+      },
+      commits: [],
+      files: [],
+      authors: [],
+      trends: {
+        commitTrend: { slope: 0, direction: "stable", confidence: 0.5 },
+        volatilityTrend: { slope: 0, direction: "stable" },
+      },
+      commitFrequency: { labels: [], data: [] },
+      churnFiles: [],
+      topAuthors: [],
+    };
+  }
+
+  describe("createShowAnalyticsHandler", () => {
+    it("returns analytics report for valid period", async () => {
+      const logger = new MockLogger();
+      const analyzer = new GitAnalyzer();
+      const analyzeSpy = vi
+        .spyOn(analyzer, "analyze")
+        .mockResolvedValueOnce(createFakeReport());
+
+      const handler = createShowAnalyticsHandler(analyzer, logger);
+
+      const result = await handler(ctx, { period: "6mo", author: "alice" });
+      const report = assertSuccess(result);
+
+      expect(analyzeSpy).toHaveBeenCalledWith({
+        period: "6mo",
+        author: "alice",
+        pathPattern: undefined,
+      });
+      expect(report.summary.totalCommits).toBe(10);
+    });
+
+    it("validates period and returns INVALID_PERIOD error", async () => {
+      const logger = new MockLogger();
+      const analyzer = new GitAnalyzer();
+      const handler = createShowAnalyticsHandler(analyzer, logger);
+
+      const result = await handler(ctx, { period: "1w" as any });
+      const err = assertFailure(result);
+
+      expect(err.code).toBe("INVALID_PERIOD");
+      expect(err.context).toBe("ShowAnalyticsHandler");
+    });
+
+    it("rejects unsafe author filters", async () => {
+      const logger = new MockLogger();
+      const analyzer = new GitAnalyzer();
+      const handler = createShowAnalyticsHandler(analyzer, logger);
+
+      const result = await handler(ctx, { period: "3mo", author: 'alice"; rm -rf /' });
+      const err = assertFailure(result);
+
+      expect(err.code).toBe("ANALYTICS_ERROR");
+      expect(err.message).toContain("Invalid author filter");
+    });
+
+    it("wraps analyzer errors with ANALYTICS_ERROR", async () => {
+      const logger = new MockLogger();
+      const analyzer = new GitAnalyzer();
+
+      vi.spyOn(analyzer, "analyze").mockRejectedValueOnce(
+        new Error("git log failed")
+      );
+
+      const handler = createShowAnalyticsHandler(analyzer, logger);
+      const result = await handler(ctx, { period: "3mo" });
+      const err = assertFailure(result);
+
+      expect(err.code).toBe("ANALYTICS_ERROR");
+      expect(err.context).toBe("ShowAnalyticsHandler");
+      expect(err.message).toContain("Failed to generate analytics");
+    });
+  });
+});
+

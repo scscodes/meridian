@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {{WEBVIEW_CSP_SOURCE}} 'nonce-{{NONCE}}'; style-src {{WEBVIEW_CSP_SOURCE}} 'unsafe-inline'; img-src {{WEBVIEW_CSP_SOURCE}} https: data:; connect-src 'none';">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Analytics</title>
+  <script src="chart.umd.js" nonce="{{NONCE}}"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="analytics-panel">
+
+    <div class="header-row">
+      <h1>Git Analytics</h1>
+      <div class="header-actions">
+        <button id="exportCsv" class="btn-secondary" title="Quick-save CSV to .meridian/artifacts/">↓ CSV</button>
+        <button id="exportJson" class="btn-secondary" title="Quick-save JSON to .meridian/artifacts/">↓ JSON</button>
+        <button id="exportAs" class="btn-secondary" title="Choose format and location…">Save as…</button>
+        <button id="refreshBtn">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <label>Period
+        <select id="period">
+          <option value="3mo">3 months</option>
+          <option value="6mo">6 months</option>
+          <option value="12mo">12 months</option>
+        </select>
+      </label>
+      <input id="authorFilter" placeholder="Author…" />
+      <input id="pathFilter" placeholder="Path pattern…" />
+      <button id="applyFilters">Apply</button>
+    </div>
+
+    <div class="summary-cards">
+      <div class="card"><h3>Commits / Week</h3><p class="value" id="commitFreq">—</p></div>
+      <div class="card"><h3>Avg Files / Commit</h3><p class="value" id="filesPerCommit">—</p></div>
+      <div class="card"><h3>Avg + Lines / Commit</h3><p class="value ins-val" id="avgInsPerCommit">—</p></div>
+      <div class="card"><h3>Avg − Lines / Commit</h3><p class="value del-val" id="avgDelPerCommit">—</p></div>
+      <div class="card"><h3>Churn Rate <span class="info-hint" title="Avg lines changed (added + deleted) per commit, averaged across all files">&#9432;</span></h3><p class="value" id="churnRate">—</p></div>
+    </div>
+
+    <div class="charts">
+      <div class="chart-container">
+        <h3>Churn by File Type <span class="info-hint" title="Sum of per-file volatility grouped by extension">&#9432;</span></h3>
+        <div class="chart-canvas-wrap">
+          <canvas id="churnByTypeChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-container">
+        <h3>Churn by Directory <span class="info-hint" title="Sum of per-file volatility grouped by parent directory">&#9432;</span></h3>
+        <div class="chart-canvas-wrap">
+          <canvas id="churnByDirChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="charts charts-wide">
+      <div class="chart-container chart-tall">
+        <h3>Risk Hotspots <span class="info-hint" title="Each bubble is a file. x = commits (change frequency), y = volatility (churn magnitude), bubble size = total lines changed, color = risk. Top-right files change often and heavily — refactor candidates.">&#9432;</span></h3>
+        <div class="chart-canvas-wrap">
+          <canvas id="hotspotChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <h3>Recent Commits <span class="table-hint">(last 50)</span></h3>
+      <table id="commitsTable">
+        <thead>
+          <tr>
+            <th>Hash</th>
+            <th>Author</th>
+            <th>Message</th>
+            <th>+ Lines</th>
+            <th>− Lines</th>
+            <th>Churn</th>
+          </tr>
+        </thead>
+        <tbody id="commitsTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="table-container">
+      <h3>All Files <span class="table-hint">(top 50 by volatility · click path to open)</span></h3>
+      <table id="filesTable">
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Commits</th>
+            <th>+Lines</th>
+            <th>-Lines</th>
+            <th title="(insertions + deletions) / commits for this file">Volatility</th>
+            <th>Risk</th>
+          </tr>
+        </thead>
+        <tbody id="filesTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="table-container" id="coChangeSection">
+      <h3>Change Companions
+        <span class="info-hint" title="Files that change together in the same commit. Co-Changes = commits touching both; Co-change % = of the rarer file's changes, the share that also touched the other. High pairs reveal hidden coupling — candidates to refactor together or split apart.">&#9432;</span>
+        <span class="table-hint" id="coChangeHint"></span>
+      </h3>
+      <table id="coChangeTable">
+        <thead>
+          <tr>
+            <th>File A</th>
+            <th>File B</th>
+            <th title="Commits in which both files changed">Co-Changes</th>
+            <th title="count / min(changes of A, changes of B)">Co-change %</th>
+          </tr>
+        </thead>
+        <tbody id="coChangeTableBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script src="script.js" nonce="{{NONCE}}"></script>
+</body>
+</html>

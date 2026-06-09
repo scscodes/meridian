@@ -1,0 +1,15 @@
+src/**
+tests/**
+tasks/**
+docs/**
+node_modules/**
+!node_modules/typescript
+!node_modules/typescript/**
+.vscode/**
+.claude/**
+.git/**
+vitest.config.ts
+tsconfig.json
+*.map
+**/*.test.ts
+media/icon.jpeg

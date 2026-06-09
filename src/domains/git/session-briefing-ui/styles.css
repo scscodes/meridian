@@ -1,0 +1,535 @@
+/* Session Briefing Webview Styles — matches analytics panel visual language */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  padding: 20px;
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: var(--vscode-input-border, #555) transparent;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--vscode-input-border, #555); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--vscode-focusBorder, #007acc); }
+
+.briefing-panel {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* Header */
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+
+h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+  margin: 0 0 10px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Buttons */
+
+button {
+  padding: 5px 14px;
+  background: var(--vscode-button-background, #0e639c);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--vscode-input-border, #555);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Branch bar */
+
+.branch-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-input-border, #555);
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.branch-name {
+  font-weight: 600;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 13px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.badge-clean {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.badge-dirty {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.timestamp {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+/* Summary cards */
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.card {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 14px 16px;
+  border-radius: 6px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.card:hover {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.card-clickable { cursor: pointer; }
+
+.card h3 { margin: 0 0 6px; }
+
+.card .value {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--vscode-terminal-ansiCyan, #17a2a2);
+  letter-spacing: -0.5px;
+}
+
+/* Flags */
+
+.flags-container {
+  margin-bottom: 14px;
+}
+
+.flag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #f59e0b;
+}
+
+.flag-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.flag-clickable { cursor: pointer; }
+.flag-clickable:hover {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.flag-cta {
+  padding: 2px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.flag-cta:hover {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+/* Pending-change diff icon */
+
+.diff-link {
+  cursor: pointer;
+  opacity: 0.45;
+  font-size: 14px;
+  transition: opacity 0.12s;
+}
+.diff-link:hover { opacity: 1; color: #06b6d4; }
+
+/* Filter row (path-substring filters above filterable tables) */
+
+.filter-row {
+  margin: 4px 0 8px;
+}
+
+.path-filter {
+  width: 220px;
+  padding: 4px 8px;
+  background: var(--vscode-input-background, rgba(0,0,0,0.2));
+  color: var(--vscode-input-foreground, #d4d4d4);
+  border: 1px solid var(--vscode-input-border, #555);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  outline: none;
+}
+.path-filter:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+/* Tables */
+
+.table-container {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 14px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+}
+
+.table-hint {
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.4;
+}
+
+.info-hint {
+  font-size: 11px;
+  opacity: 0.35;
+  cursor: help;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.info-hint:hover {
+  opacity: 0.7;
+}
+
+/* "Ships with" companion-trigger cell — de-emphasized, like a sub-label. */
+.companion-because {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th, td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--vscode-input-border, #444);
+}
+
+th {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  position: sticky;
+  top: 0;
+  white-space: nowrap;
+}
+
+th[data-col] {
+  cursor: pointer;
+  user-select: none;
+}
+
+th[data-col]:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sort-arrow {
+  font-size: 9px;
+  opacity: 0.4;
+  margin-left: 2px;
+}
+
+th[data-col]:hover .sort-arrow {
+  opacity: 0.7;
+}
+
+tbody tr {
+  transition: background-color 0.12s;
+}
+
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Commit hash badge */
+
+.hash {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.commit-msg {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.ins-count {
+  color: #22c55e;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.del-count {
+  color: #ef4444;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Status badges for uncommitted files */
+
+.status-badge {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+}
+
+.status-A { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.status-M { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.status-D { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.status-R { background: rgba(6, 182, 212, 0.2); color: #06b6d4; }
+
+/* Status legend (Uncommitted section header) */
+
+.status-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.55;
+}
+
+.status-legend .status-badge {
+  margin-left: 6px;
+}
+
+.status-legend .status-badge:first-child {
+  margin-left: 0;
+}
+
+/* Run-log phase badges (Recent Runs table) */
+
+.phase-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  letter-spacing: 0.3px;
+}
+
+.phase-complete { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.phase-fail     { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+/* Path link */
+
+.path-link { cursor: pointer; }
+.path-link:hover { color: #06b6d4; }
+
+/* Report deep-link (risk badges + dead-code adornment) */
+
+.report-link { cursor: pointer; }
+.report-link.adornment {
+  opacity: 0.45;
+  font-size: 13px;
+  transition: opacity 0.12s;
+}
+.report-link.adornment:hover { opacity: 1; color: #06b6d4; }
+
+/* Right-click ignore menu (shared structure across all three Meridian webviews) */
+
+.meridian-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 160px;
+  padding: 4px 0;
+  background: var(--vscode-menu-background, #252526);
+  color: var(--vscode-menu-foreground, #cccccc);
+  border: 1px solid var(--vscode-menu-border, var(--vscode-input-border, #454545));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  user-select: none;
+}
+.meridian-context-menu .menu-header {
+  padding: 4px 12px 6px;
+  border-bottom: 1px solid var(--vscode-menu-separatorBackground, #454545);
+  color: var(--vscode-descriptionForeground, #999);
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meridian-context-menu .menu-item {
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.meridian-context-menu .menu-item:hover {
+  background: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+/* AI Summary */
+
+.summary-section {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 14px 16px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+.summary-content {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  opacity: 0.85;
+}
+
+/* Activity & Hygiene metrics + risk badges */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.metrics .card .value {
+  font-size: 20px;
+}
+
+h3.sub {
+  margin: 6px 0 8px;
+  opacity: 0.55;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin: 0 0 14px;
+}
+
+.risk {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.risk-high { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.risk-medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.risk-low { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.risk-new { background: rgba(6, 182, 212, 0.2); color: #06b6d4; }
+.risk-cold { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+
+/* Responsive */
+
+@media (max-width: 700px) {
+  .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+  .header-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+/* Loading overlay — applied to body while a refresh is in flight.
+   Above .meridian-context-menu (z-index 9999) by intent. */
+.meridian-loading::before {
+  content: ""; position: fixed; inset: 0;
+  background: var(--vscode-editor-background); opacity: 0.4;
+  pointer-events: none; z-index: 100000;
+}
+.meridian-loading::after {
+  content: ""; position: fixed; top: 50%; left: 50%;
+  width: 32px; height: 32px; margin: -16px 0 0 -16px;
+  border: 3px solid var(--vscode-foreground); border-top-color: transparent;
+  border-radius: 50%; animation: meridian-spin 0.8s linear infinite;
+  pointer-events: none; z-index: 100001;
+}
+@keyframes meridian-spin { to { transform: rotate(360deg); } }

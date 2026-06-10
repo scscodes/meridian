@@ -318,7 +318,7 @@
       "explorer/context": [
         {
           "command": "meridian.hygiene.deleteFile",
-          "when": "workspaceFolderCount > 0",
+          "when": "workspaceFolderCount > 0 && !explorerResourceIsFolder",
           "group": "meridian@1"
         },
         {
@@ -359,15 +359,15 @@
         },
         {
           "command": "meridian.hygiene.cleanup",
-          "when": "workspaceFolderCount > 0"
+          "when": "false"
         },
         {
           "command": "meridian.hygiene.deleteFile",
-          "when": "workspaceFolderCount > 0"
+          "when": "false"
         },
         {
           "command": "meridian.hygiene.ignoreFile",
-          "when": "workspaceFolderCount > 0"
+          "when": "false"
         },
         {
           "command": "meridian.hygiene.showAnalytics",
@@ -412,19 +412,14 @@
           "group": "git@2"
         },
         {
-          "command": "meridian.hygiene.cleanup",
-          "when": "view == meridian.hygiene.view && viewItem =~ /file/",
+          "command": "meridian.hygiene.deleteFile",
+          "when": "view == meridian.hygiene.view && viewItem == file",
           "group": "hygiene@1"
         },
         {
-          "command": "meridian.hygiene.deleteFile",
-          "when": "view == meridian.hygiene.view && viewItem =~ /file/",
-          "group": "hygiene@2"
-        },
-        {
           "command": "meridian.hygiene.ignoreFile",
-          "when": "view == meridian.hygiene.view && viewItem =~ /file/",
-          "group": "hygiene@3"
+          "when": "view == meridian.hygiene.view && viewItem == file",
+          "group": "hygiene@2"
         }
       ],
       "view/item/inline": [
@@ -469,11 +464,11 @@
     "@types/micromatch": "^4.0.10",
     "@types/node": "^22.19.0",
     "@types/vscode": "^1.80.0",
-    "@vitest/coverage-v8": "^1.0.4",
-    "@vitest/ui": "^1.0.4",
+    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/ui": "^4.1.8",
     "esbuild": "^0.25.12",
     "semantic-release": "^25.0.3",
     "semantic-release-vsce": "^6.1.3",
-    "vitest": "^1.0.4"
+    "vitest": "^4.1.8"
   }
 }

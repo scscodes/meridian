@@ -38,7 +38,7 @@ describe("hygiene.showAnalytics (createShowHygieneAnalyticsHandler)", () => {
         byCategory: {},
       },
       files: [],
-      pruneCandiates: [],
+      pruneCandidates: [],
       largestFiles: [],
       oldestFiles: [],
       temporalData: { buckets: [], topExtensions: [] },

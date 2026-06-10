@@ -159,7 +159,7 @@ function renderCategoryBar() {
     legendEl.innerHTML = categories.map((cat) => `
       <span class="legend-item">
         <span class="legend-swatch" style="background:${CAT_COLORS[cat] || "#90a4ae"}"></span>
-        <span>${cat} (${byCategory[cat].count})</span>
+        <span>${esc(cat)} (${Number(byCategory[cat].count) || 0})</span>
       </span>
     `).join("");
   }
@@ -269,7 +269,7 @@ function renderPruneTable() {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const candidates = report.pruneCandiates || [];
+  const candidates = report.pruneCandidates || [];
   if (candidates.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;opacity:0.5;padding:12px">No prune candidates with active criteria</td></tr>`;
     return;
@@ -282,8 +282,8 @@ function renderPruneTable() {
       <td><span class="path-link" data-path="${esc(f.path)}"><code title="${esc(f.path)}">${esc(f.path)}</code></span></td>
       <td>${fmtBytes(f.sizeBytes)}</td>
       <td>${f.lineCount >= 0 ? f.lineCount.toLocaleString() : "—"}</td>
-      <td>${f.ageDays}</td>
-      <td><span class="cat-${f.category}">${f.category}</span></td>
+      <td>${Number(f.ageDays) || 0}</td>
+      <td><span class="cat-${esc(f.category)}">${esc(f.category)}</span></td>
     `;
   }
 }
@@ -361,8 +361,8 @@ function renderTopTable(bodyId, rows) {
       <td><span class="path-link" data-path="${esc(f.path)}"><code title="${esc(f.path)}">${esc(f.path)}</code></span></td>
       <td>${fmtBytes(f.sizeBytes)}</td>
       <td>${f.lineCount >= 0 ? f.lineCount.toLocaleString() : "—"}</td>
-      <td>${f.ageDays}</td>
-      <td><span class="cat-${f.category}">${esc(f.category)}</span></td>
+      <td>${Number(f.ageDays) || 0}</td>
+      <td><span class="cat-${esc(f.category)}">${esc(f.category)}</span></td>
     </tr>
   `).join("");
 }

@@ -35,7 +35,17 @@ export class CommandRouter {
   private afterListeners: Array<(e: DispatchCompleteEvent) => void> = [];
   private readonly runScope = new AsyncLocalStorage<{ runId: string }>();
 
-  constructor(logger: Logger, private readonly runLog?: RunLog) {
+  /**
+   * @param sanitizeLogText Applied to error messages before they are persisted
+   * to the run-log (the only router output that lands on disk). Injected so
+   * the router stays free of VS Code / settings dependencies; main.ts wires
+   * the `security.logging.sensitive` policy here. Defaults to identity.
+   */
+  constructor(
+    logger: Logger,
+    private readonly runLog?: RunLog,
+    private readonly sanitizeLogText: (text: string) => string = (text) => text
+  ) {
     this.logger = logger;
   }
 
@@ -236,7 +246,7 @@ export class CommandRouter {
             resultKind: "err",
             durationMs: duration,
             errorCode: result.error.code,
-            errorMessage: result.error.message,
+            errorMessage: this.sanitizeLogText(result.error.message),
           });
         }
         return result;
@@ -266,7 +276,7 @@ export class CommandRouter {
           resultKind: "err",
           durationMs: Date.now() - mwCtx.startTime,
           errorCode: err.code,
-          errorMessage: err.message,
+          errorMessage: this.sanitizeLogText(err.message),
         });
         return failResult;
       }

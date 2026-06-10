@@ -83,11 +83,14 @@ export class ImpactAnalysisVisitor {
     return null;
   }
 
-  // Simple heuristic: check if path contains target filename stem.
+  // Simple heuristic: check if path ends with the target filename stem.
   private pathsResolveToTarget(importPath: string): boolean {
+    if (!this.targetFile) return false;
     const targetStem = path.parse(this.targetFile).name;
-    // Match ".../name" or "./name" or "../name"
-    return importPath.endsWith(`/${targetStem}`) || importPath.endsWith(`\/${targetStem}`);
+    // Match ".../name", "./name", or "../name" (with or without extension)
+    return importPath.endsWith(`/${targetStem}`) ||
+      importPath.endsWith(`/${targetStem}.js`) ||
+      importPath.endsWith(`/${targetStem}.ts`);
   }
 
   private extractCallName(node: ts.CallExpression): string | null {

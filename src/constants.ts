@@ -28,45 +28,6 @@ export const MERIDIAN_DIR = ".meridian";
 export const MERIDIAN_ARTIFACTS_DIR = "artifacts";
 
 // ============================================================================
-// Git Configuration Defaults
-// ============================================================================
-
-export const GIT_DEFAULTS = {
-  /** Default remote name */
-  DEFAULT_REMOTE: "origin" as const,
-
-  /** Default main branch */
-  DEFAULT_BRANCH: "main" as const,
-
-  /** Fallback branch if main doesn't exist */
-  FALLBACK_BRANCH: "master" as const,
-
-  /** Default depth for shallow clones (0 = full clone) */
-  CLONE_DEPTH: 0,
-
-  /** Whether to auto-fetch before operations */
-  AUTO_FETCH: false,
-
-  /** Whether to clean branches after merge */
-  AUTO_BRANCH_CLEAN: true,
-
-  /** Commit message minimum length (characters) */
-  MIN_MESSAGE_LENGTH: 5,
-
-  /** Commit message maximum length (characters) */
-  MAX_MESSAGE_LENGTH: 72,
-
-  /** Maximum number of inbound changes to process */
-  MAX_INBOUND_CHANGES: 100,
-
-  /** Git operation timeout in milliseconds */
-  OPERATION_TIMEOUT_MS: 30 * 1000,
-
-  /** Maximum diff size in bytes before truncation (for LLM token safety) */
-  MAX_DIFF_BYTES: 50_000,
-} as const;
-
-// ============================================================================
 // Workspace Exclusion Base — shared across git and hygiene analytics.
 // Domain-specific lists extend via spread.
 // ============================================================================
@@ -172,51 +133,6 @@ export const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
 ] as const;
 
 // ============================================================================
-// Chat Configuration
-// ============================================================================
-
-export const CHAT_SETTINGS = {
-  /** Default LLM model for chat operations */
-  DEFAULT_MODEL: "gpt-4" as const,
-
-  /** Alternative models */
-  AVAILABLE_MODELS: ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"] as const,
-
-  /** Lines of context to include from active file */
-  CONTEXT_LINES: 50,
-
-  /** Maximum context size in characters */
-  MAX_CONTEXT_CHARS: 4000,
-
-  /** Chat message timeout in milliseconds */
-  RESPONSE_TIMEOUT_MS: 30 * 1000,
-
-  /** Maximum number of messages to keep in conversation */
-  MAX_CONVERSATION_DEPTH: 10,
-} as const;
-
-// ============================================================================
-// Logging Configuration
-// ============================================================================
-
-export const LOG_SETTINGS = {
-  /** Default log level */
-  DEFAULT_LEVEL: "info" as const,
-
-  /** Available log levels */
-  LEVELS: ["debug", "info", "warn", "error"] as const,
-
-  /** Maximum entries per log level */
-  MAX_ENTRIES_PER_LEVEL: 250,
-
-  /** Whether to include timestamps in logs */
-  INCLUDE_TIMESTAMPS: true,
-
-  /** Whether to include context in logs */
-  INCLUDE_CONTEXT: true,
-} as const;
-
-// ============================================================================
 // Telemetry Event Types
 // ============================================================================
 
@@ -224,14 +140,6 @@ export const TELEMETRY_EVENT_KINDS = {
   COMMAND_STARTED: "COMMAND_STARTED",
   COMMAND_COMPLETED: "COMMAND_COMPLETED",
   COMMAND_FAILED: "COMMAND_FAILED",
-  CACHE_HIT: "CACHE_HIT",
-  CACHE_MISS: "CACHE_MISS",
-  ERROR_OCCURRED: "ERROR_OCCURRED",
-  WORKFLOW_STARTED: "WORKFLOW_STARTED",
-  WORKFLOW_COMPLETED: "WORKFLOW_COMPLETED",
-  WORKFLOW_FAILED: "WORKFLOW_FAILED",
-  AGENT_INVOKED: "AGENT_INVOKED",
-  USER_ACTION: "USER_ACTION",
 } as const;
 
 // ============================================================================

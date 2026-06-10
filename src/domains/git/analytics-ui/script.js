@@ -340,8 +340,8 @@ function renderCommitsTable() {
       <td><code class="hash">${escapeHtml(c.hash.slice(0, 7))}</code></td>
       <td>${escapeHtml(c.author)}</td>
       <td class="commit-msg">${escapeHtml(c.message.slice(0, 70))}</td>
-      <td class="ins-count">+${c.insertions}</td>
-      <td class="del-count">−${c.deletions}</td>
+      <td class="ins-count">+${Number(c.insertions) || 0}</td>
+      <td class="del-count">−${Number(c.deletions) || 0}</td>
       <td>
         <div class="churn-bar">
           <div class="churn-ins" style="width:${insW}px"></div>
@@ -367,11 +367,11 @@ function renderFilesTable() {
     const row = tbody.insertRow();
     row.innerHTML = `
       <td><span class="path-link" data-path="${escapeHtml(file.path)}"><code>${escapeHtml(file.path)}</code></span></td>
-      <td>${file.commitCount}</td>
-      <td>+${file.insertions}</td>
-      <td>-${file.deletions}</td>
+      <td>${Number(file.commitCount) || 0}</td>
+      <td>+${Number(file.insertions) || 0}</td>
+      <td>-${Number(file.deletions) || 0}</td>
       <td>${file.volatility.toFixed(1)}</td>
-      <td><span class="risk-${file.risk}">${file.risk}</span></td>
+      <td><span class="risk-${escapeHtml(file.risk)}">${escapeHtml(file.risk)}</span></td>
     `;
   }
 }
@@ -411,7 +411,7 @@ function renderCoChange() {
     row.innerHTML =
       '<td><span class="path-link" data-path="' + escapeHtml(p.a) + '"><code>' + escapeHtml(p.a) + '</code></span></td>' +
       '<td><span class="path-link" data-path="' + escapeHtml(p.b) + '"><code>' + escapeHtml(p.b) + '</code></span></td>' +
-      '<td>' + p.count + '</td>' +
+      '<td>' + (Number(p.count) || 0) + '</td>' +
       '<td>' + Math.round((p.coChangeRate || 0) * 100) + '%</td>';
   }
 }
@@ -547,13 +547,4 @@ function installIgnoreContextMenu() {
   });
   window.addEventListener("blur", dismiss);
   window.addEventListener("scroll", dismiss, true);
-}
-
-// Initialize on document load
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    if (analyticsData) renderUI();
-  });
-} else {
-  if (analyticsData) renderUI();
 }

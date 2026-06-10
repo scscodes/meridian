@@ -39,7 +39,7 @@ VS Code (commands · views · webviews · chat · LM tools)
   cleanup, collections). Each exposes handlers (thin) over services (logic) and its own `types.ts`.
   Webview assets live beside their domain (`analytics-ui/`, `session-briefing-ui/`).
 - **`src/infrastructure/`** — capabilities domains depend on: `git-provider.ts` (the only place that
-  shells git), `workspace.ts` / `workspace-provider.ts`, `settings.ts` (the single `readSetting`
+  shells git), `workspace-provider.ts`, `settings.ts` (the single `readSetting`
   chokepoint, ADR 013), `run-log.ts` (append-only JSONL event log, ADR 009), `telemetry.ts`,
   `cache.ts`, `prose-generator.ts` (injected LM prose, ADR 004), `webview-provider.ts`.
 - **`src/security/`** — boundary enforcement: `path-guard.ts` (no escaping the workspace),

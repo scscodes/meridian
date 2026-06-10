@@ -7,11 +7,18 @@
 import { readSetting } from "../../infrastructure/settings";
 import { PruneConfig, FileCategory } from "./analytics-types";
 
+const VALID_CATEGORIES: ReadonlySet<string> = new Set<FileCategory>([
+  "markdown", "log", "config", "backup", "temp", "source", "artifact", "other",
+]);
+
 export function getPruneConfig(): PruneConfig {
   return {
     minAgeDays:   readSetting("hygiene.prune.minAgeDays"),
     maxSizeMB:    readSetting("hygiene.prune.maxSizeMB"),
     minLineCount: readSetting("hygiene.prune.minLineCount"),
-    categories:   [...readSetting("hygiene.prune.categories")] as FileCategory[],
+    // VS Code does not enforce enum membership on user-supplied values;
+    // narrow here so unknown strings never enter the typed config.
+    categories:   readSetting("hygiene.prune.categories")
+      .filter((c): c is FileCategory => VALID_CATEGORIES.has(c)),
   };
 }

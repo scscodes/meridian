@@ -141,7 +141,7 @@ export class HygieneAnalyzer {
       : undefined;
 
     const summary            = this.buildSummary(files);
-    const pruneCandiates     = files.filter((f) => f.isPruneCandidate);
+    const pruneCandidates     = files.filter((f) => f.isPruneCandidate);
     const largestFiles       = [...files].sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 20);
     const oldestFiles        = [...files].sort((a, b) => b.ageDays - a.ageDays).slice(0, 20);
     const temporalData       = buildTemporalData(files, deadCodeByRelPath);
@@ -154,7 +154,7 @@ export class HygieneAnalyzer {
       workspaceRoot,
       summary,
       files,
-      pruneCandiates,
+      pruneCandidates,
       largestFiles,
       oldestFiles,
       temporalData,

@@ -59,7 +59,9 @@ export const COMMAND_MAP: ReadonlyArray<CommandMapEntry> = [
   { vsCodeId: "meridian.git.sessionBriefing",   commandName: "git.sessionBriefing",  title: "Session Briefing",               showInPalette: true,  requiresGit: true,  icon: "$(notebook)" },
   // ── Hygiene ──────────────────────────────────────────────────────────────────
   { vsCodeId: "meridian.hygiene.scan",          commandName: "hygiene.scan",         title: "Hygiene: Scan Workspace",        showInPalette: true  },
-  { vsCodeId: "meridian.hygiene.cleanup",       commandName: "hygiene.cleanup",      title: "Hygiene: Cleanup",               showInPalette: true  },
+  // cleanup is not palette-exposed: it deletes files and requires an explicit
+  // file list + dryRun=false; the user-facing path is hygiene.deleteFile (confirmed).
+  { vsCodeId: "meridian.hygiene.cleanup",       commandName: "hygiene.cleanup",      title: "Hygiene: Cleanup"                                     },
   { vsCodeId: "meridian.hygiene.showAnalytics", commandName: "hygiene.showAnalytics",title: "Hygiene Analytics",              showInPalette: true,                     icon: "$(graph)" },
   // hygiene.impactAnalysis — dedicated registration per ADR 005 (active-file fallback + function name prompt)
 ];

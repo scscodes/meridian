@@ -51,12 +51,27 @@ describe('hygiene.cleanup', () => {
     }
   });
 
-  it('deletes all files successfully on execute', async () => {
+  it('defaults to dry run when dryRun is not specified', async () => {
+    const files = ['src/old.ts', 'src/legacy.ts'];
+    const deleteSpy = vi.spyOn(wp, 'deleteFile');
+
+    const handler = createCleanupHandler(wp, logger);
+    const result = await handler(createMockContext(), { files } as any);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.value.dryRun).toBe(true);
+      expect(result.value.deleted).toEqual([]);
+    }
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it('deletes all files successfully on explicit execute', async () => {
     const files = ['src/old.ts', 'src/legacy.ts'];
     vi.spyOn(wp, 'deleteFile').mockResolvedValue(success(void 0));
 
     const handler = createCleanupHandler(wp, logger);
-    const result = await handler(createMockContext(), { files } as any);
+    const result = await handler(createMockContext(), { dryRun: false, files } as any);
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
@@ -76,7 +91,7 @@ describe('hygiene.cleanup', () => {
     });
 
     const handler = createCleanupHandler(wp, logger);
-    const result = await handler(createMockContext(), { files } as any);
+    const result = await handler(createMockContext(), { dryRun: false, files } as any);
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
@@ -93,7 +108,7 @@ describe('hygiene.cleanup', () => {
     });
 
     const handler = createCleanupHandler(wp, logger);
-    const result = await handler(createMockContext(), { files: ['crash.ts'] } as any);
+    const result = await handler(createMockContext(), { dryRun: false, files: ['crash.ts'] } as any);
 
     expect(result.kind).toBe('err');
     if (result.kind === 'err') {

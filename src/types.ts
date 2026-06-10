@@ -99,25 +99,19 @@ export interface GitProvider {
   status(branch?: string): Promise<Result<GitStatus>>;
   pull(branch?: string): Promise<Result<GitPullResult>>;
   commit(message: string, branch?: string): Promise<Result<string>>; // Returns commit hash
-  getChanges(): Promise<Result<GitStageChange[]>>;
-  getDiff(paths?: string[]): Promise<Result<string>>;
-  stage(paths: string[]): Promise<Result<void>>;
-  reset(paths: string[] | { mode: string; ref: string }): Promise<Result<void>>;
   getAllChanges(): Promise<Result<GitFileChange[]>>; // Get staged + unstaged changes
-  fetch(remote?: string): Promise<Result<void>>; // Fetch from remote without pulling
+  fetch(remote?: string): Promise<Result<void>>; // Fetch from remote without pulling (network-policy gated)
   getRemoteUrl(remote?: string): Promise<Result<string>>; // Get remote URL for generating diff links
   getCurrentBranch(): Promise<Result<string>>; // Get current branch name
-  diff(revision: string, options?: string[]): Promise<Result<string>>; // Advanced diff with options
   getRecentCommits(count: number): Promise<Result<RecentCommit[]>>;
-  getCommitRange(from: string, to?: string): Promise<Result<RecentCommit[]>>;
-  getMergeBase(branch: string, base?: string): Promise<Result<string>>;
   getUntrackedFiles(): Promise<Result<string[]>>;
-  getUncommittedDiff(paths?: string[]): Promise<Result<string>>;
 }
 
 export interface WorkspaceProvider {
   findFiles(pattern: string): Promise<Result<string[]>>;
   readFile(path: string): Promise<Result<string>>;
+  /** File size in bytes from metadata — no content read. */
+  statFile(path: string): Promise<Result<{ sizeBytes: number }>>;
   deleteFile(path: string): Promise<Result<void>>;
 }
 
@@ -141,11 +135,6 @@ export interface GitPullResult {
   success: boolean;
   branch: string;
   message: string;
-}
-
-export interface GitStageChange {
-  path: string;
-  status: "added" | "modified" | "deleted";
 }
 
 export interface GitFileChange {

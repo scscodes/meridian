@@ -81,7 +81,7 @@ class ImpactAnalyzer {
     filePath?: string,
     functionName?: string
   ): ImpactContext | null {
-    const cacheKey = `${workspaceRoot}|${filePath || functionName}`;
+    const cacheKey = `${workspaceRoot}|${filePath ?? ""}|${functionName ?? ""}`;
     const cached = this.cache.get(cacheKey);
     if (cached) {
       return cached;

@@ -27,7 +27,9 @@ export interface CleanupResult {
 /**
  * hygiene.cleanup — Remove specified files from the workspace.
  * Safety: requires an explicit file list; never deletes without one.
- * If dryRun=true, returns the list of files that WOULD be deleted without touching the FS.
+ * Defaults to dryRun=true: deletion requires an explicit dryRun=false, so a
+ * bare programmatic invocation (command palette, another extension) can never
+ * remove files. The confirmed UI flow (hygiene.deleteFile) opts in explicitly.
  */
 export function createCleanupHandler(
   workspaceProvider: WorkspaceProvider,
@@ -35,7 +37,7 @@ export function createCleanupHandler(
 ): Handler<CleanupParams, CleanupResult> {
   return async (_ctx: CommandContext, params: CleanupParams = {}) => {
     try {
-      const { dryRun = false, files } = params;
+      const { dryRun = true, files } = params;
 
       if (!files || files.length === 0) {
         return failure({

@@ -2,6 +2,7 @@
  * Hygiene Domain Scan Handler — workspace analysis for dead files, large files, and stale logs.
  */
 
+import * as path from "path";
 import {
   Handler,
   CommandContext,
@@ -14,7 +15,7 @@ import {
   Logger,
 } from "../../types";
 import { HYGIENE_SETTINGS } from "../../constants";
-import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
+import { HYGIENE_ERROR_CODES, INFRASTRUCTURE_ERROR_CODES } from "../../infrastructure/error-codes";
 import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { readGitignorePatterns, readMeridianIgnorePatterns } from "../../security/ignore-store";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
@@ -23,7 +24,7 @@ import { detectCollections } from "./collection-detector";
 /**
  * hygiene.scan — Analyze workspace for dead files, large files, and stale logs.
  * Uses WorkspaceProvider.findFiles() with patterns from HYGIENE_SETTINGS.
- * Large-file detection reads file content to measure byte length (no stat API available).
+ * Large-file detection uses file metadata (statFile) — content is never read.
  */
 export function createScanHandler(
   workspaceProvider: WorkspaceProvider,
@@ -35,7 +36,14 @@ export function createScanHandler(
     try {
       logger.info("Scanning workspace for hygiene issues", "HygieneScanHandler");
 
-      const workspaceRoot = ctx.workspaceFolders?.[0] ?? process.cwd();
+      const workspaceRoot = ctx.workspaceFolders?.[0];
+      if (!workspaceRoot) {
+        return failure({
+          code: INFRASTRUCTURE_ERROR_CODES.WORKSPACE_NOT_FOUND,
+          message: "No workspace folder found",
+          context: "hygiene.scan",
+        });
+      }
       const gitignorePatterns = readGitignorePatterns(workspaceRoot);
       const meridianIgnorePatterns = readMeridianIgnorePatterns(workspaceRoot);
       const excludePatterns = [
@@ -44,51 +52,51 @@ export function createScanHandler(
         ...meridianIgnorePatterns,
       ];
 
+      // findFiles may return absolute paths; ignore patterns (including
+      // root-anchored .gitignore entries) match workspace-relative paths.
+      const isExcluded = (filePath: string): boolean =>
+        pathMatchesAny(path.isAbsolute(filePath) ? path.relative(workspaceRoot, filePath) : filePath, excludePatterns);
+
       // --- Dead files: temp/backup patterns (sourced from HYGIENE_SETTINGS.TEMP_FILE_PATTERNS) ---
-      const deadFiles: string[] = [];
+      const deadFileSet = new Set<string>();
       const deadPatterns = HYGIENE_SETTINGS.TEMP_FILE_PATTERNS.map((p) => `**/${p}`);
 
       for (const pattern of deadPatterns) {
         const result = await workspaceProvider.findFiles(pattern);
         if (result.kind === "ok") {
           for (const f of result.value) {
-            if (!deadFiles.includes(f) && !pathMatchesAny(f, excludePatterns)) {
-              deadFiles.push(f);
-            }
+            if (!isExcluded(f)) deadFileSet.add(f);
           }
         }
       }
+      const deadFiles = Array.from(deadFileSet);
 
       // --- Log files ---
-      const logFiles: string[] = [];
+      const logFileSet = new Set<string>();
       const logPatterns = HYGIENE_SETTINGS.LOG_FILE_PATTERNS.map((p) => `**/${p}`);
 
       for (const pattern of logPatterns) {
         const result = await workspaceProvider.findFiles(pattern);
         if (result.kind === "ok") {
           for (const f of result.value) {
-            if (!logFiles.includes(f) && !pathMatchesAny(f, excludePatterns)) {
-              logFiles.push(f);
-            }
+            if (!isExcluded(f)) logFileSet.add(f);
           }
         }
       }
+      const logFiles = Array.from(logFileSet);
 
-      // --- Large files: read content to measure size, skip excluded paths ---
+      // --- Large files: metadata size only, skip excluded paths ---
       const largeFiles: Array<{ path: string; sizeBytes: number }> = [];
       const allFilesResult = await workspaceProvider.findFiles("**/*");
 
       if (allFilesResult.kind === "ok") {
         for (const filePath of allFilesResult.value) {
-          if (pathMatchesAny(filePath, excludePatterns)) {
+          if (isExcluded(filePath)) {
             continue;
           }
-          const readResult = await workspaceProvider.readFile(filePath);
-          if (readResult.kind === "ok") {
-            const sizeBytes = Buffer.byteLength(readResult.value, "utf8");
-            if (sizeBytes > HYGIENE_SETTINGS.MAX_FILE_SIZE_BYTES) {
-              largeFiles.push({ path: filePath, sizeBytes });
-            }
+          const statResult = await workspaceProvider.statFile(filePath);
+          if (statResult.kind === "ok" && statResult.value.sizeBytes > HYGIENE_SETTINGS.MAX_FILE_SIZE_BYTES) {
+            largeFiles.push({ path: filePath, sizeBytes: statResult.value.sizeBytes });
           }
         }
       }
@@ -98,7 +106,7 @@ export function createScanHandler(
       const mdResult = await workspaceProvider.findFiles("**/*.md");
       if (mdResult.kind === "ok") {
         for (const filePath of mdResult.value) {
-          if (pathMatchesAny(filePath, excludePatterns)) continue;
+          if (isExcluded(filePath)) continue;
           const readResult = await workspaceProvider.readFile(filePath);
           if (readResult.kind === "ok") {
             const sizeBytes = Buffer.byteLength(readResult.value, "utf8");

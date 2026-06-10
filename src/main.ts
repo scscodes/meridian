@@ -24,6 +24,7 @@ import { readSetting } from "./infrastructure/settings";
 import { getPruneConfig } from "./domains/hygiene/prune-config";
 import { createRunLog } from "./infrastructure/run-log";
 import { migrateLegacyIgnoreFile } from "./infrastructure/dotdir-migration";
+import { isSensitiveLoggingEnabled, sanitizeForLogs } from "./security/operation-policy";
 
 // Presentation layer
 import { registerCommands, COMMAND_MAP } from "./presentation/command-registry";
@@ -72,12 +73,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const runLog = createRunLog(workspaceRoot, logger);
 
   // ── Router + middleware ─────────────────────────────────────────────
-  const router = new CommandRouter(logger, runLog);
+  // security.logging.sensitive (default "redact"): error text is redacted
+  // before it is persisted to the run-log unless the user opts into raw logs.
+  const router = new CommandRouter(logger, runLog, (text) =>
+    isSensitiveLoggingEnabled() ? text : sanitizeForLogs(text)
+  );
   router.use(createObservabilityMiddleware(logger, telemetry));
   router.use(createAuditMiddleware(logger));
 
   // ── Domain registration ─────────────────────────────────────────────
-  const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceRoot, generateProse);
+  // Pass the raw (possibly undefined) folder, not the cwd fallback: the
+  // hygiene background scan must never crawl an arbitrary cwd when no
+  // workspace is open. The service skips its timer when root is undefined.
+  const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceFolder, generateProse);
   const gitDomain = createGitDomain(
     gitProvider, logger, workspaceRoot, generateProse,
     runLog, () => hygieneDomain.getLastScan()

@@ -400,6 +400,28 @@ describe('CommandRouter — run log correlation', () => {
     expect(events[1].errorCode).toBe('FAIL');
   });
 
+  it('applies the injected sanitizer to persisted error messages', async () => {
+    const logger = new MockLogger();
+    const { runLog, events } = createMemoryRunLog();
+    const router = new CommandRouter(logger, runLog, (text) =>
+      text.replace(/secret-token/g, '[REDACTED]')
+    );
+
+    router.registerDomain({
+      name: 'run-log-sanitize',
+      handlers: {
+        'git.status': async () => ({
+          kind: 'err' as const,
+          error: { code: 'FAIL', message: 'leaked secret-token in output' },
+        }),
+      },
+    });
+
+    await router.dispatch({ name: 'git.status', params: {} }, createMockContext());
+    expect(events[1].phase).toBe('fail');
+    expect(events[1].errorMessage).toBe('leaked [REDACTED] in output');
+  });
+
   it('propagates parentRunId for nested dispatches', async () => {
     const logger = new MockLogger();
     const { runLog, events } = createMemoryRunLog();

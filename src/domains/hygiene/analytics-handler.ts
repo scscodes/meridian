@@ -3,7 +3,7 @@
  */
 
 import { Handler, CommandContext, success, failure, Logger } from "../../types";
-import { HYGIENE_ERROR_CODES } from "../../infrastructure/error-codes";
+import { HYGIENE_ERROR_CODES, INFRASTRUCTURE_ERROR_CODES } from "../../infrastructure/error-codes";
 import { HygieneAnalyticsReport, PruneConfig, PRUNE_DEFAULTS } from "./analytics-types";
 import { HygieneAnalyzer } from "./analytics-service";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
@@ -15,7 +15,14 @@ export function createShowHygieneAnalyticsHandler(
 ): Handler<Partial<PruneConfig>, HygieneAnalyticsReport> {
   return async (ctx: CommandContext, params: Partial<PruneConfig> = {}) => {
     try {
-      const workspaceRoot = ctx.workspaceFolders?.[0] ?? process.cwd();
+      const workspaceRoot = ctx.workspaceFolders?.[0];
+      if (!workspaceRoot) {
+        return failure({
+          code: INFRASTRUCTURE_ERROR_CODES.WORKSPACE_NOT_FOUND,
+          message: "No workspace folder found",
+          context: "hygiene.showAnalytics",
+        });
+      }
 
       // Merge caller-supplied config with defaults
       const config: PruneConfig = {

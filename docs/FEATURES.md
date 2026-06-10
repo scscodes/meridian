@@ -44,7 +44,7 @@ Scan the workspace for cleanup candidates:
 Respects `.gitignore` and `.meridian/.meridianignore` patterns. Returns a categorized list with file paths, sizes, ages, and reasons.
 
 ### **hygiene.cleanup**
-Delete specified files with optional dry-run mode. Batch removal of candidates surfaced by `hygiene.scan`. Requires user confirmation before deletion.
+Delete specified files. Batch removal of candidates surfaced by `hygiene.scan`. Defaults to dry-run: deletion happens only with an explicit `dryRun: false`, and the user-facing path (**Delete File**) requires a modal confirmation first. Not exposed in the command palette.
 
 ### **hygiene.impactAnalysis**
 Trace the blast radius of a file or function change by analyzing imports, call sites, and test coverage via the TypeScript Compiler API. Returns importers, call sites, dependent file count, test coverage, and an optional prose summary (when a language model is available). Helps assess refactor/removal risk.

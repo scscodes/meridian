@@ -10,7 +10,6 @@ import {
   GitProvider,
   GitStatus,
   GitPullResult,
-  GitStageChange,
   GitFileChange,
   RecentCommit,
   Result,
@@ -235,67 +234,6 @@ class RealGitProvider implements GitProvider {
     return success(hash);
   }
 
-  async getChanges(): Promise<Result<GitStageChange[]>> {
-    const result = await git(
-      ["diff", "--cached", "--name-status"],
-      this.workspaceRoot
-    );
-    if (result.kind === "err") return result;
-
-    const changes: GitStageChange[] = [];
-    for (const line of result.value.split("\n").filter(Boolean)) {
-      const [code, ...rest] = line.split("\t");
-      const filePath = rest.join("\t").trim();
-      if (!filePath) continue;
-
-      let status: GitStageChange["status"] = "modified";
-      if (code === "A") status = "added";
-      else if (code === "D") status = "deleted";
-
-      changes.push({ path: filePath, status });
-    }
-    return success(changes);
-  }
-
-  async getDiff(paths?: string[]): Promise<Result<string>> {
-    const args = ["diff", "--cached"];
-    if (paths && paths.length > 0) {
-      args.push("--", ...paths);
-    }
-    return git(args, this.workspaceRoot);
-  }
-
-  async getUncommittedDiff(paths?: string[]): Promise<Result<string>> {
-    // All changes (staged + unstaged) relative to HEAD
-    const args = ["diff", "HEAD"];
-    if (paths && paths.length > 0) {
-      args.push("--", ...paths);
-    }
-    return git(args, this.workspaceRoot);
-  }
-
-  async stage(paths: string[]): Promise<Result<void>> {
-    if (paths.length === 0) return success(undefined);
-    const result = await git(["add", "--", ...paths], this.workspaceRoot);
-    if (result.kind === "err") return result;
-    return success(undefined);
-  }
-
-  async reset(
-    paths: string[] | { mode: string; ref: string }
-  ): Promise<Result<void>> {
-    let args: string[];
-    if (Array.isArray(paths)) {
-      if (paths.length === 0) return success(undefined);
-      args = ["reset", "HEAD", "--", ...paths];
-    } else {
-      args = ["reset", `--${paths.mode}`, paths.ref];
-    }
-    const result = await git(args, this.workspaceRoot);
-    if (result.kind === "err") return result;
-    return success(undefined);
-  }
-
   async getAllChanges(): Promise<Result<GitFileChange[]>> {
     // --numstat gives: additions<TAB>deletions<TAB>path for each changed file
     const stagedResult = await git(
@@ -392,14 +330,6 @@ class RealGitProvider implements GitProvider {
     return result;
   }
 
-  async diff(
-    revision: string,
-    options?: string[]
-  ): Promise<Result<string>> {
-    const args = ["diff", ...(options ?? []), revision];
-    return git(args, this.workspaceRoot);
-  }
-
   async getRecentCommits(count: number): Promise<Result<RecentCommit[]>> {
     const logResult = await git(
       ["log", `-${count}`, "--pretty=format:%h|%s|%an", "--numstat"],
@@ -407,21 +337,6 @@ class RealGitProvider implements GitProvider {
     );
     if (logResult.kind === "err") return logResult;
     return success(parseCommitLog(logResult.value));
-  }
-
-  async getCommitRange(from: string, to: string = "HEAD"): Promise<Result<RecentCommit[]>> {
-    const logResult = await git(
-      ["log", `${from}..${to}`, "--pretty=format:%h|%s|%an", "--numstat"],
-      this.workspaceRoot
-    );
-    if (logResult.kind === "err") return logResult;
-    return success(parseCommitLog(logResult.value));
-  }
-
-  async getMergeBase(branch: string, base = "main"): Promise<Result<string>> {
-    const result = await git(["merge-base", branch, base], this.workspaceRoot);
-    if (result.kind === "err") return result;
-    return success(result.value.trim());
   }
 
   async getUntrackedFiles(): Promise<Result<string[]>> {

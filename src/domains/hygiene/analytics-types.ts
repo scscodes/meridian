@@ -117,7 +117,7 @@ export interface HygieneAnalyticsReport {
   /** All scanned non-excluded files */
   files: HygieneFileEntry[];
   /** Files satisfying active prune criteria */
-  pruneCandiates: HygieneFileEntry[];
+  pruneCandidates: HygieneFileEntry[];
   /** Top 20 by sizeBytes */
   largestFiles: HygieneFileEntry[];
   /** Top 20 by ageDays */

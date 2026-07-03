@@ -10,7 +10,6 @@ import {
   CommandContext,
   GitStatus,
   GitPullResult,
-  GitStageChange,
   GitFileChange,
   RecentCommit,
   DeadCodeScan,
@@ -67,10 +66,7 @@ export class MockGitProvider implements GitProvider {
     untracked: 0,
   };
 
-  private changes: GitStageChange[] = [];
   private allChanges: GitFileChange[] = [];
-  private diffOutput = '';
-  private stagedPaths: string[] = [];
   private currentBranch = 'main';
   private remoteUrl = 'https://github.com/test/repo.git';
 
@@ -79,16 +75,8 @@ export class MockGitProvider implements GitProvider {
     this.statusValue = status;
   }
 
-  setChanges(changes: GitStageChange[]): void {
-    this.changes = changes;
-  }
-
   setAllChanges(changes: GitFileChange[]): void {
     this.allChanges = changes;
-  }
-
-  setDiff(output: string): void {
-    this.diffOutput = output;
   }
 
   setCurrentBranch(branch: string): void {
@@ -97,10 +85,6 @@ export class MockGitProvider implements GitProvider {
 
   setRemoteUrl(url: string): void {
     this.remoteUrl = url;
-  }
-
-  getStagedPaths(): string[] {
-    return this.stagedPaths;
   }
 
   async status(): Promise<Result<GitStatus>> {
@@ -120,29 +104,6 @@ export class MockGitProvider implements GitProvider {
     return success(hash);
   }
 
-  async getChanges(): Promise<Result<GitStageChange[]>> {
-    return success(this.changes);
-  }
-
-  async getDiff(): Promise<Result<string>> {
-    return success(this.diffOutput);
-  }
-
-  async getUncommittedDiff(): Promise<Result<string>> {
-    return success(this.diffOutput);
-  }
-
-  async stage(paths: string[]): Promise<Result<void>> {
-    this.stagedPaths = paths;
-    return success(void 0);
-  }
-
-  async reset(
-    paths: string[] | { mode: string; ref: string }
-  ): Promise<Result<void>> {
-    return success(void 0);
-  }
-
   async getAllChanges(): Promise<Result<GitFileChange[]>> {
     return success(this.allChanges);
   }
@@ -159,20 +120,8 @@ export class MockGitProvider implements GitProvider {
     return success(this.currentBranch);
   }
 
-  async diff(revision: string, options?: string[]): Promise<Result<string>> {
-    return success(`diff ${revision}\n${this.diffOutput}`);
-  }
-
   async getRecentCommits(_count: number): Promise<Result<RecentCommit[]>> {
     return success([]);
-  }
-
-  async getCommitRange(_from: string, _to?: string): Promise<Result<RecentCommit[]>> {
-    return this.getRecentCommits(20);
-  }
-
-  async getMergeBase(_branch: string, _base?: string): Promise<Result<string>> {
-    return success("abc0000");
   }
 
   async getUntrackedFiles(): Promise<Result<string[]>> {
@@ -281,6 +230,17 @@ export class MockWorkspaceProvider implements WorkspaceProvider {
       });
     }
     return success(content);
+  }
+
+  async statFile(path: string): Promise<Result<{ sizeBytes: number }>> {
+    const content = this.files.get(path);
+    if (content === undefined) {
+      return failure({
+        code: 'FILE_NOT_FOUND',
+        message: `File not found: ${path}`,
+      });
+    }
+    return success({ sizeBytes: Buffer.byteLength(content, 'utf8') });
   }
 
   async deleteFile(path: string): Promise<Result<void>> {

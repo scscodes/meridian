@@ -47,7 +47,7 @@ export function registerSpecializedCommands(
       if (confirm !== "Delete") return;
       const freshCtx = getCommandContext();
       const result = await router.dispatch(
-        { name: "hygiene.cleanup", params: { files: [filePath] } }, freshCtx
+        { name: "hygiene.cleanup", params: { files: [filePath], dryRun: false } }, freshCtx
       );
       if (result.kind === "ok") {
         vscode.window.showInformationMessage(`Deleted: ${filename}`);
@@ -60,7 +60,11 @@ export function registerSpecializedCommands(
     vscode.commands.registerCommand("meridian.hygiene.ignoreFile", async (item: FileActionItem) => {
       const filePath = extractFilePath(item);
       if (!filePath) return;
-      const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+      const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!wsRoot) {
+        vscode.window.showErrorMessage("Open a workspace folder to use Meridian ignore patterns.");
+        return;
+      }
       const result = appendIgnorePattern(wsRoot, filePath, "file");
       if (result.kind === "err") {
         vscode.window.showErrorMessage(result.error.message);

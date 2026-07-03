@@ -48,45 +48,6 @@ export const MERIDIAN_ARTIFACTS_DIR = "artifacts";
 export const MERIDIAN_PULSE_DIR = "pulse";
 
 // ============================================================================
-// Git Configuration Defaults
-// ============================================================================
-
-export const GIT_DEFAULTS = {
-  /** Default remote name */
-  DEFAULT_REMOTE: "origin" as const,
-
-  /** Default main branch */
-  DEFAULT_BRANCH: "main" as const,
-
-  /** Fallback branch if main doesn't exist */
-  FALLBACK_BRANCH: "master" as const,
-
-  /** Default depth for shallow clones (0 = full clone) */
-  CLONE_DEPTH: 0,
-
-  /** Whether to auto-fetch before operations */
-  AUTO_FETCH: false,
-
-  /** Whether to clean branches after merge */
-  AUTO_BRANCH_CLEAN: true,
-
-  /** Commit message minimum length (characters) */
-  MIN_MESSAGE_LENGTH: 5,
-
-  /** Commit message maximum length (characters) */
-  MAX_MESSAGE_LENGTH: 72,
-
-  /** Maximum number of inbound changes to process */
-  MAX_INBOUND_CHANGES: 100,
-
-  /** Git operation timeout in milliseconds */
-  OPERATION_TIMEOUT_MS: 30 * 1000,
-
-  /** Maximum diff size in bytes before truncation (for LLM token safety) */
-  MAX_DIFF_BYTES: 50_000,
-} as const;
-
-// ============================================================================
 // Workspace Exclusion Base — shared across git and hygiene analytics.
 // Domain-specific lists extend via spread.
 // ============================================================================
@@ -169,40 +130,17 @@ export const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
 ] as const;
 
 // ============================================================================
-// Logging Configuration
-// ============================================================================
-
-export const LOG_SETTINGS = {
-  /** Default log level */
-  DEFAULT_LEVEL: "info" as const,
-
-  /** Available log levels */
-  LEVELS: ["debug", "info", "warn", "error"] as const,
-
-  /** Maximum entries per log level */
-  MAX_ENTRIES_PER_LEVEL: 250,
-
-  /** Whether to include timestamps in logs */
-  INCLUDE_TIMESTAMPS: true,
-
-  /** Whether to include context in logs */
-  INCLUDE_CONTEXT: true,
-} as const;
-
-// ============================================================================
 // Telemetry Event Types
 // ============================================================================
 
-// Workflow/agent kinds were removed with their domains (ADR 012); the run-log
-// schema's inert RunEventSource members are a separate, deliberate retention.
+// Command lifecycle only — the workflow/agent/cache/user-action kinds were
+// pruned with their dead consumers (ADR 012 fallout; security-hardening pass).
+// The run-log schema's inert RunEventSource members are a separate,
+// deliberate retention.
 export const TELEMETRY_EVENT_KINDS = {
   COMMAND_STARTED: "COMMAND_STARTED",
   COMMAND_COMPLETED: "COMMAND_COMPLETED",
   COMMAND_FAILED: "COMMAND_FAILED",
-  CACHE_HIT: "CACHE_HIT",
-  CACHE_MISS: "CACHE_MISS",
-  ERROR_OCCURRED: "ERROR_OCCURRED",
-  USER_ACTION: "USER_ACTION",
 } as const;
 
 // ============================================================================

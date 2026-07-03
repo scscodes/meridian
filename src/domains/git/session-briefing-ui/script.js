@@ -113,7 +113,7 @@
     // All three summary cards open the Source Control view (single VS Code
     // built-in command, no payload; handled host-side as type:"openScm").
     return '<div class="card card-clickable" data-action="openScm" title="Open Source Control">' +
-      '<h3>' + esc(label) + '</h3><p class="value">' + value + '</p></div>';
+      '<h3>' + esc(label) + '</h3><p class="value">' + (Number(value) || 0) + '</p></div>';
   }
 
   // Map known flag prefixes to a section anchor for scroll-to. Flag strings
@@ -277,7 +277,7 @@
       return;
     }
     section.style.display = "";
-    document.getElementById("activityPeriod").textContent = "(" + esc(w.period) + ")";
+    document.getElementById("activityPeriod").textContent = "(" + (w.period == null ? "" : String(w.period)) + ")";
 
     var cards = [
       metricCard("Commits", w.commitsInWindow),
@@ -514,8 +514,8 @@
         '<td><span class="hash">' + esc(c.shortHash) + '</span></td>' +
         '<td>' + esc(c.author) + '</td>' +
         '<td class="commit-msg">' + esc(c.message) + '</td>' +
-        '<td class="ins-count">+' + c.insertions + '</td>' +
-        '<td class="del-count">-' + c.deletions + '</td>' +
+        '<td class="ins-count">+' + (Number(c.insertions) || 0) + '</td>' +
+        '<td class="del-count">-' + (Number(c.deletions) || 0) + '</td>' +
         '</tr>';
     }).join("");
     updateSortIndicators();
@@ -719,6 +719,6 @@
   // ── Util ───────────────────────────────────────────────────────────
   function esc(str) {
     if (str == null) return "";
-    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
   }
 })();

@@ -98,9 +98,12 @@ export class DeadCodeAnalyzer {
       };
     }
 
-    // 2. Only files inside workspaceRoot; skip declaration files
+    // 2. Only files inside workspaceRoot; skip declaration files.
+    // Trailing separator so a sibling like "/repo-other" never matches "/repo".
+    const rootPrefix = workspaceRoot.endsWith(path.sep) ? workspaceRoot : workspaceRoot + path.sep;
+    const insideRoot = (f: string): boolean => f.startsWith(rootPrefix) || f.startsWith(rootPrefix.replace(/\\/g, "/"));
     const relevantFiles = fileNames.filter(
-      (f) => f.startsWith(workspaceRoot) && !f.endsWith(".d.ts")
+      (f) => insideRoot(f) && !f.endsWith(".d.ts")
     );
 
     // 3. Create program and collect diagnostics
@@ -109,7 +112,7 @@ export class DeadCodeAnalyzer {
 
     for (const sourceFile of program.getSourceFiles()) {
       const filePath = sourceFile.fileName;
-      if (!filePath.startsWith(workspaceRoot) || filePath.endsWith(".d.ts")) {
+      if (!insideRoot(filePath) || filePath.endsWith(".d.ts")) {
         continue;
       }
 

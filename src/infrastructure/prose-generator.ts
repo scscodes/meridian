@@ -27,10 +27,6 @@ export async function generateProse(request: ProseRequest): Promise<Result<strin
       });
     }
 
-    const dataStr = request.formatData
-      ? request.formatData(request.data)
-      : JSON.stringify(request.data, null, 2);
-
     const permitted = await enforceLmEgressPolicy(request.domain);
     if (!permitted) {
       return failure({
@@ -39,6 +35,10 @@ export async function generateProse(request: ProseRequest): Promise<Result<strin
         context: "generateProse",
       });
     }
+
+    const dataStr = request.formatData
+      ? request.formatData(request.data)
+      : JSON.stringify(request.data, null, 2);
 
     const messages = [
       vscode.LanguageModelChatMessage.User(`${request.systemPrompt}\n\n---\n\n${sanitizeLmPayload(dataStr)}`),
@@ -58,56 +58,6 @@ export async function generateProse(request: ProseRequest): Promise<Result<strin
       code: "PROSE_GENERATION_ERROR",
       message: `Prose generation failed: ${err instanceof Error ? err.message : String(err)}`,
       context: "generateProse",
-    });
-  }
-}
-
-export async function streamProse(
-  request: ProseRequest,
-  sink: (fragment: string) => void
-): Promise<Result<string>> {
-  try {
-    const model = await selectModel(request.domain);
-    if (!model) {
-      return failure({
-        code: "MODEL_UNAVAILABLE",
-        message: "No language model available. Ensure GitHub Copilot is enabled.",
-        context: "streamProse",
-      });
-    }
-
-    const dataStr = request.formatData
-      ? request.formatData(request.data)
-      : JSON.stringify(request.data, null, 2);
-
-    const permitted = await enforceLmEgressPolicy(request.domain);
-    if (!permitted) {
-      return failure({
-        code: "LM_EGRESS_BLOCKED",
-        message: "LM egress blocked by security policy.",
-        context: "streamProse",
-      });
-    }
-
-    const messages = [
-      vscode.LanguageModelChatMessage.User(`${request.systemPrompt}\n\n---\n\n${sanitizeLmPayload(dataStr)}`),
-    ];
-
-    const cts = new vscode.CancellationTokenSource();
-    const response = await model.sendRequest(messages, {}, cts.token);
-
-    let text = "";
-    for await (const fragment of response.text) {
-      text += fragment;
-      sink(fragment);
-    }
-
-    return success(text.trim());
-  } catch (err) {
-    return failure({
-      code: "PROSE_GENERATION_ERROR",
-      message: `Prose generation failed: ${err instanceof Error ? err.message : String(err)}`,
-      context: "streamProse",
     });
   }
 }

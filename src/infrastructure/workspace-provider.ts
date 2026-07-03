@@ -26,6 +26,13 @@ function fsError(code: string, op: string, filePath: string, err: unknown): AppE
 }
 
 /**
+ * Directories never worth descending into. Every consumer's exclude list
+ * already filters these out of results; pruning them during the walk avoids
+ * traversing the (typically largest) trees in the workspace at all.
+ */
+const PRUNED_DIRS = new Set([".git", "node_modules"]);
+
+/**
  * Recursively collect all file paths under a directory, applying a simple
  * glob-style include pattern. Supports ** prefix and suffix wildcards only.
  * Does not follow symlinks.
@@ -36,6 +43,7 @@ async function collectFiles(
   logger?: Logger
 ): Promise<string[]> {
   const results: string[] = [];
+  const matches = compilePattern(pattern);
 
   async function walk(current: string): Promise<void> {
     let entries: Dirent[];
@@ -52,8 +60,10 @@ async function collectFiles(
     for (const entry of entries) {
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        await walk(fullPath);
-      } else if (entry.isFile() && matchesPattern(entry.name, pattern)) {
+        if (!PRUNED_DIRS.has(entry.name)) {
+          await walk(fullPath);
+        }
+      } else if (entry.isFile() && matches(entry.name)) {
         results.push(fullPath);
       }
     }
@@ -64,18 +74,21 @@ async function collectFiles(
 }
 
 /**
- * Minimal glob pattern matching: supports leading **, *, and literal strings.
- * Matches against the file name only (not the full path).
+ * Compile a minimal glob (leading **, *, and literal strings) into a
+ * file-name predicate. Matches against the file name only (not the full path).
  */
-function matchesPattern(name: string, pattern: string): boolean {
+function compilePattern(pattern: string): (name: string) => boolean {
   // Strip leading **/ and */ prefixes — matching is against file name
   const base = pattern.replace(/^\*+\//, "");
 
-  if (base === "*" || base === "**") return true;
+  if (base === "*" || base === "**") return () => true;
 
-  // Convert simple glob to regex: * → .*, . → \.
-  const escaped = base.replace(/\./g, "\\.").replace(/\*/g, ".*");
-  return new RegExp(`^${escaped}$`).test(name);
+  // Escape regex metacharacters, then expand * → .*
+  const escaped = base
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  const regex = new RegExp(`^${escaped}$`);
+  return (name: string) => regex.test(name);
 }
 
 class RealWorkspaceProvider implements WorkspaceProvider {
@@ -107,18 +120,55 @@ class RealWorkspaceProvider implements WorkspaceProvider {
     }
   }
 
-  async deleteFile(filePath: string): Promise<Result<void>> {
+  async statFile(filePath: string): Promise<Result<{ sizeBytes: number }>> {
     let resolved: string;
     try {
       resolved = resolveWorkspacePath(this.workspaceRoot, filePath);
     } catch (err) {
+      return failure(fsError("FILE_READ_ERROR", "statFile", filePath, err));
+    }
+    try {
+      const stat = await fs.stat(resolved);
+      return success({ sizeBytes: stat.size });
+    } catch (err) {
+      return failure(fsError("FILE_READ_ERROR", "statFile", resolved, err));
+    }
+  }
+
+  async deleteFile(filePath: string): Promise<Result<void>> {
+    // Guard the parent directory (realpath + workspace containment), then
+    // unlink the entry itself. Realpathing the full candidate would follow a
+    // final-component symlink and delete its target instead of the link.
+    let target: string;
+    try {
+      const abs = path.isAbsolute(filePath)
+        ? path.resolve(filePath)
+        : path.resolve(this.workspaceRoot, filePath);
+      const base = path.basename(abs);
+      if (!base || base === "." || base === "..") {
+        throw new Error("Invalid delete target");
+      }
+      const parent = resolveWorkspacePath(this.workspaceRoot, path.dirname(abs));
+      target = path.join(parent, base);
+    } catch (err) {
       return failure(fsError("FILE_DELETE_ERROR", "deleteFile", filePath, err));
     }
     try {
-      await fs.unlink(resolved);
+      const stat = await fs.lstat(target);
+      if (stat.isDirectory()) {
+        return failure(
+          fsError(
+            "FILE_DELETE_ERROR",
+            "deleteFile",
+            target,
+            new Error("Refusing to delete a directory")
+          )
+        );
+      }
+      await fs.unlink(target);
       return success(undefined);
     } catch (err) {
-      return failure(fsError("FILE_DELETE_ERROR", "deleteFile", resolved, err));
+      return failure(fsError("FILE_DELETE_ERROR", "deleteFile", target, err));
     }
   }
 }

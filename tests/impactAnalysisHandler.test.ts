@@ -10,16 +10,21 @@ import type { GenerateProseFn } from "../src/types";
 import { MockLogger } from "./fixtures";
 
 // ── Mock TypeScript compiler API ──────────────────────────────────────────────
-vi.mock("typescript", () => ({
-  findConfigFile: vi.fn().mockReturnValue("/ws/tsconfig.json"),
-  readConfigFile: vi.fn().mockReturnValue({ config: {}, error: undefined }),
-  parseJsonConfigFileContent: vi.fn().mockReturnValue({
-    fileNames: ["/ws/src/main.ts"],
-    options: {},
-  }),
-  createProgram: vi.fn().mockReturnValue({}),
-  sys: { fileExists: vi.fn().mockReturnValue(true), readFile: vi.fn() },
-}));
+// typescript is CJS; expose the mock as both named exports and `default` so
+// `import * as ts` resolves the same members under vitest's CJS interop.
+vi.mock("typescript", () => {
+  const tsMock = {
+    findConfigFile: vi.fn().mockReturnValue("/ws/tsconfig.json"),
+    readConfigFile: vi.fn().mockReturnValue({ config: {}, error: undefined }),
+    parseJsonConfigFileContent: vi.fn().mockReturnValue({
+      fileNames: ["/ws/src/main.ts"],
+      options: {},
+    }),
+    createProgram: vi.fn().mockReturnValue({}),
+    sys: { fileExists: vi.fn().mockReturnValue(true), readFile: vi.fn() },
+  };
+  return { ...tsMock, default: tsMock };
+});
 
 // ── Mock ImpactAnalysisVisitor ────────────────────────────────────────────────
 const mockVisitorAnalyze = vi.fn().mockReturnValue({
@@ -29,9 +34,10 @@ const mockVisitorAnalyze = vi.fn().mockReturnValue({
 });
 
 vi.mock("../src/domains/hygiene/impact-visitor", () => ({
-  ImpactAnalysisVisitor: vi.fn().mockImplementation(() => ({
-    analyze: mockVisitorAnalyze,
-  })),
+  // vitest 4: a mock must use `function`/`class` to be constructible with `new`.
+  ImpactAnalysisVisitor: vi.fn().mockImplementation(function () {
+    return { analyze: mockVisitorAnalyze };
+  }),
 }));
 
 import { createImpactAnalysisHandler } from "../src/domains/hygiene/impact-analysis-handler";

@@ -495,6 +495,18 @@ h3.sub {
   margin: 0 0 14px;
 }
 
+/* Pulse trend charts sit side-by-side where width allows, stack otherwise. */
+#pulseTrendBlock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+}
+
+.pulse-trend {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
 .risk {
   display: inline-block;
   padding: 1px 8px;

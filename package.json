@@ -103,6 +103,11 @@
         "category": "Meridian"
       },
       {
+        "command": "meridian.hygiene.pruneStorage",
+        "title": "Hygiene: Prune Meridian Storage",
+        "icon": "$(trash)"
+      },
+      {
         "command": "meridian.git.refresh",
         "title": "Git: Refresh View",
         "category": "Meridian",
@@ -270,6 +275,24 @@
           ],
           "description": "File categories that are automatically flagged as prune candidates when older than minAgeDays."
         },
+        "meridian.retention.artifacts.maxCount": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "description": "Keep at most this many exported reports in .meridian/artifacts/ (oldest pruned first, enforced at activation and after each quick-save). Set to 0 to disable."
+        },
+        "meridian.retention.artifacts.maxAgeDays": {
+          "type": "number",
+          "default": 30,
+          "minimum": 0,
+          "description": "Prune exported reports in .meridian/artifacts/ older than this many days (enforced at activation and after each quick-save). Set to 0 to disable."
+        },
+        "meridian.retention.runLog.maxEvents": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 0,
+          "description": "Compact the run log (.vscode/meridian/run-log.v1.jsonl) to its newest N events at activation. Set to 0 to disable."
+        },
         "meridian.sessionBriefing.autoLaunch": {
           "type": "boolean",
           "default": false,
@@ -366,6 +389,10 @@
           "when": "workspaceFolderCount > 0"
         },
         {
+          "command": "meridian.hygiene.pruneStorage",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
           "command": "meridian.hygiene.ignoreFile",
           "when": "workspaceFolderCount > 0"
         },
@@ -425,6 +452,11 @@
           "command": "meridian.hygiene.ignoreFile",
           "when": "view == meridian.hygiene.view && viewItem =~ /file/",
           "group": "hygiene@3"
+        },
+        {
+          "command": "meridian.hygiene.pruneStorage",
+          "when": "view == meridian.hygiene.view && viewItem == storageSection",
+          "group": "inline"
         }
       ],
       "view/item/inline": [

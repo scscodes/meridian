@@ -27,6 +27,7 @@ const SPECIALIZED_COMMANDS = new Set([
   "meridian.hygiene.deleteFile",
   "meridian.hygiene.ignoreFile",
   "meridian.hygiene.impactAnalysis", // ADR 005: active-file fallback + InputBox prompt
+  "meridian.hygiene.pruneStorage",   // ADR 019: status preview + confirmation modal
 ]);
 
 /** View lifecycle commands. No routing, no palette exposure. */

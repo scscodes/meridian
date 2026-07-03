@@ -72,6 +72,24 @@ function deterministicSummary(agg: SessionBriefing): string {
     }
   }
 
+  if (agg.pulse?.deltas && agg.pulse.previousAt) {
+    const d = agg.pulse.deltas;
+    const parts: string[] = [];
+    const fmt = (label: string, v: number | undefined): void => {
+      if (v !== undefined && v !== 0) parts.push(`${label} ${v > 0 ? "+" : ""}${v}`);
+    };
+    fmt("commits-in-window", d.commitsInWindow);
+    fmt("files-touched", d.filesTouched);
+    fmt("dead files", d.deadFileCount);
+    fmt("large files", d.largeFileCount);
+    fmt("dead-code items", d.deadCodeItemCount);
+    fmt("uncommitted", d.uncommittedCount);
+    lines.push(
+      `Pulse since ${agg.pulse.previousAt}: ` +
+        (parts.length > 0 ? parts.join(", ") + "." : "no movement.")
+    );
+  }
+
   if (agg.pendingChangeRisk && agg.pendingChangeRisk.totalChanged > 0) {
     const p = agg.pendingChangeRisk;
     lines.push(
@@ -154,6 +172,7 @@ export function createSessionBriefingHandler(
         hygieneSnapshot: agg.hygieneSnapshot,
         pendingChangeRisk: agg.pendingChangeRisk,
         pendingChangeCompanions: agg.pendingChangeCompanions,
+        pulse: agg.pulse,
       },
     });
 

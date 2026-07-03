@@ -15,6 +15,8 @@ import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider"
 import { copyWithPolicy } from "../security/operation-policy";
 import { appendIgnorePattern } from "../security/ignore-store";
 import type { ImpactAnalysisResult } from "../domains/hygiene/impact-analysis-handler";
+import type { PruneStorageOutcome } from "../domains/hygiene/storage-handler";
+import type { StorageStatus } from "../infrastructure/retention";
 
 const HR = "─".repeat(UI_SETTINGS.OUTPUT_HR_LENGTH);
 
@@ -70,6 +72,59 @@ export function registerSpecializedCommands(
           : `Added to .meridian/.meridianignore: ${result.value.pattern}`
       );
       hygieneTree.refresh();
+    }),
+
+    // ── hygiene.pruneStorage (ADR 019) — status → confirm → prune → toast ──
+    vscode.commands.registerCommand("meridian.hygiene.pruneStorage", async () => {
+      const freshCtx = getCommandContext();
+
+      const statusResult = await router.dispatch(
+        { name: "hygiene.storageStatus", params: {} }, freshCtx
+      );
+      if (statusResult.kind === "err") {
+        vscode.window.showErrorMessage(`Storage status failed: ${statusResult.error.message}`);
+        return;
+      }
+      const status = statusResult.value as StorageStatus;
+      const overCap = status.policy.runLogMaxEvents > 0
+        ? Math.max(0, status.runLog.lineCount - status.policy.runLogMaxEvents)
+        : 0;
+
+      if (status.artifacts.wouldPruneCount === 0 && overCap === 0) {
+        vscode.window.showInformationMessage(
+          "Meridian storage is within policy — nothing to prune."
+        );
+        return;
+      }
+
+      const mb = (status.artifacts.wouldPruneBytes / (1024 * 1024)).toFixed(2);
+      const parts: string[] = [];
+      if (status.artifacts.wouldPruneCount > 0) {
+        parts.push(`${status.artifacts.wouldPruneCount} exported report(s) (${mb} MB)`);
+      }
+      if (overCap > 0) {
+        parts.push(`${overCap} run-log event(s)`);
+      }
+      const confirm = await vscode.window.showWarningMessage(
+        `Prune Meridian storage? This removes ${parts.join(" and ")} per the current retention settings.`,
+        { modal: true }, "Prune"
+      );
+      if (confirm !== "Prune") return;
+
+      const result = await router.dispatch(
+        { name: "hygiene.pruneStorage", params: {} }, freshCtx
+      );
+      if (result.kind === "ok") {
+        const outcome = result.value as PruneStorageOutcome;
+        const freedMb = (outcome.artifacts.freedBytes / (1024 * 1024)).toFixed(2);
+        vscode.window.showInformationMessage(
+          `Pruned ${outcome.artifacts.deletedCount} report(s) (${freedMb} MB), ` +
+            `compacted ${outcome.runLogDropped} run-log event(s).`
+        );
+        hygieneTree.refresh();
+      } else {
+        vscode.window.showErrorMessage(`Prune failed: ${result.error.message}`);
+      }
     }),
   );
 

@@ -25,7 +25,7 @@ Open a full-screen dashboard displaying Git analytics: churn (commits per file),
 **Export (all report dashboards).** Each report webview (Git Analytics, Hygiene Analytics, Session Briefing) offers two save paths: **↓ CSV / ↓ JSON** quick-save the report dialog-free to `.meridian/artifacts/` with a timestamped filename (per [ADR 014](./adr/014-dotdir-doctrine.md); the dir self-ignores so artifacts never enter git), and **Save as…** opens a dialog (format + location) for saving anywhere.
 
 ### **git.sessionBriefing**
-Generate a session-orientation summary. Aggregates git working-tree status, recent commits, run-log activity (`recentRuns`), git analytics (`activityWindow` — including momentum trends and a commit-frequency sparkline showing the shape behind the trend arrow), hygiene scan state (`hygieneSnapshot`), and a pending-change risk preview (`pendingChangeRisk` — each uncommitted file joined against the computed analytics risk model: churn, volatility, and risk tier, with files absent from the analytics window marked `new` (no history) or `cold` (changed but quiet — low, not unknown); a flag is raised when several high-risk files are in flight), and a pending-change companion preview (`pendingChangeCompanions` — files that historically ship in the same commit as your current edits but are not in the dirty set yet, i.e. possibly-forgotten siblings such as tests/types/docs; a flag is raised when several are likely missing) into a deterministic `SessionBriefing` record, then layers optional AI prose on top. Optional slices degrade gracefully when data is unavailable; the prose layer degrades to the raw aggregate when no language model is available. Useful for standup notes, context switching, pre-commit risk triage, or morning orientation.
+Generate a session-orientation summary. Aggregates git working-tree status, recent commits, run-log activity (`recentRuns`), git analytics (`activityWindow` — including momentum trends and a commit-frequency sparkline showing the shape behind the trend arrow), hygiene scan state (`hygieneSnapshot`), and a pending-change risk preview (`pendingChangeRisk` — each uncommitted file joined against the computed analytics risk model: churn, volatility, and risk tier, with files absent from the analytics window marked `new` (no history) or `cold` (changed but quiet — low, not unknown); a flag is raised when several high-risk files are in flight), and a pending-change companion preview (`pendingChangeCompanions` — files that historically ship in the same commit as your current edits but are not in the dirty set yet, i.e. possibly-forgotten siblings such as tests/types/docs; a flag is raised when several are likely missing), and a longitudinal pulse slice (`pulse` — movement since your previous briefing plus trend lines over the stored history in `.meridian/pulse/`; snapshots are captured automatically per briefing, throttled to one per 10 minutes, capped and local-only per [ADR 019](./adr/019-pulse-and-retention.md)) into a deterministic `SessionBriefing` record, then layers optional AI prose on top. Optional slices degrade gracefully when data is unavailable; the prose layer degrades to the raw aggregate when no language model is available. Useful for standup notes, context switching, pre-commit risk triage, or morning orientation.
 
 ---
 
@@ -41,7 +41,7 @@ Scan the workspace for cleanup candidates:
 - **Log files**: stale `.log` files above age and size thresholds
 - **Markdown files**: documentation artifacts for review or archival
 
-Respects `.gitignore` and `.meridian/.meridianignore` patterns. Returns a categorized list with file paths, sizes, ages, and reasons.
+Respects `.gitignore` and `.meridian/.meridianignore` patterns. Exclusions are ecosystem-aware ([ADR 018](./adr/018-ecosystem-registry.md)): envs, caches, vendored deps, and build outputs for JS/TS, Python, JVM (Maven/Gradle/Kotlin/Scala), Go, Rust, .NET, Ruby, Elixir, and more derive from a single registry (`src/ecosystems.ts`). Returns a categorized list with file paths, sizes, ages, and reasons.
 
 ### **hygiene.cleanup**
 Delete specified files with optional dry-run mode. Batch removal of candidates surfaced by `hygiene.scan`. Requires user confirmation before deletion.
@@ -55,6 +55,9 @@ Open a dashboard displaying Hygiene analytics: prune candidates over time, file-
 ### File actions (sidebar / explorer context)
 - **Delete File** — remove a file flagged by the last scan (confirmation required).
 - **Ignore File** — append the file's pattern to `.meridian/.meridianignore`.
+
+### **hygiene.pruneStorage** (Meridian Storage)
+Meridian polices its own storage ([ADR 019](./adr/019-pulse-and-retention.md)). The Hygiene view's **Meridian Storage** section shows the footprint of `.meridian/artifacts/` (exported reports), the run log, and the pulse history — including what the current retention policy would prune. **Prune Now** (inline action or `Hygiene: Prune Meridian Storage`) previews the effect, asks for confirmation, then deletes aged/surplus exports and compacts the run log. Retention is also enforced automatically at activation and after each report export.
 
 ---
 
@@ -81,6 +84,9 @@ All features respect workspace settings under the `meridian.*` namespace, includ
 - `meridian.hygiene.prune.minAgeDays` — Minimum file age (days) before a file is a prune candidate (number, default: 30)
 - `meridian.hygiene.prune.maxSizeMB` — Files larger than this (MB) are flagged when also older than `minAgeDays` (number, default: 1)
 - `meridian.hygiene.prune.minLineCount` — Files with this many lines or more are flagged when also older than `minAgeDays`; 0 disables (number, default: 0)
+- `meridian.retention.artifacts.maxCount` — Keep at most N exported reports in `.meridian/artifacts/`; 0 disables (number, default: 50)
+- `meridian.retention.artifacts.maxAgeDays` — Prune exported reports older than N days; 0 disables (number, default: 30)
+- `meridian.retention.runLog.maxEvents` — Compact the run log to its newest N events at activation; 0 disables (number, default: 5000)
 - `meridian.sessionBriefing.autoLaunch` — Open a Session Briefing on activation (boolean, default: false)
 - `meridian.startup.enableFileWatchers` — Register file watchers for auto tree/status refresh (boolean, default: true)
 
@@ -90,6 +96,7 @@ Per-workspace Meridian state lives under `.meridian/` at the workspace root (see
 
 - `.meridian/.meridianignore` — gitignore-syntax patterns excluded from hygiene scans. Editor syntax highlighting is provided via the built-in `ignore` language association. Legacy `.meridianignore` at the workspace root is auto-relocated on activation.
 - `.meridian/settings.json` — sparse JSON overrides for `meridian.*` settings. Present keys take precedence over VS Code user/workspace settings; absent keys fall through. Example: `{ "hygiene.prune.minAgeDays": 7 }`.
+- `.meridian/pulse/` — local, self-gitignored pulse history (`pulse.v1.jsonl`) behind the session briefing's pulse slice; self-capping, no maintenance needed ([ADR 019](./adr/019-pulse-and-retention.md)).
 
 ---
 

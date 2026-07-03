@@ -16,8 +16,10 @@ import {
   success,
 } from "../types";
 import { INFRASTRUCTURE_ERROR_CODES } from "./error-codes";
+import { compactJsonlTail } from "./jsonl-tail";
 
-const RUN_LOG_RELATIVE_PATH = ".vscode/meridian/run-log.v1.jsonl";
+/** Host-runtime run-log path, relative to the workspace root (ADR 009/014). */
+export const RUN_LOG_RELATIVE_PATH = ".vscode/meridian/run-log.v1.jsonl";
 
 export function createRunEventId(): string {
   return randomUUID();
@@ -32,6 +34,13 @@ export interface RunLog {
   appendMany(events: RunEventV1[]): Promise<Result<void>>;
   readByRunId(runId: string): Promise<Result<RunEventV1[]>>;
   readLatest(limit: number): Promise<Result<RunEventV1[]>>;
+  /**
+   * Retention (ADR 019): keep only the newest `maxEvents` lines, atomically.
+   * `maxEvents <= 0` disables. Resolves the number of lines dropped. Runs
+   * inside the write queue so it cannot race an in-flight append. Raw-line
+   * tail-keep — never parses, so the v1 schema pinning is untouched.
+   */
+  compact(maxEvents: number): Promise<Result<number>>;
 }
 
 function makeError(
@@ -98,6 +107,29 @@ export class FileRunLog implements RunLog {
     if (all.kind === "err") return all;
     if (safeLimit === 0) return success([]);
     return success(all.value.slice(-safeLimit));
+  }
+
+  async compact(maxEvents: number): Promise<Result<number>> {
+    try {
+      let dropped = 0;
+      const task = this.writeQueue.then(async () => {
+        dropped = await compactJsonlTail(this.filePath, maxEvents);
+      });
+      this.writeQueue = task.catch(() => {
+        // Error propagates to this caller; the queue itself must not stall.
+      });
+      await task;
+      return success(dropped);
+    } catch (err) {
+      return failure(
+        makeError(
+          INFRASTRUCTURE_ERROR_CODES.RUN_LOG_WRITE_ERROR,
+          `Run log: compaction failed (${this.filePath})`,
+          err,
+          "FileRunLog.compact"
+        )
+      );
+    }
   }
 
   private async enqueueWrite(payload: string): Promise<void> {

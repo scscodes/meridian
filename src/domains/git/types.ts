@@ -126,6 +126,37 @@ export interface PendingChangeCompanions {
   files: PendingCompanion[];
 }
 
+/** One point of the pulse series — a stored snapshot reduced to chartable fields. */
+export interface PulsePoint {
+  timestampMs: number;
+  uncommittedCount: number;
+  commitsInWindow?: number;
+  deadFileCount?: number;
+}
+
+/**
+ * Longitudinal pulse — how the workspace moved since the previous briefing
+ * (ADR 019). Additive, optional, fail-soft slice (ADR 011 rule): present iff
+ * a pulse store was injected and readable. `deltas` fields are current minus
+ * previous, present only when both sides were measured; `series` is
+ * oldest→newest and includes the current (possibly not-yet-stored) point;
+ * `appended` is false when the store's min-interval throttle suppressed the
+ * write for this briefing.
+ */
+export interface PulseSlice {
+  previousAt?: string;
+  deltas?: {
+    uncommittedCount: number;
+    commitsInWindow?: number;
+    filesTouched?: number;
+    deadFileCount?: number;
+    largeFileCount?: number;
+    deadCodeItemCount?: number;
+  };
+  series: PulsePoint[];
+  appended: boolean;
+}
+
 export interface SessionBriefing {
   generatedAt: string;
   branch: string;
@@ -141,6 +172,7 @@ export interface SessionBriefing {
   hygieneSnapshot?: HygieneSnapshot;
   pendingChangeRisk?: PendingChangeRisk;
   pendingChangeCompanions?: PendingChangeCompanions;
+  pulse?: PulseSlice;
 }
 
 export type SessionBriefingReport = SessionBriefing & { summary: string };

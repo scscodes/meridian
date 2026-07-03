@@ -216,6 +216,13 @@ export class MockRunLog implements RunLog {
     const safe = Math.max(0, Math.trunc(limit));
     return success(safe === 0 ? [] : this.events.slice(-safe));
   }
+
+  async compact(maxEvents: number): Promise<Result<number>> {
+    if (maxEvents <= 0 || this.events.length <= maxEvents) return success(0);
+    const dropped = this.events.length - maxEvents;
+    this.events = this.events.slice(-maxEvents);
+    return success(dropped);
+  }
 }
 
 // ============================================================================

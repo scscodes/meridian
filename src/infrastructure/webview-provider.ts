@@ -12,6 +12,21 @@ import { appendIgnorePattern } from "../security/ignore-store";
 import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
 import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
 import type { ReportOpenArg } from "../ui/tree-providers/reports-tree-provider";
+import type { Logger } from "../types";
+import { getRetentionPolicy, pruneArtifacts } from "./retention";
+
+/**
+ * Console-backed Logger for the fire-and-forget retention call — this module
+ * predates Logger injection and reports via the console (see handleError);
+ * the adapter keeps that convention rather than churning three provider
+ * constructors for one background call.
+ */
+const consoleLoggerAdapter: Logger = {
+  debug: () => { /* retention emits no debug output here */ },
+  info: (message) => console.log(`[Meridian] ${message}`),
+  warn: (message) => console.warn(`[Meridian] ${message}`),
+  error: (message) => console.error(`[Meridian] ${message}`),
+};
 
 /**
  * Optional hook a provider can opt into for the webview right-click "Ignore"
@@ -258,6 +273,12 @@ export abstract class BaseWebviewProvider<TReport> {
     } catch (e) {
       this.handleError("Quick-save failed", e);
       return;
+    }
+    // Retention (ADR 019): each new export lazily re-enforces the artifacts
+    // policy. Fire-and-forget — a prune failure never disturbs the save UX.
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot) {
+      void pruneArtifacts(workspaceRoot, getRetentionPolicy(), consoleLoggerAdapter);
     }
     const rel = path.join(MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR, fileName);
     vscode.window.showInformationMessage(`Saved to ${rel}`, "Reveal").then((choice) => {

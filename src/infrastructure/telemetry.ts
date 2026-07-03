@@ -28,10 +28,6 @@ export type TelemetryEventKind =
   | typeof TELEMETRY_EVENT_KINDS.CACHE_HIT
   | typeof TELEMETRY_EVENT_KINDS.CACHE_MISS
   | typeof TELEMETRY_EVENT_KINDS.ERROR_OCCURRED
-  | typeof TELEMETRY_EVENT_KINDS.WORKFLOW_STARTED
-  | typeof TELEMETRY_EVENT_KINDS.WORKFLOW_COMPLETED
-  | typeof TELEMETRY_EVENT_KINDS.WORKFLOW_FAILED
-  | typeof TELEMETRY_EVENT_KINDS.AGENT_INVOKED
   | typeof TELEMETRY_EVENT_KINDS.USER_ACTION;
 
 /**
@@ -71,30 +67,6 @@ export interface ErrorEventPayload {
 }
 
 /**
- * Workflow event payload.
- */
-export interface WorkflowEventPayload {
-  workflowId: string;
-  stepId?: string;
-  duration?: number; // milliseconds
-  outcome?: "success" | "failure";
-  error?: {
-    code: ErrorCode | string;
-    message: string;
-  };
-}
-
-/**
- * Agent event payload.
- */
-export interface AgentEventPayload {
-  agentId: string;
-  capability: CommandName | string;
-  duration?: number; // milliseconds
-  outcome?: "success" | "failure";
-}
-
-/**
  * User action event payload (e.g., UI interactions).
  */
 export interface UserActionEventPayload {
@@ -110,8 +82,6 @@ export type TelemetryEventPayload =
   | CommandEventPayload
   | CacheEventPayload
   | ErrorEventPayload
-  | WorkflowEventPayload
-  | AgentEventPayload
   | UserActionEventPayload
   | Record<string, unknown>;
 
@@ -275,93 +245,6 @@ export class TelemetryTracker {
         errorMessage: error.message,
         recoverable,
         context: additionalContext || error.context,
-      },
-      timestamp: Date.now(),
-      sessionId: this.sessionId,
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Track workflow execution start.
-   */
-  trackWorkflowStarted(workflowId: string): void {
-    const event: TelemetryEvent = {
-      kind: TELEMETRY_EVENT_KINDS.WORKFLOW_STARTED,
-      payload: {
-        workflowId,
-      },
-      timestamp: Date.now(),
-      sessionId: this.sessionId,
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Track workflow execution completion.
-   */
-  trackWorkflowCompleted(
-    workflowId: string,
-    duration: number,
-    stepId?: string
-  ): void {
-    const event: TelemetryEvent = {
-      kind: TELEMETRY_EVENT_KINDS.WORKFLOW_COMPLETED,
-      payload: {
-        workflowId,
-        stepId,
-        duration,
-        outcome: "success",
-      },
-      timestamp: Date.now(),
-      sessionId: this.sessionId,
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Track workflow execution failure.
-   */
-  trackWorkflowFailed(
-    workflowId: string,
-    duration: number,
-    error: AppError,
-    stepId?: string
-  ): void {
-    const event: TelemetryEvent = {
-      kind: TELEMETRY_EVENT_KINDS.WORKFLOW_FAILED,
-      payload: {
-        workflowId,
-        stepId,
-        duration,
-        outcome: "failure",
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-      },
-      timestamp: Date.now(),
-      sessionId: this.sessionId,
-    };
-    this.emit(event);
-  }
-
-  /**
-   * Track agent invocation.
-   */
-  trackAgentInvoked(
-    agentId: string,
-    capability: CommandName | string,
-    duration?: number,
-    outcome?: "success" | "failure"
-  ): void {
-    const event: TelemetryEvent = {
-      kind: TELEMETRY_EVENT_KINDS.AGENT_INVOKED,
-      payload: {
-        agentId,
-        capability,
-        duration,
-        outcome,
       },
       timestamp: Date.now(),
       sessionId: this.sessionId,
@@ -560,7 +443,6 @@ export class ConsoleTelemetrySink implements TelemetrySink {
       TELEMETRY_EVENT_KINDS.COMMAND_STARTED,
       TELEMETRY_EVENT_KINDS.COMMAND_FAILED,
       TELEMETRY_EVENT_KINDS.ERROR_OCCURRED,
-      TELEMETRY_EVENT_KINDS.WORKFLOW_FAILED,
     ];
 
     if (importantKinds.includes(event.kind as any)) {

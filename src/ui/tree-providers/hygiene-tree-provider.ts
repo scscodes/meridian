@@ -14,13 +14,15 @@
 import * as vscode from "vscode";
 import { Command, CommandContext, DeadCodeItem, Logger, Result, WorkspaceScan } from "../../types";
 import { ImpactAnalysisResult } from "../../domains/hygiene/impact-analysis-handler";
+import { StorageStatus } from "../../infrastructure/retention";
 
 type Dispatcher = (cmd: Command, ctx: CommandContext) => Promise<Result<unknown>>;
 
 type HygieneItemKind =
   | "category" | "file" | "markdownFile" | "deadCodeFile" | "deadCodeIssue"
   | "impactCategory" | "impactTarget" | "impactMetricGroup" | "impactFile"
-  | "collectionDir" | "report";
+  | "collectionDir" | "report"
+  | "storageSection" | "storageInfo";
 
 class HygieneTreeItem extends vscode.TreeItem {
   constructor(
@@ -226,9 +228,34 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
         return it;
       });
 
+    // Meridian Storage — self-policing surface (ADR 019). Fail-soft: on any
+    // handler error (or a dispatcher that doesn't serve the command, as in
+    // sparse test doubles) the section is omitted rather than blocking the tree.
+    let storageSection: HygieneTreeItem | undefined;
+    try {
+      const storageResult = await this.dispatch(
+        { name: "hygiene.storageStatus", params: {} },
+        this.ctx
+      );
+      if (storageResult?.kind === "ok") {
+        storageSection = this.buildStorageSection(storageResult.value as StorageStatus);
+      } else if (storageResult?.kind === "err") {
+        this.logger.warn(
+          "HygieneTreeProvider: storage status failed",
+          "HygieneTreeProvider",
+          storageResult.error
+        );
+      }
+    } catch {
+      // Omit the section; the scan categories still render.
+    }
+
     const items: HygieneTreeItem[] = [];
     if (this.lastImpactResult) {
       items.push(this.buildImpactSection());
+    }
+    if (storageSection) {
+      items.push(storageSection);
     }
     items.push(
       deadCodeSection,
@@ -243,6 +270,77 @@ export class HygieneTreeProvider implements vscode.TreeDataProvider<HygieneTreeI
     );
     this.cachedItems = items;
     return this.cachedItems;
+  }
+
+  /**
+   * "Meridian Storage" section — footprint of Meridian-owned storage plus the
+   * would-prune preview under the current retention policy. The section node
+   * carries contextValue "storageSection" for the Prune Now menu action.
+   */
+  private buildStorageSection(status: StorageStatus): HygieneTreeItem {
+    const mb = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(2);
+    const kb = (bytes: number): string => (bytes / 1024).toFixed(1);
+
+    const rows: HygieneTreeItem[] = [];
+
+    const a = status.artifacts;
+    const oldest =
+      a.oldestMtimeMs !== null
+        ? ` · oldest ${Math.floor((Date.now() - a.oldestMtimeMs) / 86_400_000)}d`
+        : "";
+    const prunable = a.wouldPruneCount > 0 ? ` · ${a.wouldPruneCount} prunable` : "";
+    const artifactsRow = new HygieneTreeItem(
+      "Exported Reports",
+      "storageInfo",
+      [],
+      vscode.TreeItemCollapsibleState.None,
+      `${a.fileCount} files · ${mb(a.totalBytes)} MB${oldest}${prunable}`
+    );
+    artifactsRow.iconPath = new vscode.ThemeIcon("files");
+    artifactsRow.tooltip =
+      `.meridian/artifacts/ — ${a.fileCount} files, ${mb(a.totalBytes)} MB.` +
+      (a.wouldPruneCount > 0
+        ? ` Current policy would prune ${a.wouldPruneCount} file(s) (${mb(a.wouldPruneBytes)} MB).`
+        : " Nothing prunable under the current policy.");
+    rows.push(artifactsRow);
+
+    const overCap =
+      status.policy.runLogMaxEvents > 0
+        ? Math.max(0, status.runLog.lineCount - status.policy.runLogMaxEvents)
+        : 0;
+    const runLogRow = new HygieneTreeItem(
+      "Run Log",
+      "storageInfo",
+      [],
+      vscode.TreeItemCollapsibleState.None,
+      `${status.runLog.lineCount} events · ${kb(status.runLog.sizeBytes)} KB` +
+        (overCap > 0 ? ` · ${overCap} over cap` : "")
+    );
+    runLogRow.iconPath = new vscode.ThemeIcon("output");
+    runLogRow.tooltip = ".vscode/meridian/run-log.v1.jsonl — compacted per retention settings.";
+    rows.push(runLogRow);
+
+    const pulseRow = new HygieneTreeItem(
+      "Pulse History",
+      "storageInfo",
+      [],
+      vscode.TreeItemCollapsibleState.None,
+      `${status.pulse.snapshotCount}/${status.pulse.maxSnapshots} snapshots · ${kb(status.pulse.sizeBytes)} KB`
+    );
+    pulseRow.iconPath = new vscode.ThemeIcon("pulse");
+    pulseRow.tooltip = ".meridian/pulse/ — self-capping; no action needed.";
+    rows.push(pulseRow);
+
+    const section = new HygieneTreeItem(
+      "Meridian Storage",
+      "storageSection",
+      rows,
+      vscode.TreeItemCollapsibleState.Collapsed,
+      a.wouldPruneCount > 0 ? `${a.wouldPruneCount} prunable` : undefined
+    );
+    section.iconPath = new vscode.ThemeIcon("server");
+    section.tooltip = "Meridian-owned storage (self-policing, ADR 019)";
+    return section;
   }
 
   private buildImpactSection(): HygieneTreeItem {

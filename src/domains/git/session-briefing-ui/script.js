@@ -77,6 +77,7 @@
     renderBranchBar(report);
     renderSummaryCards(report);
     renderFlags(report.flags);
+    renderPulse(report.pulse);
     renderActivity(report.activityWindow);
     renderHygiene(report.hygieneSnapshot);
     renderRecentRuns(report.recentRuns);
@@ -179,7 +180,7 @@
   // trend arrow. No Chart.js dependency (this webview ships none). Returns ""
   // for degenerate input (missing, <2 points, or all-zero) so the caller can
   // hide the block, mirroring the topChurnFiles empty-guard.
-  function sparklineSvg(series) {
+  function sparklineSvg(series, label) {
     var data = Array.isArray(series) ? series.map(Number).filter(function (n) {
       return isFinite(n);
     }) : [];
@@ -187,6 +188,7 @@
     var max = Math.max.apply(null, data);
     var min = Math.min.apply(null, data);
     if (max <= 0) return "";
+    var ariaLabel = label || "Commit frequency trend";
 
     var W = 240, H = 44, padY = H * 0.12;
     var span = max - min;
@@ -200,10 +202,71 @@
     var d = "M" + pts.join(" L");
 
     return '<svg class="sparkline" viewBox="0 0 ' + W + ' ' + H +
-      '" preserveAspectRatio="none" role="img" aria-label="Commit frequency trend">' +
+      '" preserveAspectRatio="none" role="img" aria-label="' + esc(ariaLabel) + '">' +
       '<path d="' + d + '" fill="none" stroke="#06b6d4" stroke-width="1.5" ' +
       'vector-effect="non-scaling-stroke" stroke-linejoin="round" ' +
       'stroke-linecap="round" /></svg>';
+  }
+
+  // ── Pulse (longitudinal history, ADR 019) ──────────────────────────
+
+  function signed(v) {
+    return v > 0 ? "+" + v : String(v);
+  }
+
+  function pulseSeriesOf(series, key) {
+    var out = [];
+    for (var i = 0; i < series.length; i++) {
+      if (typeof series[i][key] === "number") out.push(series[i][key]);
+    }
+    return out;
+  }
+
+  function renderPulse(p) {
+    var section = document.getElementById("pulseSection");
+    if (!p) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+
+    var hint = document.getElementById("pulseHint");
+    hint.textContent = p.previousAt
+      ? "(since " + new Date(p.previousAt).toLocaleString() + ")"
+      : "(first snapshot — history starts now)";
+
+    var cards = [];
+    if (p.deltas) {
+      var d = p.deltas;
+      var deltaDefs = [
+        ["Commits Δ", d.commitsInWindow],
+        ["Files Touched Δ", d.filesTouched],
+        ["Dead Files Δ", d.deadFileCount],
+        ["Large Files Δ", d.largeFileCount],
+        ["Dead Code Δ", d.deadCodeItemCount],
+        ["Uncommitted Δ", d.uncommittedCount],
+      ];
+      for (var i = 0; i < deltaDefs.length; i++) {
+        if (typeof deltaDefs[i][1] === "number") {
+          cards.push(metricCard(deltaDefs[i][0], signed(deltaDefs[i][1])));
+        }
+      }
+    }
+    document.getElementById("pulseMetrics").innerHTML = cards.join("");
+
+    var series = p.series || [];
+    var blocks = [];
+    var commits = pulseSeriesOf(series, "commitsInWindow");
+    var dead = pulseSeriesOf(series, "deadFileCount");
+    var commitsSpark = sparklineSvg(commits, "Commits-in-window across briefings");
+    var deadSpark = sparklineSvg(dead, "Dead-file count across briefings");
+    if (commitsSpark) {
+      blocks.push('<div class="pulse-trend"><h3 class="sub">Activity (' + commits.length + ' snapshots)</h3>' + commitsSpark + '</div>');
+    }
+    if (deadSpark) {
+      blocks.push('<div class="pulse-trend"><h3 class="sub">Dead Files (' + dead.length + ' snapshots)</h3>' + deadSpark + '</div>');
+    }
+    document.getElementById("pulseTrendBlock").innerHTML = blocks.join("");
   }
 
   function renderActivity(w) {

@@ -16,6 +16,7 @@ import {
   success,
 } from "../../types";
 import { RunLog } from "../../infrastructure/run-log";
+import { PulseSnapshotV1, PulseStore, PULSE_SCHEMA_VERSION } from "../../infrastructure/pulse-store";
 import { GitAnalyzer } from "./analytics-service";
 import { CoChangePair, FileMetric } from "./analytics-types";
 import { normalizeRenamePath } from "./git-path";
@@ -28,8 +29,9 @@ import {
   PendingChangeFile,
   PendingChangeCompanions,
   PendingCompanion,
+  PulseSlice,
 } from "./types";
-import { SESSION_BRIEFING, PENDING_RISK, COMPANIONS } from "../../constants";
+import { SESSION_BRIEFING, PENDING_RISK, COMPANIONS, PULSE } from "../../constants";
 
 export type HygieneScanGetter = () => { scan: WorkspaceScan; scannedAt: string } | undefined;
 
@@ -38,6 +40,7 @@ export interface SessionBriefingSources {
   runLog: RunLog | undefined;
   gitAnalyzer: GitAnalyzer;
   getHygieneScan: HygieneScanGetter | undefined;
+  pulseStore?: PulseStore;
   logger: Logger;
   options?: { recentRunLimit?: number; recentCommitLimit?: number };
 }
@@ -183,10 +186,61 @@ function computePendingChangeCompanions(
   };
 }
 
+/**
+ * Optional snapshot fields carried into the pulse deltas. A delta exists only
+ * when the field was measured on BOTH sides (absence means "not measured",
+ * never zero — matching PulseSnapshotV1).
+ */
+const PULSE_DELTA_FIELDS = [
+  "commitsInWindow",
+  "filesTouched",
+  "deadFileCount",
+  "largeFileCount",
+  "deadCodeItemCount",
+] as const;
+
+/**
+ * Build the pulse slice from stored history plus the just-captured current
+ * snapshot. Pure, exported for tests. `series` includes `current` as its
+ * final point regardless of whether the throttle let it be stored — the
+ * chart should always end at "now".
+ */
+export function buildPulseSlice(
+  history: ReadonlyArray<PulseSnapshotV1>,
+  current: PulseSnapshotV1,
+  appended: boolean
+): PulseSlice {
+  const previous = history.length > 0 ? history[history.length - 1] : undefined;
+  const slice: PulseSlice = {
+    series: [...history, current]
+      .slice(-PULSE.SERIES_LIMIT)
+      .map((s) => ({
+        timestampMs: s.timestampMs,
+        uncommittedCount: s.uncommittedCount,
+        ...(s.commitsInWindow !== undefined ? { commitsInWindow: s.commitsInWindow } : {}),
+        ...(s.deadFileCount !== undefined ? { deadFileCount: s.deadFileCount } : {}),
+      })),
+    appended,
+  };
+  if (previous) {
+    slice.previousAt = new Date(previous.timestampMs).toISOString();
+    const deltas: NonNullable<PulseSlice["deltas"]> = {
+      uncommittedCount: current.uncommittedCount - previous.uncommittedCount,
+    };
+    for (const field of PULSE_DELTA_FIELDS) {
+      const curr = current[field];
+      const prev = previous[field];
+      if (curr !== undefined && prev !== undefined) deltas[field] = curr - prev;
+    }
+    slice.deltas = deltas;
+  }
+  return slice;
+}
+
 export async function aggregateSessionBriefing(
   sources: SessionBriefingSources
 ): Promise<Result<SessionBriefing>> {
-  const { gitProvider, runLog, gitAnalyzer, getHygieneScan, logger, options } = sources;
+  const { gitProvider, runLog, gitAnalyzer, getHygieneScan, pulseStore, logger, options } = sources;
   const recentRunLimit = options?.recentRunLimit ?? SESSION_BRIEFING.RECENT_RUN_LIMIT;
   const recentCommitLimit = options?.recentCommitLimit ?? SESSION_BRIEFING.RECENT_COMMIT_LIMIT;
 
@@ -337,6 +391,52 @@ export async function aggregateSessionBriefing(
     flags.push("No hygiene scan yet");
   }
 
+  // ── Pulse history — fail-soft ────────────────────────────────────────────
+  let pulse: PulseSlice | undefined;
+  if (pulseStore) {
+    const historyResult = await pulseStore.readLatest(PULSE.SERIES_LIMIT);
+    if (historyResult.kind === "err") {
+      logger.warn("Session briefing: pulse history read failed", "aggregateSessionBriefing", historyResult.error);
+      flags.push("Pulse history unavailable");
+    } else {
+      const history = historyResult.value;
+      const previous = history.length > 0 ? history[history.length - 1] : undefined;
+      const current: PulseSnapshotV1 = {
+        schemaVersion: PULSE_SCHEMA_VERSION,
+        timestampMs: Date.now(),
+        branch: status.branch,
+        uncommittedCount: uncommitted.length,
+        ...(activityWindow
+          ? { commitsInWindow: activityWindow.commitsInWindow, filesTouched: activityWindow.filesTouched }
+          : {}),
+        ...(hygieneSnapshot
+          ? {
+              deadFileCount: hygieneSnapshot.deadFileCount,
+              largeFileCount: hygieneSnapshot.largeFileCount,
+              logFileCount: hygieneSnapshot.logFileCount,
+              deadCodeItemCount: hygieneSnapshot.deadCodeItemCount,
+            }
+          : {}),
+        ...(pendingChangeRisk ? { hotspotCount: pendingChangeRisk.hotspotCount } : {}),
+      };
+
+      let appended = false;
+      const throttled =
+        previous !== undefined &&
+        current.timestampMs - previous.timestampMs < PULSE.MIN_APPEND_INTERVAL_MS;
+      if (!throttled) {
+        const appendResult = await pulseStore.append(current);
+        if (appendResult.kind === "err") {
+          logger.warn("Session briefing: pulse append failed", "aggregateSessionBriefing", appendResult.error);
+          flags.push("Pulse history not recorded");
+        } else {
+          appended = true;
+        }
+      }
+      pulse = buildPulseSlice(history, current, appended);
+    }
+  }
+
   return success({
     generatedAt: new Date().toISOString(),
     branch: status.branch,
@@ -352,5 +452,6 @@ export async function aggregateSessionBriefing(
     hygieneSnapshot,
     pendingChangeRisk,
     pendingChangeCompanions,
+    pulse,
   });
 }

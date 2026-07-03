@@ -54,7 +54,13 @@ export type GitCommandName =
   | "git.commit"
   | "git.showAnalytics"
   | "git.sessionBriefing";
-export type HygieneCommandName = "hygiene.scan" | "hygiene.cleanup" | "hygiene.showAnalytics" | "hygiene.impactAnalysis";
+export type HygieneCommandName =
+  | "hygiene.scan"
+  | "hygiene.cleanup"
+  | "hygiene.showAnalytics"
+  | "hygiene.impactAnalysis"
+  | "hygiene.storageStatus"
+  | "hygiene.pruneStorage";
 
 // ============================================================================
 // Handler Interface (Aiogram-style Router Pattern)

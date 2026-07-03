@@ -23,6 +23,8 @@ import { HygieneAnalyzer } from "./analytics-service";
 import { DeadCodeAnalyzer } from "./dead-code-analyzer";
 import { createShowHygieneAnalyticsHandler } from "./analytics-handler";
 import { createImpactAnalysisHandler } from "./impact-analysis-handler";
+import { createStorageHandlers } from "./storage-handler";
+import { RunLog } from "../../infrastructure/run-log";
 
 /**
  * Hygiene domain commands.
@@ -32,6 +34,8 @@ export const HYGIENE_COMMANDS: HygieneCommandName[] = [
   "hygiene.cleanup",
   "hygiene.showAnalytics",
   "hygiene.impactAnalysis",
+  "hygiene.storageStatus",
+  "hygiene.pruneStorage",
 ];
 
 export class HygieneDomainService implements DomainService {
@@ -54,7 +58,8 @@ export class HygieneDomainService implements DomainService {
     workspaceProvider: WorkspaceProvider,
     logger: Logger,
     workspaceRoot?: string,
-    generateProseFn?: GenerateProseFn
+    generateProseFn?: GenerateProseFn,
+    runLog?: RunLog
   ) {
     this.logger = logger;
     this.workspaceRoot = workspaceRoot;
@@ -62,6 +67,7 @@ export class HygieneDomainService implements DomainService {
     this.deadCodeAnalyzer = new DeadCodeAnalyzer(logger);
 
     // Initialize handlers
+    const storage = createStorageHandlers(logger, runLog, workspaceRoot);
     this.handlers = {
       "hygiene.scan": createScanHandler(workspaceProvider, logger, this.deadCodeAnalyzer, (scan, scannedAt) => {
         this.lastScan = { scan, scannedAt };
@@ -69,6 +75,8 @@ export class HygieneDomainService implements DomainService {
       "hygiene.cleanup": createCleanupHandler(workspaceProvider, logger),
       "hygiene.showAnalytics": createShowHygieneAnalyticsHandler(this.analyzer, this.deadCodeAnalyzer, logger),
       "hygiene.impactAnalysis": createImpactAnalysisHandler(logger, generateProseFn),
+      "hygiene.storageStatus": storage.storageStatus,
+      "hygiene.pruneStorage": storage.pruneStorage,
     };
   }
 
@@ -140,7 +148,8 @@ export function createHygieneDomain(
   workspaceProvider: WorkspaceProvider,
   logger: Logger,
   workspaceRoot?: string,
-  generateProseFn?: GenerateProseFn
+  generateProseFn?: GenerateProseFn,
+  runLog?: RunLog
 ): HygieneDomainService {
-  return new HygieneDomainService(workspaceProvider, logger, workspaceRoot, generateProseFn);
+  return new HygieneDomainService(workspaceProvider, logger, workspaceRoot, generateProseFn, runLog);
 }

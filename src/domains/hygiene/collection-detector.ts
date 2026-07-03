@@ -21,7 +21,7 @@ import { bucketForDirName } from "./analytics-utils";
 const MAX_DEPTH = 3;
 
 /** Skip these dir names entirely during the walk (not collections, not interesting). */
-const SKIP_DIRS = new Set([".git", ".meridian", ".vscode", ".idea"]);
+const SKIP_DIRS = new Set([".git", ".meridian", ".vscode", ".idea", ".settings"]);
 
 export function detectCollections(workspaceRoot: string): CollectionsBreakdown {
   const result: CollectionsBreakdown = {

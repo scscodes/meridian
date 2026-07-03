@@ -2,8 +2,18 @@
  * Centralized, typed constants for the entire application.
  * No magic strings or numbers; all thresholds, names, and patterns are explicit.
  *
- * Organized by domain for clarity.
+ * Organized by domain for clarity. Ecosystem-specific directory/extension
+ * knowledge lives in ecosystems.ts (ADR 018); the exclusion lists below are
+ * derived from it, never hand-extended.
  */
+
+import {
+  ECOSYSTEM_BUILD_DIRS,
+  ECOSYSTEM_CACHE_DIRS,
+  ECOSYSTEM_ENV_DIRS,
+  ECOSYSTEM_VENDOR_DIRS,
+  dirExcludeGlobs,
+} from "./ecosystems";
 
 // ============================================================================
 // Cache Configuration
@@ -15,6 +25,13 @@ export const CACHE_SETTINGS = {
 
   /** Dead code scan cache TTL in milliseconds (5 minutes) */
   DEAD_CODE_TTL_MS: 5 * 60 * 1000,
+
+  /**
+   * Storage-status cache TTL (30s) — the hygiene tree rebuilds on debounced
+   * file-watcher events; without this, every rebuild re-reads the full run
+   * log just to line-count it. Prune invalidates explicitly.
+   */
+  STORAGE_STATUS_TTL_MS: 30 * 1000,
 } as const;
 
 // ============================================================================
@@ -27,6 +44,9 @@ export const MERIDIAN_DIR = ".meridian";
 /** Generated-report / artifact subdir under the dotdir (self-ignored). */
 export const MERIDIAN_ARTIFACTS_DIR = "artifacts";
 
+/** Pulse-history subdir under the dotdir (self-ignored, ADR 019). */
+export const MERIDIAN_PULSE_DIR = "pulse";
+
 // ============================================================================
 // Workspace Exclusion Base — shared across git and hygiene analytics.
 // Domain-specific lists extend via spread.
@@ -37,7 +57,16 @@ export const WORKSPACE_EXCLUDE_BASE = [
   "**/.git/**",
   "**/.vscode/**",
   "**/.idea/**",
+  // Eclipse per-project IDE metadata — same class as .vscode/.idea.
+  "**/.settings/**",
 ] as const;
+
+/**
+ * Python packaging metadata dirs match by SUFFIX (`<pkg>.egg-info`), which the
+ * name-keyed ecosystem registry cannot express — kept as a literal glob here
+ * and as an `endsWith` check in the hygiene analytics walker.
+ */
+const EGG_INFO_GLOB = "**/*.egg-info/**";
 
 // ============================================================================
 // Hygiene Configuration
@@ -58,28 +87,20 @@ export const HYGIENE_SETTINGS = {
    */
   MAX_FILE_SIZE_BYTES: 1 * 1024 * 1024,
 
-  /** File patterns to exclude from hygiene checks */
+  /**
+   * File patterns to exclude from hygiene checks — every ecosystem env,
+   * cache, vendor, AND build dir (the scan hunts stray files, not the
+   * contents of generated trees). Derived from the ecosystem registry.
+   */
   EXCLUDE_PATTERNS: [
     ...WORKSPACE_EXCLUDE_BASE,
-    // Build / output
-    "**/dist/**",
-    "**/build/**",
-    "**/out/**",
-    "**/bundled/**",
-    // Python runtime & tooling
-    "**/.venv/**",
-    "**/venv/**",
-    "**/__pycache__/**",
-    "**/.pytest_cache/**",
-    "**/.mypy_cache/**",
-    "**/.ruff_cache/**",
-    "**/.tox/**",
-    "**/.eggs/**",
-    "**/*.egg-info/**",
-    // JS/TS coverage & caches
-    "**/coverage/**",
-    "**/.nyc_output/**",
-    "**/.cache/**",
+    ...dirExcludeGlobs([
+      ECOSYSTEM_ENV_DIRS,
+      ECOSYSTEM_CACHE_DIRS,
+      ECOSYSTEM_VENDOR_DIRS,
+      ECOSYSTEM_BUILD_DIRS,
+    ]),
+    EGG_INFO_GLOB,
   ] as readonly string[],
 
   /** Log file patterns to detect */
@@ -91,51 +112,31 @@ export const HYGIENE_SETTINGS = {
 
 // ============================================================================
 // Hygiene Analytics — lighter exclusion set for the analytics scan.
-// Unlike HYGIENE_SETTINGS.EXCLUDE_PATTERNS, we keep dist/, build/, out/, etc.
-// so they are surfaced as prune candidates. Heavy dirs (node_modules, venv,
-// __pycache__) are excluded from recursion but get a single "exists" placeholder
-// so they still show in the report without scanning contents.
+// Unlike HYGIENE_SETTINGS.EXCLUDE_PATTERNS, build-output dirs (dist/, build/,
+// out/, target/, _build/, …) are NOT excluded here, so their contents are
+// recursed and surfaced as prune candidates. Env/cache/vendor dirs are
+// excluded from recursion but get a single "exists" placeholder — the
+// walker's heavy-dir set derives from the same registry, so exclusion and
+// placeholder membership cannot drift apart.
 // ============================================================================
 
 export const HYGIENE_ANALYTICS_EXCLUDE_PATTERNS = [
   ...WORKSPACE_EXCLUDE_BASE,
-  // Python runtime & tooling
-  "**/.venv/**",
-  "**/venv/**",
-  "**/__pycache__/**",
-  "**/.pytest_cache/**",
-  "**/.mypy_cache/**",
-  "**/.ruff_cache/**",
-  "**/.tox/**",
-  "**/.eggs/**",
-  "**/*.egg-info/**",
-  // Package managers & build tool caches
-  "**/.yarn/**",
-  "**/.pnpm-store/**",
-  "**/vendor/**",
-  "**/vendor",
-  "**/.bundle/**",
-  "**/.gradle/**",
-  "**/packages/**",
-  "**/packages",
-  "**/.terraform/**",
-  "**/.terraform",
-  "**/.dart_tool/**",
-  "**/.dart_tool",
-  "**/deps/**",
-  "**/deps",
-  "**/_build/**",
-  "**/_build",
-  "**/.stack-work/**",
-  "**/.stack-work",
-  "**/.cpcache/**",
-  "**/.cpcache",
+  // "both" forms: the analytics walker pattern-matches directory paths
+  // themselves (to stop recursion and emit placeholder rows), which the
+  // bare "**/<dir>" form covers.
+  ...dirExcludeGlobs([ECOSYSTEM_ENV_DIRS, ECOSYSTEM_CACHE_DIRS, ECOSYSTEM_VENDOR_DIRS], "both"),
+  EGG_INFO_GLOB,
 ] as const;
 
 // ============================================================================
 // Telemetry Event Types
 // ============================================================================
 
+// Command lifecycle only — the workflow/agent/cache/user-action kinds were
+// pruned with their dead consumers (ADR 012 fallout; security-hardening pass).
+// The run-log schema's inert RunEventSource members are a separate,
+// deliberate retention.
 export const TELEMETRY_EVENT_KINDS = {
   COMMAND_STARTED: "COMMAND_STARTED",
   COMMAND_COMPLETED: "COMMAND_COMPLETED",
@@ -226,6 +227,29 @@ export const SESSION_BRIEFING = {
 
   /** Minimum number of failed runs that triggers a flag */
   FAILED_RUNS_FLAG_THRESHOLD: 1,
+} as const;
+
+// ============================================================================
+// Pulse History (ADR 019)
+// ============================================================================
+
+/**
+ * Bounds for the longitudinal pulse store (`.meridian/pulse/pulse.v1.jsonl`)
+ * and the additive `SessionBriefing.pulse` slice derived from it.
+ */
+export const PULSE = {
+  /** Hard cap on stored snapshots; the store tail-compacts past this on append. */
+  MAX_SNAPSHOTS: 500,
+
+  /** Max history points carried into the briefing's pulse series (wire bound). */
+  SERIES_LIMIT: 30,
+
+  /**
+   * Minimum gap between stored snapshots. Repeated briefings inside the gap
+   * still render the pulse slice, but do not append — several briefings in
+   * one sitting are one working session, not several data points.
+   */
+  MIN_APPEND_INTERVAL_MS: 10 * 60 * 1000,
 } as const;
 
 // ============================================================================

@@ -16,6 +16,11 @@ import {
 } from "./analytics-types";
 import { DeadCodeScan } from "../../types";
 import { CACHE_SETTINGS, HYGIENE_ANALYTICS_EXCLUDE_PATTERNS } from "../../constants";
+import {
+  ECOSYSTEM_CACHE_DIRS,
+  ECOSYSTEM_ENV_DIRS,
+  ECOSYSTEM_VENDOR_DIRS,
+} from "../../ecosystems";
 import { TtlCache } from "../../infrastructure/cache";
 import { pathMatchesAny } from "../../infrastructure/glob-match";
 import { ignoreFileMtimeMs, readMeridianIgnorePatterns } from "../../security/ignore-store";
@@ -31,19 +36,16 @@ import {
 
 /**
  * Heavy dirs we never recurse into (would be expensive). We only check existence
- * and add a single placeholder entry (one stat) so they still show as hygiene targets.
- * Covers: JS/Node, Python, PHP/Ruby, JVM/Gradle, .NET, Terraform, Dart/Flutter,
- * Elixir, Haskell, Clojure.
+ * and add a single placeholder entry (one stat) so they still show as hygiene
+ * targets. Derived from the ecosystem registry (ADR 018) as env∪cache∪vendor —
+ * exactly the dirs HYGIENE_ANALYTICS_EXCLUDE_PATTERNS excludes, so exclusion
+ * and placeholder membership cannot drift. Build-output dirs are absent by
+ * design: the walker recurses them so contents surface as prune candidates.
  */
-const HEAVY_ARTIFACT_DIRS = new Set([
-  "node_modules", "venv", ".venv",
-  "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
-  ".yarn", ".pnpm-store",
-  "vendor", ".bundle",
-  ".gradle", "packages",
-  ".terraform", ".dart_tool",
-  "deps", "_build",
-  ".stack-work", ".cpcache",
+const HEAVY_ARTIFACT_DIRS: ReadonlySet<string> = new Set([
+  ...ECOSYSTEM_ENV_DIRS,
+  ...ECOSYSTEM_CACHE_DIRS,
+  ...ECOSYSTEM_VENDOR_DIRS,
 ]);
 
 function countLines(filePath: string, ext: string, sizeBytes: number): number {

@@ -13,24 +13,38 @@ import {
   TemporalBucket,
   TemporalData,
 } from "./analytics-types";
+import {
+  ECOSYSTEM_ARTIFACT_EXTS,
+  ECOSYSTEM_BUILD_DIRS,
+  ECOSYSTEM_CACHE_DIRS,
+  ECOSYSTEM_CONFIG_EXTS,
+  ECOSYSTEM_ENV_DIRS,
+  ECOSYSTEM_SOURCE_EXTS,
+  ECOSYSTEM_VENDOR_DIRS,
+} from "../../ecosystems";
 
 // ============================================================================
-// Category mapping
+// Category mapping — ecosystem-specific sets derive from the registry
+// (ADR 018); only the ecosystem-neutral sets are defined here.
 // ============================================================================
 
 const MARKDOWN_EXTS  = new Set([".md", ".mdx"]);
 const LOG_EXTS       = new Set([".log"]);
-const CONFIG_EXTS    = new Set([".yml", ".yaml", ".json", ".toml", ".ini", ".env"]);
+const CONFIG_EXTS    = ECOSYSTEM_CONFIG_EXTS;
 const BACKUP_EXTS    = new Set([".bak", ".orig", ".swp"]);
 const TEMP_EXTS      = new Set([".tmp", ".temp"]);
-const SOURCE_EXTS    = new Set([".ts", ".js", ".py", ".go", ".rs", ".java", ".rb", ".cs", ".tsx", ".jsx", ".sh", ".bash"]);
+const SOURCE_EXTS    = ECOSYSTEM_SOURCE_EXTS;
 /** Compiled / generated artifact extensions */
-export const ARTIFACT_EXTS  = new Set([".class", ".pyc", ".pyo", ".o", ".obj", ".a", ".so"]);
-/** Directory names that indicate build / cache, venvs, or tool output */
-export const ARTIFACT_DIRS = new Set([
-  "target", ".next", ".nuxt", ".parcel-cache",
-  "__pycache__", "venv", ".venv",
-  ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
+export const ARTIFACT_EXTS = ECOSYSTEM_ARTIFACT_EXTS;
+/**
+ * Directory names whose contents categorize as "artifact": environments,
+ * caches, and build outputs. Vendor dirs are deliberately absent — they are
+ * never recursed, so their contents never reach categorize().
+ */
+export const ARTIFACT_DIRS: ReadonlySet<string> = new Set([
+  ...ECOSYSTEM_ENV_DIRS,
+  ...ECOSYSTEM_CACHE_DIRS,
+  ...ECOSYSTEM_BUILD_DIRS,
 ]);
 
 /** Extensions for which we attempt line counting (text-based only) */
@@ -92,25 +106,17 @@ const COLLECTION_BUCKET_KEYS: readonly CollectionBucket[] = [
 ];
 
 /**
- * Dir-name → bucket map for the Collections section. Broader than
- * HEAVY_ARTIFACT_DIRS in analytics-service.ts: includes build-output dirs
- * (dist/build/out/target) that the walker DOES recurse into, so they get
- * surfaced as collections via their file paths, not via a placeholder row.
+ * Dir-name → bucket map for the Collections section, derived directly from
+ * the ecosystem registry (ADR 018). Broader than HEAVY_ARTIFACT_DIRS in
+ * analytics-service.ts: includes build-output dirs (dist/build/out/target)
+ * that the walker DOES recurse into, so they get surfaced as collections via
+ * their file paths, not via a placeholder row.
  */
 export const COLLECTION_BUCKETS: Record<CollectionBucket, ReadonlySet<string>> = {
-  envs: new Set(["venv", ".venv", "env"]),
-  caches: new Set([
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".eggs",
-    ".yarn", ".pnpm-store", ".cache",
-    ".gradle", ".terraform", ".dart_tool", ".cpcache", ".stack-work", ".parcel-cache",
-    ".next", ".nuxt",
-  ]),
-  buildOutputs: new Set([
-    "dist", "build", "out", "target", "_build", "deps", "bundled",
-  ]),
-  vendoredDeps: new Set([
-    "node_modules", "vendor", "packages", ".bundle",
-  ]),
+  envs: ECOSYSTEM_ENV_DIRS,
+  caches: ECOSYSTEM_CACHE_DIRS,
+  buildOutputs: ECOSYSTEM_BUILD_DIRS,
+  vendoredDeps: ECOSYSTEM_VENDOR_DIRS,
 };
 
 /** Resolve a directory name to its Collections bucket, or null if it's not a known heavy-artifact dir. */

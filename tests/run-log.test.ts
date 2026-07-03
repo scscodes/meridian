@@ -121,5 +121,49 @@ describe("run-log", () => {
       expect(isSupportedRunEventVersion(1)).toBe(true);
     });
   });
+
+  it("compact keeps only the newest N events, atomically, and reports dropped count", async () => {
+    await withTempWorkspace(async (workspaceRoot) => {
+      const log = new FileRunLog(workspaceRoot, new MockLogger());
+      for (let i = 0; i < 10; i++) {
+        await log.append(makeEvent({ runId: `run-${i}` }));
+      }
+
+      const compacted = await log.compact(4);
+      expect(compacted.kind).toBe("ok");
+      if (compacted.kind === "ok") expect(compacted.value).toBe(6);
+
+      const latest = await log.readLatest(100);
+      expect(latest.kind).toBe("ok");
+      if (latest.kind === "ok") {
+        expect(latest.value.map((e) => e.runId)).toEqual(["run-6", "run-7", "run-8", "run-9"]);
+      }
+      // No tmp residue from the atomic rewrite.
+      const dir = await fs.readdir(path.join(workspaceRoot, ".vscode", "meridian"));
+      expect(dir).toEqual(["run-log.v1.jsonl"]);
+    });
+  });
+
+  it("compact is a no-op when disabled (0) or under the cap, and on a missing file", async () => {
+    await withTempWorkspace(async (workspaceRoot) => {
+      const log = new FileRunLog(workspaceRoot, new MockLogger());
+
+      const missing = await log.compact(5);
+      expect(missing.kind).toBe("ok");
+      if (missing.kind === "ok") expect(missing.value).toBe(0);
+
+      await log.append(makeEvent());
+      const disabled = await log.compact(0);
+      expect(disabled.kind).toBe("ok");
+      if (disabled.kind === "ok") expect(disabled.value).toBe(0);
+
+      const underCap = await log.compact(10);
+      expect(underCap.kind).toBe("ok");
+      if (underCap.kind === "ok") expect(underCap.value).toBe(0);
+
+      const latest = await log.readLatest(10);
+      if (latest.kind === "ok") expect(latest.value).toHaveLength(1);
+    });
+  });
 });
 

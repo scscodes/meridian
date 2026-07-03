@@ -30,6 +30,9 @@ export const SETTING_DEFAULTS = {
   "hygiene.prune.maxSizeMB":          1 as number,
   "hygiene.prune.minLineCount":       0 as number,
   "hygiene.prune.categories":         ["backup", "temp", "log", "artifact"] as readonly string[],
+  "retention.artifacts.maxCount":     50 as number,
+  "retention.artifacts.maxAgeDays":   30 as number,
+  "retention.runLog.maxEvents":       5000 as number,
   "sessionBriefing.autoLaunch":       false as boolean,
   "startup.enableFileWatchers":       true as boolean,
 } as const;

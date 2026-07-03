@@ -654,6 +654,110 @@ describe('aggregateSessionBriefing', () => {
     expect(result.value.pendingChangeCompanions).toBeUndefined();
   });
 
+  // ── Pulse history (ADR 019) ────────────────────────────────────────────────
+
+  function makePulseStore(history: import('../src/infrastructure/pulse-store').PulseSnapshotV1[] = []) {
+    return {
+      readLatest: vi.fn().mockResolvedValue(success(history)),
+      append: vi.fn().mockResolvedValue(success(void 0)),
+    };
+  }
+
+  function pastSnapshot(overrides: Partial<import('../src/infrastructure/pulse-store').PulseSnapshotV1> = {}) {
+    return {
+      schemaVersion: 1 as const,
+      timestampMs: Date.now() - 60 * 60 * 1000, // 1h ago — clear of the throttle
+      branch: 'main',
+      uncommittedCount: 5,
+      commitsInWindow: 40,
+      deadFileCount: 4,
+      ...overrides,
+    };
+  }
+
+  it('omits the pulse slice when no pulse store is injected', async () => {
+    const result = await aggregateSessionBriefing(makeSources(git, logger, runLog));
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pulse).toBeUndefined();
+  });
+
+  it('first briefing: pulse has no deltas, appends, and series holds the current point', async () => {
+    const store = makePulseStore([]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { pulseStore: store as never })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const pulse = result.value.pulse;
+    expect(pulse).toBeDefined();
+    expect(pulse?.deltas).toBeUndefined();
+    expect(pulse?.previousAt).toBeUndefined();
+    expect(pulse?.appended).toBe(true);
+    expect(pulse?.series).toHaveLength(1);
+    expect(store.append).toHaveBeenCalledOnce();
+    const stored = store.append.mock.calls[0][0];
+    expect(stored.schemaVersion).toBe(1);
+    expect(stored.branch).toBe('main');
+    expect(stored.commitsInWindow).toBe(42); // from makeAnalyzer summary
+  });
+
+  it('computes deltas against the previous snapshot and appends past the throttle window', async () => {
+    git.setAllChanges([createMockChange('a.ts', 'M'), createMockChange('b.ts', 'M')]);
+    const store = makePulseStore([pastSnapshot()]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { pulseStore: store as never })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    const pulse = result.value.pulse;
+    expect(pulse?.previousAt).toBeDefined();
+    expect(pulse?.deltas?.uncommittedCount).toBe(2 - 5);
+    expect(pulse?.deltas?.commitsInWindow).toBe(42 - 40);
+    // No hygiene scan cached → current side unmeasured → no dead-file delta.
+    expect(pulse?.deltas?.deadFileCount).toBeUndefined();
+    expect(pulse?.appended).toBe(true);
+    expect(pulse?.series).toHaveLength(2);
+  });
+
+  it('throttles the append when the previous snapshot is inside MIN_APPEND_INTERVAL_MS', async () => {
+    const store = makePulseStore([pastSnapshot({ timestampMs: Date.now() - 1000 })]);
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { pulseStore: store as never })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(store.append).not.toHaveBeenCalled();
+    expect(result.value.pulse?.appended).toBe(false);
+    // Slice still renders: deltas + series ending at "now".
+    expect(result.value.pulse?.deltas).toBeDefined();
+    expect(result.value.pulse?.series).toHaveLength(2);
+  });
+
+  it('flags and omits pulse when the history read fails (fail-soft)', async () => {
+    const store = {
+      readLatest: vi.fn().mockResolvedValue(failure({ code: 'PULSE_READ_ERROR', message: 'x' })),
+      append: vi.fn(),
+    };
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { pulseStore: store as never })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.pulse).toBeUndefined();
+    expect(result.value.flags).toContain('Pulse history unavailable');
+    expect(store.append).not.toHaveBeenCalled();
+  });
+
+  it('flags but still returns the slice when the append fails (fail-soft)', async () => {
+    const store = {
+      readLatest: vi.fn().mockResolvedValue(success([pastSnapshot()])),
+      append: vi.fn().mockResolvedValue(failure({ code: 'PULSE_WRITE_ERROR', message: 'x' })),
+    };
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { pulseStore: store as never })
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.value.flags).toContain('Pulse history not recorded');
+    expect(result.value.pulse).toBeDefined();
+    expect(result.value.pulse?.appended).toBe(false);
+  });
+
   // The session-briefing webview's FLAG_ANCHORS table couples to literal flag
   // prefixes emitted from this aggregator. The webview JS isn't importable here
   // (ES5 IIFE served as a static asset), so this test pins the contract from

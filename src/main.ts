@@ -23,6 +23,8 @@ import { generateProse } from "./infrastructure/prose-generator";
 import { readSetting } from "./infrastructure/settings";
 import { getPruneConfig } from "./domains/hygiene/prune-config";
 import { createRunLog } from "./infrastructure/run-log";
+import { createPulseStore } from "./infrastructure/pulse-store";
+import { runActivationRetention } from "./infrastructure/retention";
 import { migrateLegacyIgnoreFile } from "./infrastructure/dotdir-migration";
 import { isSensitiveLoggingEnabled, sanitizeForLogs } from "./security/operation-policy";
 
@@ -71,6 +73,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const gitProvider = createGitProvider(workspaceRoot);
   const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);
   const runLog = createRunLog(workspaceRoot, logger);
+  // Pulse history writes into .meridian/ — only when a real workspace folder
+  // is open, never inside an arbitrary cwd (same guard as the ADR 014 migration).
+  const pulseStore = workspaceFolder ? createPulseStore(workspaceFolder, logger) : undefined;
 
   // ── Router + middleware ─────────────────────────────────────────────
   // security.logging.sensitive (default "redact"): error text is redacted
@@ -84,11 +89,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // ── Domain registration ─────────────────────────────────────────────
   // Pass the raw (possibly undefined) folder, not the cwd fallback: the
   // hygiene background scan must never crawl an arbitrary cwd when no
-  // workspace is open. The service skips its timer when root is undefined.
-  const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceFolder, generateProse);
+  // workspace is open. The service skips its timer when root is undefined —
+  // and the storage handlers then fail with WORKSPACE_NOT_FOUND (ADR 019).
+  const hygieneDomain = createHygieneDomain(workspaceProvider, logger, workspaceFolder, generateProse, runLog);
   const gitDomain = createGitDomain(
     gitProvider, logger, workspaceRoot, generateProse,
-    runLog, () => hygieneDomain.getLastScan()
+    runLog, () => hygieneDomain.getLastScan(), pulseStore
   );
   router.registerDomain(gitDomain);
   router.registerDomain(hygieneDomain);
@@ -144,6 +150,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // ── Finalize ────────────────────────────────────────────────────────
   statusBar.update();
+
+  // Retention (ADR 019): lazy, fire-and-forget self-policing of Meridian-owned
+  // storage. Only with a real workspace folder — never prune inside a bare cwd.
+  if (workspaceFolder) {
+    void runActivationRetention(workspaceFolder, runLog, logger);
+  }
 
   // Auto-launch session briefing if configured
   const autoLaunch = readSetting("sessionBriefing.autoLaunch");

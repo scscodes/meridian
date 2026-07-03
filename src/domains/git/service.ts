@@ -20,6 +20,7 @@ import {
   GenerateProseFn,
 } from "../../types";
 import { RunLog } from "../../infrastructure/run-log";
+import { PulseStore } from "../../infrastructure/pulse-store";
 import {
   createStatusHandler,
   createPullHandler,
@@ -54,6 +55,7 @@ export class GitDomainService implements DomainService {
 
   private readonly runLog: RunLog | undefined;
   private readonly getHygieneScan: HygieneScanGetter | undefined;
+  private readonly pulseStore: PulseStore | undefined;
 
   constructor(
     gitProvider: GitProvider,
@@ -61,12 +63,14 @@ export class GitDomainService implements DomainService {
     workspaceRoot: string = process.cwd(),
     generateProseFn?: GenerateProseFn,
     runLog?: RunLog,
-    getHygieneScan?: HygieneScanGetter
+    getHygieneScan?: HygieneScanGetter,
+    pulseStore?: PulseStore
   ) {
     this.gitProvider = gitProvider;
     this.logger = logger;
     this.runLog = runLog;
     this.getHygieneScan = getHygieneScan;
+    this.pulseStore = pulseStore;
 
     // Initialize analytics — pass workspace root so git log runs in the correct repo
     this.analyzer = new GitAnalyzer(workspaceRoot);
@@ -85,6 +89,7 @@ export class GitDomainService implements DomainService {
           runLog: this.runLog,
           gitAnalyzer: this.analyzer,
           getHygieneScan: this.getHygieneScan,
+          pulseStore: this.pulseStore,
           logger,
         } satisfies SessionBriefingSources,
         generateProseFn
@@ -145,7 +150,8 @@ export function createGitDomain(
   workspaceRoot: string = process.cwd(),
   generateProseFn?: GenerateProseFn,
   runLog?: RunLog,
-  getHygieneScan?: HygieneScanGetter
+  getHygieneScan?: HygieneScanGetter,
+  pulseStore?: PulseStore
 ): GitDomainService {
-  return new GitDomainService(gitProvider, logger, workspaceRoot, generateProseFn, runLog, getHygieneScan);
+  return new GitDomainService(gitProvider, logger, workspaceRoot, generateProseFn, runLog, getHygieneScan, pulseStore);
 }

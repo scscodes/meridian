@@ -408,6 +408,14 @@ document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "export", format: "csv" });
 });
 
+document.getElementById("exportMdBtn")?.addEventListener("click", () => {
+  vscode?.postMessage({ type: "export", format: "md" });
+});
+
+document.getElementById("copyMdBtn")?.addEventListener("click", () => {
+  vscode?.postMessage({ type: "copyMarkdown" });
+});
+
 document.getElementById("exportAsBtn")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "exportAs" });
 });

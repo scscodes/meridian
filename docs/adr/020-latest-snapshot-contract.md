@@ -171,6 +171,10 @@ new subsystem.
 - **Layering invariant.** `src/infrastructure/latest-snapshot.ts` has no
   `vscode` import and no dependency on `src/domains/*`; `BaseWebviewProvider`
   is the only caller. Consistent with `retention.ts` / `jsonl-tail.ts`.
+- **Internal consumer.** The Reports tree is a sanctioned internal consumer
+  of `latest/` — but mtime-only: it stats the three files for its coarse
+  "updated Nm ago" row descriptions (redrawn via `onLatestSnapshotWrite`)
+  and never parses the JSON, so it cannot couple to the envelope shape.
 
 ## Cross-references
 

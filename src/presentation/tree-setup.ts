@@ -3,7 +3,9 @@
  */
 
 import * as vscode from "vscode";
+import * as fs from "fs";
 import { Command, CommandContext, GitProvider, Logger, Result } from "../types";
+import { latestDirPath, onLatestSnapshotWrite } from "../infrastructure/latest-snapshot";
 import { GitTreeProvider } from "../ui/tree-providers/git-tree-provider";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 import {
@@ -43,12 +45,18 @@ export function setupTreeProviders(
 ): TreeProviders {
   const gitTree     = new GitTreeProvider(gitProvider, logger, workspaceRoot);
   const hygieneTree = new HygieneTreeProvider(dispatch, cmdCtx, logger);
-  const reportsTree = new ReportsTreeProvider();
+  // Real workspace folder only (not the cwd fallback in workspaceRoot):
+  // without one there are no snapshots, so rows render without freshness.
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const reportsTree = new ReportsTreeProvider(workspaceFolder);
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("meridian.reports.view", reportsTree),
     vscode.window.registerTreeDataProvider("meridian.git.view",     gitTree),
     vscode.window.registerTreeDataProvider("meridian.hygiene.view", hygieneTree),
+    // Freshness: redraw the Reports rows whenever a latest snapshot lands, so
+    // "updated Nm ago" descriptions track renders without any live timer.
+    { dispose: onLatestSnapshotWrite(() => reportsTree.refresh()) },
   );
 
   // reportId → underlying VS Code command + its webview panel provider.
@@ -72,6 +80,19 @@ export function setupTreeProviders(
     vscode.commands.registerCommand("meridian.reports.refresh", (item?: ReportOpenArg) => {
       if (!item) return;
       void vscode.commands.executeCommand(reportMap[item.reportId].cmd);
+    }),
+    // Surface the on-disk ADR 020 snapshots to humans. Reveal-if-present;
+    // otherwise explain how they come into being.
+    vscode.commands.registerCommand("meridian.latest.reveal", () => {
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const latestDir = root ? latestDirPath(root) : null;
+      if (latestDir && fs.existsSync(latestDir)) {
+        void vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(latestDir));
+      } else {
+        void vscode.window.showInformationMessage(
+          "No snapshots yet — open any Meridian report to generate them."
+        );
+      }
     }),
     // Branded "Meridian Settings" title action — host-portable replacement for
     // VS Code's implicit view→extension settings cog, which Cursor doesn't honor

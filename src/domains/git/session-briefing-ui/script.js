@@ -32,6 +32,12 @@
   document.getElementById("exportJson").addEventListener("click", function () {
     vscode.postMessage({ type: "export", format: "json" });
   });
+  document.getElementById("exportMd").addEventListener("click", function () {
+    vscode.postMessage({ type: "export", format: "md" });
+  });
+  document.getElementById("copyMd").addEventListener("click", function () {
+    vscode.postMessage({ type: "copyMarkdown" });
+  });
   document.getElementById("exportAs").addEventListener("click", function () {
     vscode.postMessage({ type: "exportAs" });
   });
@@ -120,8 +126,15 @@
   // anchor and/or an action button. Keyed by id rather than matched against
   // message text, so rewording a message never breaks the wiring. Flags
   // without an entry here (or entries with neither `anchor` nor `action`)
-  // render as inert cards — acceptable, matching the prior regex-miss
-  // behavior.
+  // render as inert cards.
+  //
+  // Deliberately inert (no honest action exists — the condition is either
+  // environmental or self-describing):
+  //   runlog.unavailable / runlog.readFailed — run log is a peripheral; there
+  //     is no user command that creates or repairs it.
+  //   pulse.unavailable — pulse store missing/unreadable; same, no command.
+  //   pulse.notRecorded — throttle suppressed the write by design (ADR 019);
+  //     "record now" would defeat the min-interval.
   var HYGIENE_REPORT_UI = {
     anchor: "hygieneSection",
     action: { label: "Open Hygiene Analytics", message: { type: "openReport", payload: { id: "hygiene" } } },
@@ -132,9 +145,17 @@
       anchor: "uncommittedSection",
       action: { label: "Open Source Control", message: { type: "openScm" } },
     },
+    "head.detached": {
+      action: { label: "Open Source Control", message: { type: "openScm" } },
+    },
     "runs.failures": { anchor: "recentRunsSection" },
     "risk.hotspots": {
       anchor: "pendingRiskSection",
+      action: { label: "Open Git Analytics", message: { type: "openReport", payload: { id: "gitAnalytics" } } },
+    },
+    // Self-healing: opening Git Analytics computes the report, so the next
+    // briefing has the activity slice.
+    "analytics.unavailable": {
       action: { label: "Open Git Analytics", message: { type: "openReport", payload: { id: "gitAnalytics" } } },
     },
     "companions.missing": { anchor: "companionsSection" },
@@ -242,9 +263,13 @@
     section.style.display = "";
 
     var hint = document.getElementById("pulseHint");
-    hint.textContent = p.previousAt
-      ? "(since " + new Date(p.previousAt).toLocaleString() + ")"
-      : "(first snapshot — history starts now)";
+    var since = p.previousAt
+      ? "since " + new Date(p.previousAt).toLocaleString()
+      : "first snapshot — history starts now";
+    var recorded = p.appended
+      ? "recorded"
+      : "not recorded (within 10-min window)";
+    hint.textContent = "(" + since + " · " + recorded + ")";
 
     var cards = [];
     if (p.deltas) {
@@ -305,6 +330,19 @@
       cards.push(metricCard("Volatility", trendLabel(w.trends.volatilityDirection)));
     }
     document.getElementById("activityMetrics").innerHTML = cards.join("");
+
+    // Top contributors — already aggregator-capped (SESSION_BRIEFING limit)
+    // and already in the CSV export; previously dropped by this renderer.
+    var contributors = w.topContributors || [];
+    document.getElementById("contributorsBlock").innerHTML = contributors.length
+      ? '<h3 class="sub">Top Contributors</h3>' +
+        '<div class="contributor-chips">' +
+        contributors.map(function (a) {
+          return '<span class="contributor-chip">' + esc(a.name) +
+            '<span class="contributor-count">' + (Number(a.commits) || 0) + '</span></span>';
+        }).join("") +
+        '</div>'
+      : "";
 
     var sb = document.getElementById("sparklineBlock");
     var spark = sparklineSvg(w.commitFrequency && w.commitFrequency.data);

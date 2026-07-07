@@ -9,6 +9,7 @@ const {
   showErrorMessageMock,
   showQuickPickMock,
   showSaveDialogMock,
+  clipboardWriteTextMock,
   workspaceState,
 } = vi.hoisted(() => ({
   writeFileMock: vi.fn(async () => {}),
@@ -16,6 +17,7 @@ const {
   showErrorMessageMock: vi.fn(() => Promise.resolve(undefined)),
   showQuickPickMock: vi.fn(),
   showSaveDialogMock: vi.fn(),
+  clipboardWriteTextMock: vi.fn(async () => {}),
   workspaceState: { root: undefined as string | undefined },
 }));
 
@@ -36,6 +38,9 @@ vi.mock("vscode", () => ({
     },
     fs: { writeFile: writeFileMock },
   },
+  env: {
+    clipboard: { writeText: clipboardWriteTextMock },
+  },
   Uri: {
     file: (fsPath: string) => ({ fsPath }),
   },
@@ -45,6 +50,8 @@ vi.mock("vscode", () => ({
 import * as vscode from "vscode";
 import { AnalyticsWebviewProvider } from "../src/infrastructure/webview-provider";
 import { flushLatestSnapshotWrites } from "../src/infrastructure/latest-snapshot";
+import { gitReportToMd } from "../src/domains/git/analytics-service";
+import { makeGitAnalyticsReport } from "./fixtures";
 import { LATEST_SNAPSHOT_FILES, MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../src/constants";
 
 function makeProvider(root: string): AnalyticsWebviewProvider {
@@ -58,6 +65,7 @@ function makeProvider(root: string): AnalyticsWebviewProvider {
   return provider;
 }
 
+
 describe("WebviewProvider report export", () => {
   beforeEach(() => {
     writeFileMock.mockReset().mockResolvedValue(undefined);
@@ -65,6 +73,7 @@ describe("WebviewProvider report export", () => {
     showErrorMessageMock.mockReset().mockReturnValue(Promise.resolve(undefined));
     showQuickPickMock.mockReset();
     showSaveDialogMock.mockReset();
+    clipboardWriteTextMock.mockReset().mockResolvedValue(undefined);
     workspaceState.root = undefined;
   });
 
@@ -117,6 +126,63 @@ describe("WebviewProvider report export", () => {
     await (provider as any).handleQuickSave("json");
 
     expect(fs.readFileSync(path.join(artifactsDir, ".gitignore"), "utf-8")).toBe("# custom\n");
+  });
+
+  it("quick-save md writes the real markdown serialization", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-export-md-"));
+    workspaceState.root = root;
+    const provider = makeProvider(root);
+    const report = makeGitAnalyticsReport();
+    (provider as any).lastReport = report;
+
+    await (provider as any).handleQuickSave("md");
+
+    expect(writeFileMock).toHaveBeenCalledTimes(1);
+    const [target, buf] = writeFileMock.mock.calls[0] as unknown as [
+      { fsPath: string },
+      Buffer,
+    ];
+    expect(target.fsPath).toMatch(/meridian-git-analytics-.*\.md$/);
+    expect(buf.toString("utf-8")).toBe(gitReportToMd(report));
+  });
+
+  it("quick-save rejects an unknown format and writes nothing", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-export-bad-"));
+    workspaceState.root = root;
+    const provider = makeProvider(root);
+
+    await (provider as any).handleQuickSave("html");
+
+    expect(writeFileMock).not.toHaveBeenCalled();
+  });
+
+  it("copyMarkdown routes the markdown through the clipboard policy", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-copy-md-"));
+    workspaceState.root = root;
+    const provider = makeProvider(root);
+    const report = makeGitAnalyticsReport();
+    (provider as any).lastReport = report;
+
+    // autoCopy defaults to false → copyWithPolicy prompts; accepting copies.
+    showInformationMessageMock.mockReturnValue(Promise.resolve("Copy to Clipboard") as never);
+
+    await (provider as any).handleMessage({ type: "copyMarkdown" });
+
+    expect(showInformationMessageMock).toHaveBeenCalledWith(
+      "Git Analytics markdown is ready.",
+      "Copy to Clipboard"
+    );
+    expect(clipboardWriteTextMock).toHaveBeenCalledWith(gitReportToMd(report));
+  });
+
+  it("copyMarkdown with no report does nothing", async () => {
+    const provider = makeProvider("/tmp/none");
+    (provider as any).lastReport = null;
+
+    await (provider as any).handleMessage({ type: "copyMarkdown" });
+
+    expect(clipboardWriteTextMock).not.toHaveBeenCalled();
+    expect(showInformationMessageMock).not.toHaveBeenCalled();
   });
 
   it("save-as cancelled (dialog returns nothing) leaves no artifacts dir behind", async () => {

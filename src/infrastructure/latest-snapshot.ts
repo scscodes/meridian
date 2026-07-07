@@ -91,8 +91,14 @@ export function serializeReportJson(value: unknown): string {
   }, 2);
 }
 
-function latestDirPath(workspaceRoot: string): string {
+/** Canonical `.meridian/latest/` location — the one place the on-disk layout is encoded. */
+export function latestDirPath(workspaceRoot: string): string {
   return path.join(workspaceRoot, MERIDIAN_DIR, MERIDIAN_LATEST_DIR);
+}
+
+/** Canonical absolute path of one kind's snapshot file (writer and readers share it). */
+export function latestSnapshotPath(workspaceRoot: string, kind: LatestSnapshotKind): string {
+  return path.join(latestDirPath(workspaceRoot), LATEST_SNAPSHOT_FILES[kind]);
 }
 
 /**
@@ -117,6 +123,23 @@ async function writeFileIfMissing(filePath: string, content: string, logger: Log
  */
 let writeQueue: Promise<void> = Promise.resolve();
 
+export type LatestSnapshotWriteListener = (kind: LatestSnapshotKind) => void;
+
+const writeListeners = new Set<LatestSnapshotWriteListener>();
+
+/**
+ * Subscribe to successful snapshot writes (invoked inside the queue, after
+ * the rename lands). Returns an unsubscribe function. Listener errors are
+ * swallowed — a bad subscriber can never stall the queue or fail a write.
+ * Module stays `vscode`-free; callers adapt the unsubscribe to a Disposable.
+ */
+export function onLatestSnapshotWrite(listener: LatestSnapshotWriteListener): () => void {
+  writeListeners.add(listener);
+  return () => {
+    writeListeners.delete(listener);
+  };
+}
+
 /**
  * Write `report` to `.meridian/latest/<kind>.v1.json`, atomically (unique
  * tmp + rename) so a concurrent reader never observes torn JSON.
@@ -131,7 +154,7 @@ export function writeLatestSnapshot(
 ): Promise<void> {
   const run = async (): Promise<void> => {
     const latestDir = latestDirPath(workspaceRoot);
-    const target = path.join(latestDir, LATEST_SNAPSHOT_FILES[kind]);
+    const target = latestSnapshotPath(workspaceRoot, kind);
     // pid-scoped tmp name: in-process interleaving is prevented by the queue;
     // this guards against a second extension host on the same workspace.
     const tmpTarget = `${target}.${process.pid}.tmp`;
@@ -162,6 +185,15 @@ export function writeLatestSnapshot(
         // Best-effort cleanup only — nothing further to do on double failure.
       });
       logger.warn(`Latest-snapshot write failed for ${kind}: ${String(e)}`, "writeLatestSnapshot");
+      return;
+    }
+
+    for (const listener of writeListeners) {
+      try {
+        listener(kind);
+      } catch {
+        // Listener errors never fail the write or stall the queue.
+      }
     }
   };
 

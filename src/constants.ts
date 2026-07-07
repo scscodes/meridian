@@ -47,6 +47,16 @@ export const MERIDIAN_ARTIFACTS_DIR = "artifacts";
 /** Pulse-history subdir under the dotdir (self-ignored, ADR 019). */
 export const MERIDIAN_PULSE_DIR = "pulse";
 
+/** Agent-readable "latest report" snapshot subdir under the dotdir (self-ignored, ADR 020). */
+export const MERIDIAN_LATEST_DIR = "latest";
+
+/** Versioned filenames for the `.meridian/latest/` snapshot convention (ADR 020). */
+export const LATEST_SNAPSHOT_FILES = {
+  sessionBriefing: "session-briefing.v1.json",
+  gitAnalytics: "git-analytics.v1.json",
+  hygieneAnalytics: "hygiene-analytics.v1.json",
+} as const;
+
 // ============================================================================
 // Workspace Exclusion Base — shared across git and hygiene analytics.
 // Domain-specific lists extend via spread.

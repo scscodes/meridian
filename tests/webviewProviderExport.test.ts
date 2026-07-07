@@ -44,6 +44,7 @@ vi.mock("vscode", () => ({
 
 import * as vscode from "vscode";
 import { AnalyticsWebviewProvider } from "../src/infrastructure/webview-provider";
+import { LATEST_SNAPSHOT_FILES, MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../src/constants";
 
 function makeProvider(root: string): AnalyticsWebviewProvider {
   const provider = new AnalyticsWebviewProvider(
@@ -128,5 +129,29 @@ describe("WebviewProvider report export", () => {
 
     expect(writeFileMock).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(root, ".meridian", "artifacts"))).toBe(false);
+  });
+
+  describe("ADR 020 latest-snapshot write", () => {
+    it("updateReport writes .meridian/latest/git-analytics.v1.json when a workspace is open", async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-latest-export-"));
+      workspaceState.root = root;
+      const provider = makeProvider(root);
+
+      const report = { summary: { totalCommits: 7 } };
+      (provider as any).updateReport(report);
+
+      const target = path.join(root, MERIDIAN_DIR, MERIDIAN_LATEST_DIR, LATEST_SNAPSHOT_FILES.gitAnalytics);
+      expect(fs.existsSync(target)).toBe(true);
+      const parsed = JSON.parse(fs.readFileSync(target, "utf-8"));
+      expect(parsed.kind).toBe("gitAnalytics");
+      expect(parsed.report).toEqual(report);
+    });
+
+    it("updateReport with no workspace folder writes nothing and does not throw", () => {
+      workspaceState.root = undefined;
+      const provider = makeProvider("/tmp/no-root");
+
+      expect(() => (provider as any).updateReport({ summary: {} })).not.toThrow();
+    });
   });
 });

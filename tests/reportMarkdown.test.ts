@@ -22,24 +22,13 @@ import {
 import type { GitAnalyticsReport } from "../src/domains/git/analytics-types";
 import type { HygieneAnalyticsReport } from "../src/domains/hygiene/analytics-types";
 import type { SessionBriefingReport } from "../src/domains/git/types";
+import { makeGitAnalyticsReport } from "./fixtures";
 
 const WHEN = new Date("2026-07-07T12:00:00.000Z");
 
+/** Shared fixture, seeded with pipe/backtick escape-bait values. */
 function makeGitReport(): GitAnalyticsReport {
-  return {
-    period: "3mo",
-    generatedAt: WHEN,
-    summary: {
-      totalCommits: 2,
-      totalAuthors: 1,
-      totalFilesModified: 2,
-      totalLinesAdded: 10,
-      totalLinesDeleted: 4,
-      commitFrequency: 0.5,
-      averageCommitSize: 7,
-      churnRate: 1.25,
-    },
-    commits: [],
+  return makeGitAnalyticsReport({
     files: [
       {
         path: "src/pipe|and`tick.ts",
@@ -62,15 +51,8 @@ function makeGitReport(): GitAnalyticsReport {
         lastActive: WHEN,
       },
     ],
-    trends: {
-      commitTrend: { slope: 0, direction: "stable", confidence: 0.5 },
-      volatilityTrend: { slope: 0, direction: "stable" },
-    },
-    commitFrequency: { labels: ["Week 1"], data: [2] },
-    churnFiles: [],
-    topAuthors: [],
     coChange: [{ a: "a.ts", b: "b|c.ts", count: 3, coChangeRate: 0.75 }],
-  };
+  });
 }
 
 function makeBriefingReport(): SessionBriefingReport {

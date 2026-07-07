@@ -41,6 +41,29 @@ export interface IgnoreHooks {
   readonly invalidateCaches: () => void;
 }
 
+/**
+ * Single home for per-format export facts. Adding a format = one entry here
+ * plus a serializer branch in `serializeReport` (which switches exhaustively
+ * on ExportFormat); the QuickPick labels, label→format lookup, and save-dialog
+ * filters all derive from this table.
+ */
+interface ExportFormatSpec {
+  label: string;
+  filters: Record<string, string[]>;
+}
+
+const EXPORT_FORMATS: Record<"json" | "csv" | "md", ExportFormatSpec> = {
+  json: { label: "JSON", filters: { "JSON Files": ["json"] } },
+  csv: { label: "CSV", filters: { "CSV Files": ["csv"] } },
+  md: { label: "Markdown", filters: { "Markdown Files": ["md"] } },
+};
+
+type ExportFormat = keyof typeof EXPORT_FORMATS;
+
+function isExportFormat(format: string): format is ExportFormat {
+  return format in EXPORT_FORMATS;
+}
+
 // ============================================================================
 // Base Class
 // ============================================================================
@@ -215,12 +238,12 @@ export abstract class BaseWebviewProvider<TReport> {
 
   /** Serialize the current report in the requested format, or null if absent/invalid. */
   private serializeReport(format: string): string | null {
-    if (!this.lastReport || (format !== "json" && format !== "csv" && format !== "md")) {
-      return null;
+    if (!this.lastReport || !isExportFormat(format)) return null;
+    switch (format) {
+      case "json": return this.reportToJson(this.lastReport);
+      case "csv": return this.reportToCsv(this.lastReport);
+      case "md": return this.reportToMarkdown(this.lastReport);
     }
-    if (format === "json") return this.reportToJson(this.lastReport);
-    if (format === "md") return this.reportToMarkdown(this.lastReport);
-    return this.reportToCsv(this.lastReport);
   }
 
   /**
@@ -320,11 +343,14 @@ export abstract class BaseWebviewProvider<TReport> {
    * .meridian/artifacts/). The escape hatch for saving anywhere.
    */
   protected async handleSaveAs(): Promise<void> {
-    const picked = await vscode.window.showQuickPick(["JSON", "CSV", "Markdown"], {
-      placeHolder: "Export format",
-    });
+    const formats = Object.keys(EXPORT_FORMATS) as ExportFormat[];
+    const picked = await vscode.window.showQuickPick(
+      formats.map((f) => EXPORT_FORMATS[f].label),
+      { placeHolder: "Export format" }
+    );
     if (!picked) return;
-    const format = picked === "Markdown" ? "md" : picked.toLowerCase();
+    const format = formats.find((f) => EXPORT_FORMATS[f].label === picked);
+    if (!format) return;
 
     const content = this.serializeReport(format);
     if (content === null) return;
@@ -337,13 +363,10 @@ export abstract class BaseWebviewProvider<TReport> {
       ? vscode.Uri.file(path.join(artifactsDir, defaultName))
       : vscode.Uri.file(defaultName);
 
-    const filters: Record<string, string[]> = format === "json"
-      ? { "JSON Files": ["json"] }
-      : format === "md"
-        ? { "Markdown Files": ["md"] }
-        : { "CSV Files": ["csv"] };
-
-    const uri = await vscode.window.showSaveDialog({ defaultUri, filters });
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri,
+      filters: EXPORT_FORMATS[format].filters,
+    });
     if (!uri) return;
 
     try {

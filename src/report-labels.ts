@@ -21,9 +21,6 @@ export function reportMdHeader(label: string): string {
  * the row structure.
  */
 export function mdEscape(value: string): string {
-  return value
-    .replace(/\r?\n/g, " ")
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|")
-    .replace(/`/g, "\\`");
+  // Single pass: it runs per table cell inside the export serializer loops.
+  return value.replace(/\r?\n|[\\|`]/g, (m) => (m === "\r\n" || m === "\n" ? " " : `\\${m}`));
 }

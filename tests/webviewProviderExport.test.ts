@@ -51,7 +51,7 @@ import * as vscode from "vscode";
 import { AnalyticsWebviewProvider } from "../src/infrastructure/webview-provider";
 import { flushLatestSnapshotWrites } from "../src/infrastructure/latest-snapshot";
 import { gitReportToMd } from "../src/domains/git/analytics-service";
-import type { GitAnalyticsReport } from "../src/domains/git/analytics-types";
+import { makeGitAnalyticsReport } from "./fixtures";
 import { LATEST_SNAPSHOT_FILES, MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../src/constants";
 
 function makeProvider(root: string): AnalyticsWebviewProvider {
@@ -65,37 +65,6 @@ function makeProvider(root: string): AnalyticsWebviewProvider {
   return provider;
 }
 
-/** Minimal fully-typed report so the markdown paths serialize real values. */
-function makeGitReport(): GitAnalyticsReport {
-  const when = new Date("2026-07-07T12:00:00.000Z");
-  return {
-    period: "3mo",
-    generatedAt: when,
-    summary: {
-      totalCommits: 1,
-      totalAuthors: 1,
-      totalFilesModified: 1,
-      totalLinesAdded: 2,
-      totalLinesDeleted: 1,
-      commitFrequency: 0.25,
-      averageCommitSize: 3,
-      churnRate: 1,
-    },
-    commits: [],
-    files: [],
-    authors: [
-      { name: "Ada", commits: 1, insertions: 2, deletions: 1, filesChanged: 1, lastActive: when },
-    ],
-    trends: {
-      commitTrend: { slope: 0, direction: "stable", confidence: 0.5 },
-      volatilityTrend: { slope: 0, direction: "stable" },
-    },
-    commitFrequency: { labels: ["Week 1"], data: [1] },
-    churnFiles: [],
-    topAuthors: [],
-    coChange: [],
-  };
-}
 
 describe("WebviewProvider report export", () => {
   beforeEach(() => {
@@ -163,7 +132,7 @@ describe("WebviewProvider report export", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-export-md-"));
     workspaceState.root = root;
     const provider = makeProvider(root);
-    const report = makeGitReport();
+    const report = makeGitAnalyticsReport();
     (provider as any).lastReport = report;
 
     await (provider as any).handleQuickSave("md");
@@ -191,7 +160,7 @@ describe("WebviewProvider report export", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-copy-md-"));
     workspaceState.root = root;
     const provider = makeProvider(root);
-    const report = makeGitReport();
+    const report = makeGitAnalyticsReport();
     (provider as any).lastReport = report;
 
     // autoCopy defaults to false → copyWithPolicy prompts; accepting copies.

@@ -91,8 +91,14 @@ export function serializeReportJson(value: unknown): string {
   }, 2);
 }
 
-function latestDirPath(workspaceRoot: string): string {
+/** Canonical `.meridian/latest/` location — the one place the on-disk layout is encoded. */
+export function latestDirPath(workspaceRoot: string): string {
   return path.join(workspaceRoot, MERIDIAN_DIR, MERIDIAN_LATEST_DIR);
+}
+
+/** Canonical absolute path of one kind's snapshot file (writer and readers share it). */
+export function latestSnapshotPath(workspaceRoot: string, kind: LatestSnapshotKind): string {
+  return path.join(latestDirPath(workspaceRoot), LATEST_SNAPSHOT_FILES[kind]);
 }
 
 /**
@@ -148,7 +154,7 @@ export function writeLatestSnapshot(
 ): Promise<void> {
   const run = async (): Promise<void> => {
     const latestDir = latestDirPath(workspaceRoot);
-    const target = path.join(latestDir, LATEST_SNAPSHOT_FILES[kind]);
+    const target = latestSnapshotPath(workspaceRoot, kind);
     // pid-scoped tmp name: in-process interleaving is prevented by the queue;
     // this guards against a second extension host on the same workspace.
     const tmpTarget = `${target}.${process.pid}.tmp`;

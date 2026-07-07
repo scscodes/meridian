@@ -20,6 +20,7 @@ import {
   AppError,
 } from '../src/types';
 import type { RunLog } from '../src/infrastructure/run-log';
+import type { GitAnalyticsReport } from '../src/domains/git/analytics-types';
 
 // ============================================================================
 // Mock Logger
@@ -247,6 +248,48 @@ export class MockWorkspaceProvider implements WorkspaceProvider {
     this.files.delete(path);
     return success(void 0);
   }
+}
+
+// ============================================================================
+// Git Analytics Report Fixture
+// ============================================================================
+
+/**
+ * Minimal fully-typed GitAnalyticsReport. Tests override the fields they
+ * exercise (e.g. escape-bait paths for the markdown serializer).
+ */
+export function makeGitAnalyticsReport(
+  overrides?: Partial<GitAnalyticsReport>
+): GitAnalyticsReport {
+  const when = new Date('2026-07-07T12:00:00.000Z');
+  return {
+    period: '3mo',
+    generatedAt: when,
+    summary: {
+      totalCommits: 1,
+      totalAuthors: 1,
+      totalFilesModified: 1,
+      totalLinesAdded: 2,
+      totalLinesDeleted: 1,
+      commitFrequency: 0.25,
+      averageCommitSize: 3,
+      churnRate: 1,
+    },
+    commits: [],
+    files: [],
+    authors: [
+      { name: 'Ada', commits: 1, insertions: 2, deletions: 1, filesChanged: 1, lastActive: when },
+    ],
+    trends: {
+      commitTrend: { slope: 0, direction: 'stable', confidence: 0.5 },
+      volatilityTrend: { slope: 0, direction: 'stable' },
+    },
+    commitFrequency: { labels: ['Week 1'], data: [1] },
+    churnFiles: [],
+    topAuthors: [],
+    coChange: [],
+    ...overrides,
+  };
 }
 
 // ============================================================================

@@ -4,10 +4,8 @@
 
 import * as vscode from "vscode";
 import * as fs from "fs";
-import * as path from "path";
 import { Command, CommandContext, GitProvider, Logger, Result } from "../types";
-import { MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../constants";
-import { onLatestSnapshotWrite } from "../infrastructure/latest-snapshot";
+import { latestDirPath, onLatestSnapshotWrite } from "../infrastructure/latest-snapshot";
 import { GitTreeProvider } from "../ui/tree-providers/git-tree-provider";
 import { HygieneTreeProvider } from "../ui/tree-providers/hygiene-tree-provider";
 import {
@@ -87,7 +85,7 @@ export function setupTreeProviders(
     // otherwise explain how they come into being.
     vscode.commands.registerCommand("meridian.latest.reveal", () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const latestDir = root ? path.join(root, MERIDIAN_DIR, MERIDIAN_LATEST_DIR) : null;
+      const latestDir = root ? latestDirPath(root) : null;
       if (latestDir && fs.existsSync(latestDir)) {
         void vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(latestDir));
       } else {

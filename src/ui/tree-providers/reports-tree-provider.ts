@@ -13,9 +13,8 @@
 
 import * as vscode from "vscode";
 import { promises as fsp } from "node:fs";
-import * as path from "node:path";
 import { REPORT_LABELS } from "../../report-labels";
-import { LATEST_SNAPSHOT_FILES, MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../../constants";
+import { latestSnapshotPath, LatestSnapshotKind } from "../../infrastructure/latest-snapshot";
 
 export type ReportId = "sessionBriefing" | "gitAnalytics" | "hygiene";
 
@@ -35,11 +34,11 @@ const REPORTS: ReadonlyArray<{ id: ReportId; label: string }> = [
   { id: "hygiene", label: REPORT_LABELS.hygieneAnalytics },
 ];
 
-/** ReportId → latest-snapshot filename. The tree's `hygiene` row reads the `hygieneAnalytics` snapshot. */
-const REPORT_SNAPSHOT_FILE: Record<ReportId, string> = {
-  sessionBriefing: LATEST_SNAPSHOT_FILES.sessionBriefing,
-  gitAnalytics: LATEST_SNAPSHOT_FILES.gitAnalytics,
-  hygiene: LATEST_SNAPSHOT_FILES.hygieneAnalytics,
+/** ReportId → snapshot kind. Only the tree's `hygiene` row is renamed (`hygieneAnalytics`). */
+const REPORT_SNAPSHOT_KIND: Record<ReportId, LatestSnapshotKind> = {
+  sessionBriefing: "sessionBriefing",
+  gitAnalytics: "gitAnalytics",
+  hygiene: "hygieneAnalytics",
 };
 
 /**
@@ -91,11 +90,11 @@ export class ReportsTreeProvider implements vscode.TreeDataProvider<ReportTreeIt
     const items = REPORTS.map((r) => new ReportTreeItem(r.id, r.label));
     if (!this.workspaceRoot) return items;
 
-    const latestDir = path.join(this.workspaceRoot, MERIDIAN_DIR, MERIDIAN_LATEST_DIR);
+    const root = this.workspaceRoot;
     await Promise.all(
       items.map(async (item) => {
         try {
-          const stat = await fsp.stat(path.join(latestDir, REPORT_SNAPSHOT_FILE[item.reportId]));
+          const stat = await fsp.stat(latestSnapshotPath(root, REPORT_SNAPSHOT_KIND[item.reportId]));
           item.description = formatRelativeAge(Date.now() - stat.mtimeMs);
         } catch {
           // No snapshot yet for this report — leave the description absent.

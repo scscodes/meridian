@@ -8,6 +8,7 @@
  * Whitelisted command classes (not in COMMAND_MAP, but valid in the manifest):
  *   SPECIALIZED_COMMANDS — dedicated registrations per ADR 005 (custom UI/param sourcing)
  *   INFRASTRUCTURE_COMMANDS — view lifecycle commands (refresh, statusBar); no routing
+ *   PRESENTATION_UTILITY_COMMANDS — palette-visible utilities registered in tree-setup.ts
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -22,13 +23,21 @@ import { SETTING_DEFAULTS } from "../src/infrastructure/settings";
 
 // ── Whitelists ────────────────────────────────────────────────────────────────
 
-/** Dedicated registrations outside COMMAND_MAP (ADR 005): custom UI/param sourcing. */
+/** Registered in specialized-commands.ts (ADR 005). Not in COMMAND_MAP. */
 const SPECIALIZED_COMMANDS = new Set([
   "meridian.hygiene.deleteFile",
   "meridian.hygiene.ignoreFile",
   "meridian.hygiene.impactAnalysis", // ADR 005: active-file fallback + InputBox prompt
   "meridian.hygiene.pruneStorage",   // ADR 019: status preview + confirmation modal
-  "meridian.latest.reveal",          // tree-setup.ts: reveal-or-explain .meridian/latest/ (ADR 020)
+]);
+
+/**
+ * Palette-visible utility commands registered in tree-setup.ts. Distinct from
+ * INFRASTRUCTURE_COMMANDS (which are enforced out of the palette) and from
+ * SPECIALIZED_COMMANDS (whose home is specialized-commands.ts).
+ */
+const PRESENTATION_UTILITY_COMMANDS = new Set([
+  "meridian.latest.reveal", // reveal-or-explain .meridian/latest/ (ADR 020)
 ]);
 
 /** View lifecycle commands. No routing, no palette exposure. */
@@ -102,7 +111,12 @@ describe("Manifest — VS Code commands surface", () => {
   it("every contributes.commands entry is accounted for (COMMAND_MAP or whitelist)", () => {
     const orphans: string[] = [];
     for (const { command } of manifestCommands) {
-      if (!commandMapIds.has(command) && !SPECIALIZED_COMMANDS.has(command) && !INFRASTRUCTURE_COMMANDS.has(command)) {
+      if (
+        !commandMapIds.has(command) &&
+        !SPECIALIZED_COMMANDS.has(command) &&
+        !INFRASTRUCTURE_COMMANDS.has(command) &&
+        !PRESENTATION_UTILITY_COMMANDS.has(command)
+      ) {
         orphans.push(command);
       }
     }

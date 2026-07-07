@@ -525,6 +525,31 @@ h3.sub {
   margin: 0 0 14px;
 }
 
+/* Top-contributor chips (Activity section) */
+
+.contributor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.contributor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-input-border, #555);
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.contributor-count {
+  font-weight: 600;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
 /* Pulse trend charts sit side-by-side where width allows, stack otherwise. */
 #pulseTrendBlock {
   display: flex;

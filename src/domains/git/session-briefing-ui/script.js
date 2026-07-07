@@ -32,6 +32,12 @@
   document.getElementById("exportJson").addEventListener("click", function () {
     vscode.postMessage({ type: "export", format: "json" });
   });
+  document.getElementById("exportMd").addEventListener("click", function () {
+    vscode.postMessage({ type: "export", format: "md" });
+  });
+  document.getElementById("copyMd").addEventListener("click", function () {
+    vscode.postMessage({ type: "copyMarkdown" });
+  });
   document.getElementById("exportAs").addEventListener("click", function () {
     vscode.postMessage({ type: "exportAs" });
   });

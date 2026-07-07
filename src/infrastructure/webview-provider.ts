@@ -4,12 +4,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { GitAnalyticsReport, AnalyticsOptions } from "../domains/git/analytics-types";
-import { gitReportToCsv } from "../domains/git/analytics-service";
+import { gitReportToCsv, gitReportToMd } from "../domains/git/analytics-service";
 import { HygieneAnalyticsReport } from "../domains/hygiene/analytics-types";
 import { SessionBriefingReport } from "../domains/git/types";
 import { resolveWorkspacePath } from "../security/path-guard";
 import { appendIgnorePattern } from "../security/ignore-store";
-import { REPORT_LABELS, reportCsvHeader } from "../report-labels";
+import { copyWithPolicy } from "../security/operation-policy";
+import { REPORT_LABELS, reportCsvHeader, reportMdHeader, mdEscape } from "../report-labels";
 import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
 import type { ReportOpenArg } from "../ui/tree-providers/reports-tree-provider";
 import type { Logger } from "../types";
@@ -55,6 +56,7 @@ export abstract class BaseWebviewProvider<TReport> {
   protected abstract getUiDirSegments(): string[];
   protected abstract getExportFilenamePrefix(): string;
   protected abstract reportToCsv(report: TReport): string;
+  protected abstract reportToMarkdown(report: TReport): string;
   protected abstract onMessage(msg: { type: string; [key: string]: unknown }): Promise<void>;
   /** Snapshot kind for the ADR 020 `.meridian/latest/` write on every updateReport(). */
   protected abstract getLatestSnapshotKind(): LatestSnapshotKind;
@@ -91,6 +93,10 @@ export abstract class BaseWebviewProvider<TReport> {
     }
     if (msg.type === "exportAs") {
       await this.handleSaveAs();
+      return;
+    }
+    if (msg.type === "copyMarkdown") {
+      await this.handleCopyMarkdown();
       return;
     }
     if (msg.type === "ignorePath") {
@@ -209,10 +215,23 @@ export abstract class BaseWebviewProvider<TReport> {
 
   /** Serialize the current report in the requested format, or null if absent/invalid. */
   private serializeReport(format: string): string | null {
-    if (!this.lastReport || (format !== "json" && format !== "csv")) return null;
-    return format === "json"
-      ? this.reportToJson(this.lastReport)
-      : this.reportToCsv(this.lastReport);
+    if (!this.lastReport || (format !== "json" && format !== "csv" && format !== "md")) {
+      return null;
+    }
+    if (format === "json") return this.reportToJson(this.lastReport);
+    if (format === "md") return this.reportToMarkdown(this.lastReport);
+    return this.reportToCsv(this.lastReport);
+  }
+
+  /**
+   * Copy the markdown rendering of the current report to the clipboard,
+   * routed through the security.clipboard.autoCopy policy (same gate as the
+   * impact-analysis summary copy — no new clipboard surface).
+   */
+  protected async handleCopyMarkdown(): Promise<void> {
+    const content = this.serializeReport("md");
+    if (content === null) return;
+    await copyWithPolicy(content, `${this.getViewTitle()} markdown`);
   }
 
   /** Timestamped, Windows-safe filename for this report (millisecond precision). */
@@ -301,11 +320,11 @@ export abstract class BaseWebviewProvider<TReport> {
    * .meridian/artifacts/). The escape hatch for saving anywhere.
    */
   protected async handleSaveAs(): Promise<void> {
-    const picked = await vscode.window.showQuickPick(["JSON", "CSV"], {
+    const picked = await vscode.window.showQuickPick(["JSON", "CSV", "Markdown"], {
       placeHolder: "Export format",
     });
     if (!picked) return;
-    const format = picked.toLowerCase();
+    const format = picked === "Markdown" ? "md" : picked.toLowerCase();
 
     const content = this.serializeReport(format);
     if (content === null) return;
@@ -320,7 +339,9 @@ export abstract class BaseWebviewProvider<TReport> {
 
     const filters: Record<string, string[]> = format === "json"
       ? { "JSON Files": ["json"] }
-      : { "CSV Files": ["csv"] };
+      : format === "md"
+        ? { "Markdown Files": ["md"] }
+        : { "CSV Files": ["csv"] };
 
     const uri = await vscode.window.showSaveDialog({ defaultUri, filters });
     if (!uri) return;
@@ -423,6 +444,10 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
     return gitReportToCsv(report);
   }
 
+  protected reportToMarkdown(report: GitAnalyticsReport): string {
+    return gitReportToMd(report);
+  }
+
   protected async onMessage(msg: { type: string; payload?: unknown }): Promise<void> {
     if (msg.type === "filter") {
       try {
@@ -518,6 +543,31 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
     for (const f of report.files) {
       lines.push(
         `${csvStr(f.path)},${f.sizeBytes},${f.lineCount},${f.ageDays},${f.category},${f.isPruneCandidate}`
+      );
+    }
+
+    return lines.join("\n");
+  }
+
+  protected reportToMarkdown(report: HygieneAnalyticsReport): string {
+    const lines: string[] = [];
+
+    lines.push(reportMdHeader(REPORT_LABELS.hygieneAnalytics));
+    lines.push("");
+    lines.push(`- **Generated:** ${report.generatedAt instanceof Date ? report.generatedAt.toISOString() : String(report.generatedAt)}`);
+    lines.push(`- **Workspace:** ${mdEscape(report.workspaceRoot)}`);
+    lines.push(`- **Total Files:** ${report.summary.totalFiles}`);
+    lines.push(`- **Prune Candidates:** ${report.summary.pruneCount}`);
+    lines.push(`- **Estimated Savings:** ${(report.summary.pruneEstimateSizeBytes / 1024).toFixed(1)} KB`);
+    lines.push("");
+
+    lines.push("## Files");
+    lines.push("");
+    lines.push("| Path | Size (bytes) | Lines | Age (days) | Category | Prune Candidate |");
+    lines.push("| --- | --- | --- | --- | --- | --- |");
+    for (const f of report.files) {
+      lines.push(
+        `| ${mdEscape(f.path)} | ${f.sizeBytes} | ${f.lineCount} | ${f.ageDays} | ${f.category} | ${f.isPruneCandidate} |`
       );
     }
 
@@ -695,6 +745,131 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
       for (const f of pc.files) {
         lines.push(
           `${csvStr(f.path)},${f.count},${(f.coChangeRate * 100).toFixed(0)},${csvStr(f.becauseOf.join(";"))}`
+        );
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  protected reportToMarkdown(report: SessionBriefingReport): string {
+    const lines: string[] = [];
+
+    lines.push(reportMdHeader(REPORT_LABELS.sessionBriefing));
+    lines.push("");
+    lines.push(`- **Generated:** ${report.generatedAt}`);
+    lines.push(`- **Branch:** ${mdEscape(report.branch)}`);
+    lines.push(`- **Dirty:** ${report.isDirty}`);
+    lines.push(`- **Staged:** ${report.staged}`);
+    lines.push(`- **Unstaged:** ${report.unstaged}`);
+    lines.push(`- **Untracked:** ${report.untracked}`);
+    lines.push("");
+
+    lines.push("## Recent Commits");
+    lines.push("");
+    lines.push("| Hash | Author | Message | Insertions | Deletions |");
+    lines.push("| --- | --- | --- | --- | --- |");
+    for (const c of report.recentCommits) {
+      lines.push(
+        `| ${c.shortHash} | ${mdEscape(c.author)} | ${mdEscape(c.message)} | ${c.insertions} | ${c.deletions} |`
+      );
+    }
+    lines.push("");
+
+    lines.push("## Uncommitted Files");
+    lines.push("");
+    lines.push("| Path | Status |");
+    lines.push("| --- | --- |");
+    for (const f of report.uncommittedFiles) {
+      lines.push(`| ${mdEscape(f.path)} | ${f.status} |`);
+    }
+
+    const w = report.activityWindow;
+    if (w) {
+      lines.push("");
+      lines.push("## Activity");
+      lines.push("");
+      lines.push(`- **Period:** ${w.period}`);
+      lines.push(`- **Commits In Window:** ${w.commitsInWindow}`);
+      lines.push(`- **Files Touched:** ${w.filesTouched}`);
+      if (w.trends) {
+        lines.push(`- **Commit Trend:** ${w.trends.commitDirection}`);
+        lines.push(`- **Commit Confidence:** ${w.trends.commitConfidence}`);
+        lines.push(`- **Volatility Trend:** ${w.trends.volatilityDirection}`);
+      }
+      lines.push("");
+      lines.push("### Top Contributors");
+      lines.push("");
+      lines.push("| Name | Commits |");
+      lines.push("| --- | --- |");
+      for (const a of w.topContributors) {
+        lines.push(`| ${mdEscape(a.name)} | ${a.commits} |`);
+      }
+      if (w.topChurnFiles && w.topChurnFiles.length > 0) {
+        lines.push("");
+        lines.push("### Top Churn Files");
+        lines.push("");
+        lines.push("| Path | Volatility | Risk |");
+        lines.push("| --- | --- | --- |");
+        for (const f of w.topChurnFiles) {
+          lines.push(`| ${mdEscape(f.path)} | ${f.volatility} | ${f.risk} |`);
+        }
+      }
+    }
+
+    const h = report.hygieneSnapshot;
+    if (h) {
+      lines.push("");
+      lines.push("## Hygiene");
+      lines.push("");
+      lines.push(`- **Scanned At:** ${h.scannedAt}`);
+      lines.push(`- **Dead Files:** ${h.deadFileCount}`);
+      lines.push(`- **Large Files:** ${h.largeFileCount}`);
+      lines.push(`- **Log Files:** ${h.logFileCount}`);
+      lines.push(`- **Dead Code Items:** ${h.deadCodeItemCount}`);
+      if (h.deadCodeSample && h.deadCodeSample.length > 0) {
+        lines.push("");
+        lines.push("### Dead Code Sample");
+        lines.push("");
+        lines.push("| File | Line | Message |");
+        lines.push("| --- | --- | --- |");
+        for (const d of h.deadCodeSample) {
+          lines.push(`| ${mdEscape(d.filePath)} | ${d.line} | ${mdEscape(d.message)} |`);
+        }
+      }
+    }
+
+    const pr = report.pendingChangeRisk;
+    if (pr && pr.files.length > 0) {
+      lines.push("");
+      lines.push("## Pending-Change Risk");
+      lines.push("");
+      lines.push(`- **Total Changed:** ${pr.totalChanged}`);
+      lines.push(`- **High-Risk:** ${pr.hotspotCount}`);
+      lines.push(`- **Capped:** ${pr.capped}`);
+      lines.push("");
+      lines.push("| Path | Status | Churn | Volatility | Risk |");
+      lines.push("| --- | --- | --- | --- | --- |");
+      for (const f of pr.files) {
+        lines.push(
+          `| ${mdEscape(f.path)} | ${f.status} | ${f.churn ?? ""} | ${f.volatility ?? ""} | ${f.risk} |`
+        );
+      }
+    }
+
+    const pc2 = report.pendingChangeCompanions;
+    if (pc2 && pc2.files.length > 0) {
+      lines.push("");
+      lines.push("## Pending-Change Companions");
+      lines.push("");
+      lines.push(`- **Suggested:** ${pc2.count}`);
+      lines.push(`- **Capped:** ${pc2.capped}`);
+      lines.push("");
+      lines.push("| Path | Co-Changes | Co-change % | Ships With |");
+      lines.push("| --- | --- | --- | --- |");
+      for (const f of pc2.files) {
+        lines.push(
+          `| ${mdEscape(f.path)} | ${f.count} | ${(f.coChangeRate * 100).toFixed(0)} | ${mdEscape(f.becauseOf.join("; "))} |`
         );
       }
     }

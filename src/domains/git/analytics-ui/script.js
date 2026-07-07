@@ -467,6 +467,14 @@ document.getElementById("exportCsv")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "export", format: "csv" });
 });
 
+document.getElementById("exportMd")?.addEventListener("click", () => {
+  vscode?.postMessage({ type: "export", format: "md" });
+});
+
+document.getElementById("copyMd")?.addEventListener("click", () => {
+  vscode?.postMessage({ type: "copyMarkdown" });
+});
+
 document.getElementById("exportAs")?.addEventListener("click", () => {
   vscode?.postMessage({ type: "exportAs" });
 });

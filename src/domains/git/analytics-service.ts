@@ -16,7 +16,7 @@ import {
   TrendData,
 } from "./analytics-types";
 import { ANALYTICS_SETTINGS, CACHE_SETTINGS, CO_CHANGE, WORKSPACE_EXCLUDE_BASE } from "../../constants";
-import { REPORT_LABELS, reportCsvHeader } from "../../report-labels";
+import { REPORT_LABELS, reportCsvHeader, reportMdHeader, mdEscape } from "../../report-labels";
 import { normalizeRenamePath } from "./git-path";
 import { TtlCache } from "../../infrastructure/cache";
 import { pathMatchesAny } from "../../infrastructure/glob-match";
@@ -630,6 +630,73 @@ export function gitReportToCsv(report: GitAnalyticsReport): string {
     for (const pair of coChange.slice(0, CO_CHANGE.CSV_MAX_PAIRS)) {
       lines.push(
         `${csvStr(pair.a)},${csvStr(pair.b)},${pair.count},${(pair.coChangeRate * 100).toFixed(0)}`
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Convert a git analytics report to Markdown. Mirrors gitReportToCsv's
+ * section structure (same caps) so the two exports can never diverge in
+ * coverage, only in framing.
+ */
+export function gitReportToMd(report: GitAnalyticsReport): string {
+  const lines: string[] = [];
+
+  lines.push(reportMdHeader(REPORT_LABELS.gitAnalytics));
+  lines.push("");
+  lines.push(`- **Period:** ${report.period}`);
+  lines.push(`- **Generated:** ${report.generatedAt.toISOString()}`);
+  lines.push("");
+
+  const sum = report.summary;
+  lines.push("## Summary");
+  lines.push("");
+  lines.push("| Metric | Value |");
+  lines.push("| --- | --- |");
+  lines.push(`| Total Commits | ${sum.totalCommits} |`);
+  lines.push(`| Total Authors | ${sum.totalAuthors} |`);
+  lines.push(`| Total Files Modified | ${sum.totalFilesModified} |`);
+  lines.push(`| Lines Added | ${sum.totalLinesAdded} |`);
+  lines.push(`| Lines Deleted | ${sum.totalLinesDeleted} |`);
+  lines.push(`| Commit Frequency (per week) | ${sum.commitFrequency.toFixed(2)} |`);
+  lines.push(`| Avg Commit Size | ${sum.averageCommitSize.toFixed(2)} |`);
+  lines.push(`| Churn Rate | ${sum.churnRate.toFixed(2)} |`);
+  lines.push("");
+
+  lines.push("## Files");
+  lines.push("");
+  lines.push("| Path | Commits | Insertions | Deletions | Volatility | Risk | Authors | Last Modified |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
+  for (const file of report.files.slice(0, ANALYTICS_SETTINGS.CSV_MAX_FILES)) {
+    lines.push(
+      `| ${mdEscape(file.path)} | ${file.commitCount} | ${file.insertions} | ${file.deletions} | ${file.volatility.toFixed(2)} | ${file.risk} | ${mdEscape(file.authors.join("; "))} | ${file.lastModified.toISOString()} |`
+    );
+  }
+  lines.push("");
+
+  lines.push("## Authors");
+  lines.push("");
+  lines.push("| Name | Commits | Insertions | Deletions | Files Changed | Last Active |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
+  for (const author of report.authors) {
+    lines.push(
+      `| ${mdEscape(author.name)} | ${author.commits} | ${author.insertions} | ${author.deletions} | ${author.filesChanged} | ${author.lastActive.toISOString()} |`
+    );
+  }
+
+  const coChange = report.coChange ?? [];
+  if (coChange.length > 0) {
+    lines.push("");
+    lines.push("## Change Companions");
+    lines.push("");
+    lines.push("| File A | File B | Co-Changes | Co-change % |");
+    lines.push("| --- | --- | --- | --- |");
+    for (const pair of coChange.slice(0, CO_CHANGE.CSV_MAX_PAIRS)) {
+      lines.push(
+        `| ${mdEscape(pair.a)} | ${mdEscape(pair.b)} | ${pair.count} | ${(pair.coChangeRate * 100).toFixed(0)} |`
       );
     }
   }

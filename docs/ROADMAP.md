@@ -13,19 +13,8 @@ deferred. (See [ADR 012](./adr/012-product-reanchor.md) for the re-anchor.)
 
 ## Now
 
-1. **Session-briefing UI polish (continued)** — richer presentation over the
-   `aggregateSessionBriefing()` record: actionable cards, inline panel links,
-   quick filters. The pulse slice (ADR 019) landed; remaining polish is
-   presentation-only. Prose stays optional and degrades to the raw aggregate
-   when `vscode.lm` is unavailable.
-   - Primary files: `src/domains/git/session-briefing-ui/`,
-     `src/domains/git/session-aggregator.ts`.
-
-2. **Agent-readable snapshot (stretch, file-shaped)** — a stable, versioned
-   JSON "latest" convention (e.g. `.meridian/latest/briefing.json`) that
-   Copilot/Cursor/CLI agents read directly, plus a documented pointer users
-   paste into their agent rules. No runtime integration, no LM-tool surface —
-   the inversion of the pre-ADR-012 approach.
+Nothing currently in flight. Next natural candidates live in Deferred below —
+none are commitments until picked up here.
 
 ---
 
@@ -44,6 +33,14 @@ deferred. (See [ADR 012](./adr/012-product-reanchor.md) for the re-anchor.)
 
 ## Done
 
+- **Session-briefing actionable cards** — raised flags render as actionable
+  cards in the briefing panel with jump-to-section links and one-click
+  actions, completing the presentation-only UI polish over
+  `aggregateSessionBriefing()`.
+- **Agent-readable latest snapshot** (ADR 020) — stable, versioned
+  `.meridian/latest/*.v1.json` snapshots of all three reports, refreshed on
+  every render; `.meridian/AGENTS.md` as a generated discovery pointer. File-
+  shaped only — no runtime integration, no LM-tool surface.
 - **Ecosystem registry** (ADR 018) — single source for language/toolchain
   semantics; JVM (Maven/Gradle/Kotlin/Scala) first-class; exclusion/bucket/
   categorization drift structurally eliminated.

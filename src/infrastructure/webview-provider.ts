@@ -14,6 +14,7 @@ import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
 import type { ReportOpenArg } from "../ui/tree-providers/reports-tree-provider";
 import type { Logger } from "../types";
 import { getRetentionPolicy, pruneArtifacts } from "./retention";
+import { writeLatestSnapshot, serializeReportJson, LatestSnapshotKind } from "./latest-snapshot";
 
 /**
  * Console-backed Logger for the fire-and-forget retention call — this module
@@ -55,6 +56,8 @@ export abstract class BaseWebviewProvider<TReport> {
   protected abstract getExportFilenamePrefix(): string;
   protected abstract reportToCsv(report: TReport): string;
   protected abstract onMessage(msg: { type: string; [key: string]: unknown }): Promise<void>;
+  /** Snapshot kind for the ADR 020 `.meridian/latest/` write on every updateReport(). */
+  protected abstract getLatestSnapshotKind(): LatestSnapshotKind;
 
   /**
    * Subclasses that wire up IgnoreHooks return them here. The base routes the
@@ -183,18 +186,25 @@ export abstract class BaseWebviewProvider<TReport> {
   }
 
   /**
-   * Cache report and push to webview. Called on initial open and every refresh.
+   * Cache report and push to webview. Called on initial open and every
+   * refresh/filter. Also fire-and-forgets the ADR 020 `.meridian/latest/`
+   * snapshot write — "last rendered" is the contract, so every call here
+   * (including filter-triggered re-renders) refreshes the on-disk snapshot.
    */
   protected updateReport(report: TReport): void {
     this.lastReport = report;
     this.panel?.webview.postMessage({ type: "init", payload: report });
+
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot) {
+      void writeLatestSnapshot(workspaceRoot, this.getLatestSnapshotKind(), report, consoleLoggerAdapter);
+    }
   }
 
   protected reportToJson(report: TReport): string {
-    return JSON.stringify(report, (_key, value) => {
-      if (value instanceof Date) return value.toISOString();
-      return value;
-    }, 2);
+    // Delegates to the ADR 020 serializer so the human-facing JSON export and
+    // the .meridian/latest/ snapshot can never drift.
+    return serializeReportJson(report);
   }
 
   /** Serialize the current report in the requested format, or null if absent/invalid. */
@@ -407,6 +417,7 @@ export class AnalyticsWebviewProvider extends BaseWebviewProvider<GitAnalyticsRe
   protected getViewTitle(): string { return REPORT_LABELS.gitAnalytics; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "git", "analytics-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-git-analytics"; }
+  protected getLatestSnapshotKind(): LatestSnapshotKind { return "gitAnalytics"; }
 
   protected reportToCsv(report: GitAnalyticsReport): string {
     return gitReportToCsv(report);
@@ -469,6 +480,7 @@ export class HygieneAnalyticsWebviewProvider extends BaseWebviewProvider<Hygiene
   protected getViewTitle(): string { return REPORT_LABELS.hygieneAnalytics; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "hygiene", "analytics-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-hygiene-analytics"; }
+  protected getLatestSnapshotKind(): LatestSnapshotKind { return "hygieneAnalytics"; }
 
   protected override getIgnoreHooks(): IgnoreHooks | null {
     if (!this.workspaceRoot || !this.invalidateAnalyticsCaches) return null;
@@ -568,6 +580,7 @@ export class SessionBriefingWebviewProvider extends BaseWebviewProvider<SessionB
   protected getViewTitle(): string { return REPORT_LABELS.sessionBriefing; }
   protected getUiDirSegments(): string[] { return ["out", "domains", "git", "session-briefing-ui"]; }
   protected getExportFilenamePrefix(): string { return "meridian-session-briefing"; }
+  protected getLatestSnapshotKind(): LatestSnapshotKind { return "sessionBriefing"; }
 
   protected override getIgnoreHooks(): IgnoreHooks | null {
     if (!this.invalidateAnalyticsCaches) return null;

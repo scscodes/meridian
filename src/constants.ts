@@ -47,6 +47,22 @@ export const MERIDIAN_ARTIFACTS_DIR = "artifacts";
 /** Pulse-history subdir under the dotdir (self-ignored, ADR 019). */
 export const MERIDIAN_PULSE_DIR = "pulse";
 
+/** Agent-readable "latest report" snapshot subdir under the dotdir (self-ignored, ADR 020). */
+export const MERIDIAN_LATEST_DIR = "latest";
+
+/**
+ * Versioned filenames for the `.meridian/latest/` snapshot convention
+ * (ADR 020). The KEYS are wire-frozen: each key is written verbatim as the
+ * public envelope `kind`, so renaming one is a silent breaking change to the
+ * v1 contract even though nothing internal would flag it. Rename the file
+ * constants if you must — never the keys. Pinned by tests/latestSnapshot.test.ts.
+ */
+export const LATEST_SNAPSHOT_FILES = {
+  sessionBriefing: "session-briefing.v1.json",
+  gitAnalytics: "git-analytics.v1.json",
+  hygieneAnalytics: "hygiene-analytics.v1.json",
+} as const;
+
 // ============================================================================
 // Workspace Exclusion Base — shared across git and hygiene analytics.
 // Domain-specific lists extend via spread.

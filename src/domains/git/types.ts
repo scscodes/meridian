@@ -157,6 +157,42 @@ export interface PulseSlice {
   appended: boolean;
 }
 
+/**
+ * Closed producer-side set of flag ids the aggregator can emit. Consumers of
+ * the public JSON contract (ADR 020) must still treat ids as an OPEN set —
+ * this union exists for compile-time safety inside the extension (a typo'd
+ * id in the aggregator or a test fails to compile), not as a wire guarantee.
+ */
+export type FlagId =
+  | "uncommitted.many"
+  | "head.detached"
+  | "runlog.unavailable"
+  | "runlog.readFailed"
+  | "runs.failures"
+  | "analytics.unavailable"
+  | "risk.hotspots"
+  | "companions.missing"
+  | "hygiene.noScan"
+  | "hygiene.deadFiles"
+  | "hygiene.largeFiles"
+  | "pulse.unavailable"
+  | "pulse.notRecorded";
+
+/**
+ * One structured flag emitted by the aggregator (ADR 011-style additive
+ * slice): `flags: string[]` is derived from `flagItems` (`message` in
+ * insertion order) so the two can never drift. `id` is a stable machine
+ * identifier for UI wiring (e.g. anchors, actions) — deliberately free of
+ * anchors, action names, or any other DOM concept, since this type is
+ * frozen into a public JSON contract (unknown ids/severities must be
+ * tolerated by external consumers per ADR 020).
+ */
+export interface FlagItem {
+  id: FlagId;
+  severity: "warn" | "info";
+  message: string;
+}
+
 export interface SessionBriefing {
   generatedAt: string;
   branch: string;
@@ -167,6 +203,13 @@ export interface SessionBriefing {
   recentCommits: RecentCommit[];
   uncommittedFiles: Array<{ path: string; status: "A" | "M" | "D" | "R" }>;
   flags: string[];
+  /**
+   * Structured counterpart to `flags` (additive slice, ADR 011 style). The
+   * aggregator always populates it — `flags` is derived from it — so it is
+   * required: an optional field here would force dead defensive branches in
+   * every consumer for a producer state that cannot occur.
+   */
+  flagItems: FlagItem[];
   recentRuns?: RecentRunEntry[];
   activityWindow?: ActivityWindow;
   hygieneSnapshot?: HygieneSnapshot;

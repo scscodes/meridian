@@ -36,7 +36,9 @@
     </div>
 
     <div class="table-container" id="activitySection">
-      <h3>Activity <span class="table-hint" id="activityPeriod"></span></h3>
+      <h3>Activity <span class="table-hint" id="activityPeriod"></span>
+        <span class="report-link adornment" data-report="gitAnalytics" title="Open in Git Analytics">&#8599;</span>
+      </h3>
       <div class="metrics" id="activityMetrics"></div>
       <div id="sparklineBlock"></div>
       <div id="churnFilterRow" class="filter-row" style="display:none">
@@ -46,7 +48,9 @@
     </div>
 
     <div class="table-container" id="hygieneSection">
-      <h3>Workspace Hygiene <span class="table-hint" id="hygieneScannedAt"></span></h3>
+      <h3>Workspace Hygiene <span class="table-hint" id="hygieneScannedAt"></span>
+        <span class="report-link adornment" data-report="hygiene" title="Open in Hygiene Analytics">&#8599;</span>
+      </h3>
       <div class="metrics" id="hygieneMetrics"></div>
       <div id="deadCodeBlock"></div>
     </div>
@@ -68,7 +72,9 @@
     </div>
 
     <div class="table-container" id="pendingRiskSection">
-      <h3>Pending-Change Risk <span class="table-hint" id="pendingRiskHint"></span></h3>
+      <h3>Pending-Change Risk <span class="table-hint" id="pendingRiskHint"></span>
+        <span class="report-link adornment" data-report="gitAnalytics" title="Open in Git Analytics">&#8599;</span>
+      </h3>
       <div class="metrics" id="pendingRiskMetrics"></div>
       <div class="filter-row">
         <input type="text" class="path-filter" data-target="pending" placeholder="filter path…" />

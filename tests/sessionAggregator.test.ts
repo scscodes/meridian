@@ -840,11 +840,13 @@ describe('aggregateSessionBriefing', () => {
   });
 
   // The session-briefing webview's FLAG_UI table (id-keyed, see script.js)
-  // no longer parses flag message text, but the messages themselves are
-  // still surfaced verbatim in the UI and pinned by CSV/summary consumers.
-  // The webview JS isn't importable here (ES5 IIFE served as a static
-  // asset), so this test pins the message contract from the aggregator side.
-  it('emits the exact flag message strings other consumers (webview, CSV, summary) depend on', async () => {
+  // no longer parses flag message text, but the messages remain user-facing
+  // contract: they surface verbatim in the flag cards, in deterministicSummary
+  // (session-handler.ts), and in the ADR 004 prose data. (They are NOT in the
+  // CSV export — reportToCsv never emits flags.) The webview JS isn't
+  // importable here (ES5 IIFE served as a static asset), so this test pins
+  // the message contract from the aggregator side.
+  it('emits the exact flag message strings user-facing consumers (cards, summary, prose) depend on', async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = await import('fs');
     // eslint-disable-next-line @typescript-eslint/no-require-imports

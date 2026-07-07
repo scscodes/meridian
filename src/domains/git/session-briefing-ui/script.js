@@ -122,6 +122,11 @@
   // without an entry here (or entries with neither `anchor` nor `action`)
   // render as inert cards — acceptable, matching the prior regex-miss
   // behavior.
+  var HYGIENE_REPORT_UI = {
+    anchor: "hygieneSection",
+    action: { label: "Open Hygiene Analytics", message: { type: "openReport", payload: { id: "hygiene" } } },
+  };
+
   var FLAG_UI = {
     "uncommitted.many": {
       anchor: "uncommittedSection",
@@ -133,14 +138,8 @@
       action: { label: "Open Git Analytics", message: { type: "openReport", payload: { id: "gitAnalytics" } } },
     },
     "companions.missing": { anchor: "companionsSection" },
-    "hygiene.deadFiles": {
-      anchor: "hygieneSection",
-      action: { label: "Open Hygiene Analytics", message: { type: "openReport", payload: { id: "hygiene" } } },
-    },
-    "hygiene.largeFiles": {
-      anchor: "hygieneSection",
-      action: { label: "Open Hygiene Analytics", message: { type: "openReport", payload: { id: "hygiene" } } },
-    },
+    "hygiene.deadFiles": HYGIENE_REPORT_UI,
+    "hygiene.largeFiles": HYGIENE_REPORT_UI,
     "hygiene.noScan": {
       action: { label: "Run scan", message: { type: "runHygieneScan" } },
     },
@@ -163,40 +162,16 @@
       '</div>';
   }
 
-  // Legacy fallback for reports that only carry the plain string array
-  // (e.g. older cached JSON re-opened, or a host that hasn't upgraded yet).
-  function legacyFlagChip(f) {
-    if (f === "No hygiene scan yet") {
-      return '<div class="flag-card flag-card-info">' +
-        '<span class="flag-icon">&#9432;</span>' +
-        '<span class="flag-message">No hygiene scan yet</span>' +
-        '<button class="flag-cta" data-flag-id="hygiene.noScan">Run scan</button>' +
-        '</div>';
-    }
-    return '<div class="flag-card flag-card-warn">' +
-      '<span class="flag-icon">&#9888;</span>' +
-      '<span class="flag-message">' + esc(f) + '</span>' +
-      '</div>';
-  }
-
+  // flagItems is a required field of the aggregate (same-bundle host — no
+  // version skew or cached-JSON path exists), so no string-array fallback.
   function renderFlags(report) {
     var el = document.getElementById("flagsSection");
     var items = report.flagItems;
-    if (items && items.length > 0) {
-      el.innerHTML = '<div class="flags-container">' + items.map(flagCard).join("") + '</div>';
-      return;
-    }
-    var flags = report.flags;
-    if (!flags || flags.length === 0) {
+    if (!items || items.length === 0) {
       el.innerHTML = "";
       return;
     }
-    el.innerHTML = '<div class="flags-container">' + flags.map(legacyFlagChip).join("") + '</div>';
-  }
-
-  function flagActionMessageFor(flagId) {
-    var ui = FLAG_UI[flagId];
-    return ui && ui.action ? ui.action.message : null;
+    el.innerHTML = '<div class="flags-container">' + items.map(flagCard).join("") + '</div>';
   }
 
   // ── Activity & Hygiene (retained computed insight) ─────────────────
@@ -661,8 +636,8 @@
 
     var cta = e.target.closest(".flag-cta");
     if (cta && cta.dataset.flagId) {
-      var msg = flagActionMessageFor(cta.dataset.flagId);
-      if (msg) vscode.postMessage(msg);
+      var ui = FLAG_UI[cta.dataset.flagId];
+      if (ui && ui.action) vscode.postMessage(ui.action.message);
       return;
     }
 

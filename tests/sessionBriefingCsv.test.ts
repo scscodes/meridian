@@ -37,6 +37,7 @@ const base: SessionBriefingReport = {
   recentCommits: [],
   uncommittedFiles: [],
   flags: [],
+  flagItems: [],
   summary: "s",
 };
 

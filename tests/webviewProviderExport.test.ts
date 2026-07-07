@@ -44,6 +44,7 @@ vi.mock("vscode", () => ({
 
 import * as vscode from "vscode";
 import { AnalyticsWebviewProvider } from "../src/infrastructure/webview-provider";
+import { flushLatestSnapshotWrites } from "../src/infrastructure/latest-snapshot";
 import { LATEST_SNAPSHOT_FILES, MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../src/constants";
 
 function makeProvider(root: string): AnalyticsWebviewProvider {
@@ -139,6 +140,9 @@ describe("WebviewProvider report export", () => {
 
       const report = { summary: { totalCommits: 7 } };
       (provider as any).updateReport(report);
+      // The write is genuinely async (queued, off the render path) — flush
+      // before asserting on disk state.
+      await flushLatestSnapshotWrites();
 
       const target = path.join(root, MERIDIAN_DIR, MERIDIAN_LATEST_DIR, LATEST_SNAPSHOT_FILES.gitAnalytics);
       expect(fs.existsSync(target)).toBe(true);
@@ -147,11 +151,15 @@ describe("WebviewProvider report export", () => {
       expect(parsed.report).toEqual(report);
     });
 
-    it("updateReport with no workspace folder writes nothing and does not throw", () => {
+    it("updateReport with no workspace folder writes nothing and does not throw", async () => {
       workspaceState.root = undefined;
-      const provider = makeProvider("/tmp/no-root");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "meridian-latest-nows-"));
+      const provider = makeProvider(root);
 
       expect(() => (provider as any).updateReport({ summary: {} })).not.toThrow();
+      await flushLatestSnapshotWrites();
+      // Not just "no throw": nothing may be materialized under the provider root.
+      expect(fs.existsSync(path.join(root, MERIDIAN_DIR, MERIDIAN_LATEST_DIR))).toBe(false);
     });
   });
 });

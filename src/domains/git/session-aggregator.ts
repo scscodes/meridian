@@ -31,6 +31,7 @@ import {
   PendingCompanion,
   PulseSlice,
   FlagItem,
+  FlagId,
 } from "./types";
 import { SESSION_BRIEFING, PENDING_RISK, COMPANIONS, PULSE } from "../../constants";
 
@@ -47,11 +48,12 @@ export interface SessionBriefingSources {
 }
 
 /**
- * Single append point for every flag emitted by the aggregator. Keeping all
- * flag creation funneled through here guarantees `flags` (derived at the end
- * as `flagItems.map(i => i.message)`) can never drift from `flagItems`.
+ * Shorthand append for the aggregator's flag sites. The no-drift guarantee
+ * between `flags` and `flagItems` comes from the derivation at the return
+ * site (`flags: flagItems.map(i => i.message)`), not from this funnel; the
+ * FlagId parameter type is what catches a typo'd id at compile time.
  */
-function pushFlag(items: FlagItem[], id: string, severity: "warn" | "info", message: string): void {
+function pushFlag(items: FlagItem[], id: FlagId, severity: "warn" | "info", message: string): void {
   items.push({ id, severity, message });
 }
 

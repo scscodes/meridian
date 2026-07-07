@@ -192,8 +192,10 @@ button:hover {
   flex-shrink: 0;
 }
 
+/* Messages wrap within their card: nowrap here would give a card a hard
+   minimum width and force horizontal overflow on narrow panels. */
 .flag-message {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .flag-card-clickable { cursor: pointer; }

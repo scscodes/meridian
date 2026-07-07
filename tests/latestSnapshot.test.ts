@@ -47,6 +47,16 @@ describe("writeLatestSnapshot", () => {
     expect(LATEST_SNAPSHOT_FILES.hygieneAnalytics).toBe("hygiene-analytics.v1.json");
   });
 
+  it("pins all three envelope `kind` wire values (ADR 020: keys are wire-frozen)", async () => {
+    // The LATEST_SNAPSHOT_FILES keys are written verbatim as the public
+    // envelope `kind`. An internal rename of a key is a silent breaking
+    // change to the v1 contract — this test is what makes it loud.
+    for (const kind of ["sessionBriefing", "gitAnalytics", "hygieneAnalytics"] as const) {
+      await writeLatestSnapshot(root, kind, {}, logger);
+      expect(readSnapshot(kind).kind).toBe(kind);
+    }
+  });
+
   it("writes a parseable envelope with schemaVersion, kind, generatedAt, and report", async () => {
     await writeLatestSnapshot(root, "gitAnalytics", { summary: { totalCommits: 3 } }, logger);
     const parsed = readSnapshot("gitAnalytics");
@@ -99,6 +109,33 @@ describe("writeLatestSnapshot", () => {
     await writeLatestSnapshot(root, "sessionBriefing", {}, logger);
 
     expect(fs.readFileSync(agentsMd, "utf-8")).toBe("# my custom notes\n");
+  });
+
+  it("a broken side file never blocks the snapshot write itself", async () => {
+    // A directory squatting at .meridian/AGENTS.md makes the side-file write
+    // fail persistently (surfaces as EEXIST, swallowed as "already present"
+    // per the never-clobber contract); the snapshot must still land — side
+    // files live in an isolated error scope.
+    const squatter = path.join(root, MERIDIAN_DIR, "AGENTS.md");
+    fs.mkdirSync(squatter, { recursive: true });
+
+    await writeLatestSnapshot(root, "sessionBriefing", { branch: "main" }, logger);
+
+    expect(readSnapshot("sessionBriefing").report).toEqual({ branch: "main" });
+    expect(fs.statSync(squatter).isDirectory()).toBe(true);
+  });
+
+  it("serializes concurrent writes through the queue — last call wins, output intact", async () => {
+    // Fire without awaiting individually: the module-level queue must
+    // prevent tmp+rename interleaving and preserve FIFO (last-write-wins).
+    const writes = Array.from({ length: 10 }, (_, i) =>
+      writeLatestSnapshot(root, "gitAnalytics", { version: i }, logger)
+    );
+    await Promise.all(writes);
+
+    const parsed = readSnapshot("gitAnalytics");
+    expect(parsed.report).toEqual({ version: 9 });
+    expect(fs.readdirSync(latestDir).filter((e) => e.includes(".tmp"))).toHaveLength(0);
   });
 
   it("an invalid workspaceRoot resolves without throwing and warns via the logger", async () => {

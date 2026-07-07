@@ -14,7 +14,7 @@ import { MERIDIAN_DIR, MERIDIAN_ARTIFACTS_DIR } from "../constants";
 import type { ReportOpenArg } from "../ui/tree-providers/reports-tree-provider";
 import type { Logger } from "../types";
 import { getRetentionPolicy, pruneArtifacts } from "./retention";
-import { writeLatestSnapshot, LatestSnapshotKind } from "./latest-snapshot";
+import { writeLatestSnapshot, serializeReportJson, LatestSnapshotKind } from "./latest-snapshot";
 
 /**
  * Console-backed Logger for the fire-and-forget retention call — this module
@@ -202,10 +202,9 @@ export abstract class BaseWebviewProvider<TReport> {
   }
 
   protected reportToJson(report: TReport): string {
-    return JSON.stringify(report, (_key, value) => {
-      if (value instanceof Date) return value.toISOString();
-      return value;
-    }, 2);
+    // Delegates to the ADR 020 serializer so the human-facing JSON export and
+    // the .meridian/latest/ snapshot can never drift.
+    return serializeReportJson(report);
   }
 
   /** Serialize the current report in the requested format, or null if absent/invalid. */

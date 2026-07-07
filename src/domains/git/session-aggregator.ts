@@ -30,6 +30,7 @@ import {
   PendingChangeCompanions,
   PendingCompanion,
   PulseSlice,
+  FlagItem,
 } from "./types";
 import { SESSION_BRIEFING, PENDING_RISK, COMPANIONS, PULSE } from "../../constants";
 
@@ -43,6 +44,15 @@ export interface SessionBriefingSources {
   pulseStore?: PulseStore;
   logger: Logger;
   options?: { recentRunLimit?: number; recentCommitLimit?: number };
+}
+
+/**
+ * Single append point for every flag emitted by the aggregator. Keeping all
+ * flag creation funneled through here guarantees `flags` (derived at the end
+ * as `flagItems.map(i => i.message)`) can never drift from `flagItems`.
+ */
+function pushFlag(items: FlagItem[], id: string, severity: "warn" | "info", message: string): void {
+  items.push({ id, severity, message });
 }
 
 /**
@@ -268,23 +278,23 @@ export async function aggregateSessionBriefing(
   const uncommitted = changesResult.value;
   const uncommittedFiles = uncommitted.map((f) => ({ path: f.path, status: f.status }));
 
-  const flags: string[] = [];
+  const flagItems: FlagItem[] = [];
   if (uncommitted.length > SESSION_BRIEFING.UNCOMMITTED_FILES_FLAG_THRESHOLD) {
-    flags.push(`Large number of uncommitted files (${uncommitted.length})`);
+    pushFlag(flagItems, "uncommitted.many", "warn", `Large number of uncommitted files (${uncommitted.length})`);
   }
   if (status.branch === "HEAD") {
-    flags.push("Detached HEAD — not on a named branch");
+    pushFlag(flagItems, "head.detached", "warn", "Detached HEAD — not on a named branch");
   }
 
   // ── Run log — fail-soft ──────────────────────────────────────────────────
   let recentRuns: RecentRunEntry[] | undefined;
   if (!runLogFetch) {
-    flags.push("Run log unavailable");
+    pushFlag(flagItems, "runlog.unavailable", "info", "Run log unavailable");
   } else {
     const runLogResult = await runLogFetch;
     if (runLogResult.kind === "err") {
       logger.warn("Session briefing: run log read failed", "aggregateSessionBriefing", runLogResult.error);
-      flags.push("Run log read failed");
+      pushFlag(flagItems, "runlog.readFailed", "info", "Run log read failed");
     } else {
       const terminalEvents = runLogResult.value.filter(
         (e): e is RunCompleteEvent | RunFailEvent =>
@@ -307,7 +317,7 @@ export async function aggregateSessionBriefing(
       });
       const failCount = recentRuns.filter((r) => r.phase === "fail").length;
       if (failCount >= SESSION_BRIEFING.FAILED_RUNS_FLAG_THRESHOLD) {
-        flags.push(`Recent run failures: ${failCount}`);
+        pushFlag(flagItems, "runs.failures", "warn", `Recent run failures: ${failCount}`);
       }
     }
   }
@@ -319,7 +329,7 @@ export async function aggregateSessionBriefing(
   const analyticsReport = await analyticsFetch;
   if (!analyticsReport) {
     logger.warn("Session briefing: analytics unavailable", "aggregateSessionBriefing");
-    flags.push("Analytics unavailable");
+    pushFlag(flagItems, "analytics.unavailable", "info", "Analytics unavailable");
   } else {
     activityWindow = {
       period: analyticsReport.period,
@@ -348,7 +358,7 @@ export async function aggregateSessionBriefing(
 
     pendingChangeRisk = computePendingChangeRisk(uncommitted, analyticsReport.files);
     if (pendingChangeRisk.hotspotCount >= PENDING_RISK.HOTSPOT_FLAG_THRESHOLD) {
-      flags.push(`Modifying ${pendingChangeRisk.hotspotCount} high-risk files`);
+      pushFlag(flagItems, "risk.hotspots", "warn", `Modifying ${pendingChangeRisk.hotspotCount} high-risk files`);
     }
 
     pendingChangeCompanions = computePendingChangeCompanions(
@@ -359,7 +369,10 @@ export async function aggregateSessionBriefing(
       pendingChangeCompanions &&
       pendingChangeCompanions.count >= COMPANIONS.FLAG_THRESHOLD
     ) {
-      flags.push(
+      pushFlag(
+        flagItems,
+        "companions.missing",
+        "warn",
         `Possibly missing ${pendingChangeCompanions.count} companion file${pendingChangeCompanions.count === 1 ? "" : "s"}`
       );
     }
@@ -382,13 +395,13 @@ export async function aggregateSessionBriefing(
       ...(deadCodeSample.length > 0 ? { deadCodeSample } : {}),
     };
     if (scan.deadFiles.length >= SESSION_BRIEFING.DEAD_FILE_FLAG_THRESHOLD) {
-      flags.push(`Hygiene: ${scan.deadFiles.length} dead files`);
+      pushFlag(flagItems, "hygiene.deadFiles", "warn", `Hygiene: ${scan.deadFiles.length} dead files`);
     }
     if (scan.largeFiles.length >= SESSION_BRIEFING.LARGE_FILE_FLAG_THRESHOLD) {
-      flags.push(`Hygiene: ${scan.largeFiles.length} large files`);
+      pushFlag(flagItems, "hygiene.largeFiles", "warn", `Hygiene: ${scan.largeFiles.length} large files`);
     }
   } else {
-    flags.push("No hygiene scan yet");
+    pushFlag(flagItems, "hygiene.noScan", "info", "No hygiene scan yet");
   }
 
   // ── Pulse history — fail-soft ────────────────────────────────────────────
@@ -397,7 +410,7 @@ export async function aggregateSessionBriefing(
     const historyResult = await pulseStore.readLatest(PULSE.SERIES_LIMIT);
     if (historyResult.kind === "err") {
       logger.warn("Session briefing: pulse history read failed", "aggregateSessionBriefing", historyResult.error);
-      flags.push("Pulse history unavailable");
+      pushFlag(flagItems, "pulse.unavailable", "info", "Pulse history unavailable");
     } else {
       const history = historyResult.value;
       const previous = history.length > 0 ? history[history.length - 1] : undefined;
@@ -428,7 +441,7 @@ export async function aggregateSessionBriefing(
         const appendResult = await pulseStore.append(current);
         if (appendResult.kind === "err") {
           logger.warn("Session briefing: pulse append failed", "aggregateSessionBriefing", appendResult.error);
-          flags.push("Pulse history not recorded");
+          pushFlag(flagItems, "pulse.notRecorded", "info", "Pulse history not recorded");
         } else {
           appended = true;
         }
@@ -446,7 +459,8 @@ export async function aggregateSessionBriefing(
     untracked: status.untracked,
     recentCommits: commitsResult.value,
     uncommittedFiles,
-    flags,
+    flags: flagItems.map((i) => i.message),
+    flagItems,
     recentRuns,
     activityWindow,
     hygieneSnapshot,

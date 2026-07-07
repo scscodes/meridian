@@ -156,23 +156,35 @@ button:hover {
   letter-spacing: -0.5px;
 }
 
-/* Flags */
+/* Flag action cards */
 
 .flags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
 }
 
-.flag {
+.flag-card {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  flex: 0 1 auto;
+}
+
+.flag-card-warn {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 6px;
-  margin-bottom: 6px;
-  font-size: 12px;
   color: #f59e0b;
+}
+
+.flag-card-info {
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #94a3b8;
 }
 
 .flag-icon {
@@ -180,10 +192,18 @@ button:hover {
   flex-shrink: 0;
 }
 
-.flag-clickable { cursor: pointer; }
-.flag-clickable:hover {
+.flag-message {
+  white-space: nowrap;
+}
+
+.flag-card-clickable { cursor: pointer; }
+.flag-card-clickable.flag-card-warn:hover {
   background: rgba(245, 158, 11, 0.14);
   border-color: rgba(245, 158, 11, 0.5);
+}
+.flag-card-clickable.flag-card-info:hover {
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(148, 163, 184, 0.45);
 }
 
 .flag-cta {
@@ -198,6 +218,14 @@ button:hover {
 }
 .flag-cta:hover {
   background: rgba(245, 158, 11, 0.15);
+}
+
+.flag-card-info .flag-cta {
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #94a3b8;
+}
+.flag-card-info .flag-cta:hover {
+  background: rgba(148, 163, 184, 0.15);
 }
 
 /* Pending-change diff icon */

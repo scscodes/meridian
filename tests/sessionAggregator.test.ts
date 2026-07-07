@@ -758,11 +758,93 @@ describe('aggregateSessionBriefing', () => {
     expect(result.value.pulse?.appended).toBe(false);
   });
 
-  // The session-briefing webview's FLAG_ANCHORS table couples to literal flag
-  // prefixes emitted from this aggregator. The webview JS isn't importable here
-  // (ES5 IIFE served as a static asset), so this test pins the contract from
-  // the aggregator side: any rewording must be paired with a script.js update.
-  it('emits flag strings the webview FLAG_ANCHORS table can match', async () => {
+  // ── flagItems — structured counterpart to flags (additive slice) ─────────
+
+  it('returns flagItems alongside flags, each with id/severity/message, in parity with flags', async () => {
+    const result = await aggregateSessionBriefing(makeSources(git, logger, runLog));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const { flags, flagItems } = result.value;
+    expect(flagItems).toBeDefined();
+    for (const item of flagItems!) {
+      expect(typeof item.id).toBe('string');
+      expect(['warn', 'info']).toContain(item.severity);
+      expect(typeof item.message).toBe('string');
+    }
+    expect(flagItems!.map((i) => i.message)).toEqual(flags);
+  });
+
+  it('spot-checks id + severity for uncommitted.many, head.detached, hygiene.noScan, risk.hotspots, analytics.unavailable', async () => {
+    const manyChanges = Array.from({ length: 11 }, (_, i) =>
+      createMockChange({ path: `src/file${i}.ts`, status: 'M' })
+    );
+    git.setAllChanges(manyChanges);
+    git.setStatus({ branch: 'HEAD', isDirty: true, staged: 0, unstaged: 11, untracked: 0 });
+
+    const n = PENDING_RISK.HOTSPOT_FLAG_THRESHOLD;
+    const hotspotChanges = Array.from({ length: n }, (_, i) =>
+      createMockChange({ path: `src/hot${i}.ts`, status: 'M' })
+    );
+    git.setAllChanges([...manyChanges, ...hotspotChanges]);
+
+    const brokenAnalyzer = { analyze: vi.fn().mockRejectedValue(new Error('no git repo')) } as unknown as GitAnalyzer;
+    const result = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, { gitAnalyzer: brokenAnalyzer, getHygieneScan: () => undefined })
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const byId = Object.fromEntries(result.value.flagItems!.map((i) => [i.id, i]));
+
+    expect(byId['uncommitted.many']).toMatchObject({ severity: 'warn' });
+    expect(byId['uncommitted.many'].message).toBe(`Large number of uncommitted files (${manyChanges.length + n})`);
+
+    expect(byId['head.detached']).toMatchObject({
+      severity: 'warn',
+      message: 'Detached HEAD — not on a named branch',
+    });
+
+    expect(byId['hygiene.noScan']).toMatchObject({
+      severity: 'info',
+      message: 'No hygiene scan yet',
+    });
+
+    expect(byId['analytics.unavailable']).toMatchObject({
+      severity: 'info',
+      message: 'Analytics unavailable',
+    });
+
+    // Analytics is unavailable here, so risk.hotspots cannot fire in this
+    // same run — verify it separately with a working analyzer instead.
+    expect(byId['risk.hotspots']).toBeUndefined();
+
+    const hotspotResult = await aggregateSessionBriefing(
+      makeSources(git, logger, runLog, {
+        gitAnalyzer: makeAnalyzer({
+          files: hotspotChanges.map((c) => ({
+            path: c.path, commitCount: 5, insertions: 0, deletions: 0,
+            volatility: 5, authors: [] as string[], lastModified: new Date(), risk: 'high' as const,
+          })),
+        }),
+        getHygieneScan: () => undefined,
+      })
+    );
+    expect(hotspotResult.kind).toBe('ok');
+    if (hotspotResult.kind !== 'ok') return;
+    const hotspotById = Object.fromEntries(hotspotResult.value.flagItems!.map((i) => [i.id, i]));
+    expect(hotspotById['risk.hotspots']).toMatchObject({
+      severity: 'warn',
+      message: `Modifying ${n} high-risk files`,
+    });
+  });
+
+  // The session-briefing webview's FLAG_UI table (id-keyed, see script.js)
+  // no longer parses flag message text, but the messages themselves are
+  // still surfaced verbatim in the UI and pinned by CSV/summary consumers.
+  // The webview JS isn't importable here (ES5 IIFE served as a static
+  // asset), so this test pins the message contract from the aggregator side.
+  it('emits the exact flag message strings other consumers (webview, CSV, summary) depend on', async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = await import('fs');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -771,7 +853,6 @@ describe('aggregateSessionBriefing', () => {
       path.join(__dirname, '../src/domains/git/session-aggregator.ts'),
       'utf-8',
     );
-    // Keep in sync with script.js FLAG_ANCHORS in session-briefing-ui/.
     const expectedFlagPrefixes = [
       'Recent run failures',
       'Modifying ',                          // "Modifying N high-risk files"

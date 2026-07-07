@@ -76,7 +76,7 @@
   function renderUI(report) {
     renderBranchBar(report);
     renderSummaryCards(report);
-    renderFlags(report.flags);
+    renderFlags(report);
     renderPulse(report.pulse);
     renderActivity(report.activityWindow);
     renderHygiene(report.hygieneSnapshot);
@@ -116,51 +116,87 @@
       '<h3>' + esc(label) + '</h3><p class="value">' + (Number(value) || 0) + '</p></div>';
   }
 
-  // Map known flag prefixes to a section anchor for scroll-to. Flag strings
-  // live in session-aggregator.ts; if they change here without an update there
-  // the flag degrades to inert (no scroll, no error) — acceptable.
-  var FLAG_ANCHORS = [
-    { re: /^Recent run failures/i,             anchor: "recentRunsSection" },
-    { re: /^Modifying \d+ high-risk files/i,   anchor: "pendingRiskSection" },
-    { re: /^Possibly missing \d+ companion/i,  anchor: "companionsSection" },
-    { re: /^Hygiene: \d+ dead files/i,         anchor: "hygieneSection" },
-    { re: /^Hygiene: \d+ large files/i,        anchor: "hygieneSection" },
-    { re: /^Large number of uncommitted files/i, anchor: "uncommittedSection" },
-  ];
+  // Map known flag ids (from FlagItem.id, session-aggregator.ts) to a section
+  // anchor and/or an action button. Keyed by id rather than matched against
+  // message text, so rewording a message never breaks the wiring. Flags
+  // without an entry here (or entries with neither `anchor` nor `action`)
+  // render as inert cards — acceptable, matching the prior regex-miss
+  // behavior.
+  var FLAG_UI = {
+    "uncommitted.many": {
+      anchor: "uncommittedSection",
+      action: { label: "Open Source Control", message: { type: "openScm" } },
+    },
+    "runs.failures": { anchor: "recentRunsSection" },
+    "risk.hotspots": {
+      anchor: "pendingRiskSection",
+      action: { label: "Open Git Analytics", message: { type: "openReport", payload: { id: "gitAnalytics" } } },
+    },
+    "companions.missing": { anchor: "companionsSection" },
+    "hygiene.deadFiles": {
+      anchor: "hygieneSection",
+      action: { label: "Open Hygiene Analytics", message: { type: "openReport", payload: { id: "hygiene" } } },
+    },
+    "hygiene.largeFiles": {
+      anchor: "hygieneSection",
+      action: { label: "Open Hygiene Analytics", message: { type: "openReport", payload: { id: "hygiene" } } },
+    },
+    "hygiene.noScan": {
+      action: { label: "Run scan", message: { type: "runHygieneScan" } },
+    },
+  };
 
-  function flagAnchorFor(text) {
-    for (var i = 0; i < FLAG_ANCHORS.length; i++) {
-      if (FLAG_ANCHORS[i].re.test(text)) return FLAG_ANCHORS[i].anchor;
-    }
-    return null;
+  function flagCard(item) {
+    var ui = FLAG_UI[item.id] || {};
+    var isWarn = item.severity !== "info";
+    var glyph = isWarn ? "&#9888;" : "&#9432;";
+    var cls = "flag-card flag-card-" + (isWarn ? "warn" : "info") +
+      (ui.anchor ? " flag-card-clickable" : "");
+    var attrs = ui.anchor ? ' data-anchor="' + esc(ui.anchor) + '" title="Jump to section"' : '';
+    var actionHtml = ui.action
+      ? '<button class="flag-cta" data-flag-id="' + esc(item.id) + '">' + esc(ui.action.label) + '</button>'
+      : '';
+    return '<div class="' + cls + '"' + attrs + '>' +
+      '<span class="flag-icon">' + glyph + '</span>' +
+      '<span class="flag-message">' + esc(item.message) + '</span>' +
+      actionHtml +
+      '</div>';
   }
 
-  function renderFlags(flags) {
+  // Legacy fallback for reports that only carry the plain string array
+  // (e.g. older cached JSON re-opened, or a host that hasn't upgraded yet).
+  function legacyFlagChip(f) {
+    if (f === "No hygiene scan yet") {
+      return '<div class="flag-card flag-card-info">' +
+        '<span class="flag-icon">&#9432;</span>' +
+        '<span class="flag-message">No hygiene scan yet</span>' +
+        '<button class="flag-cta" data-flag-id="hygiene.noScan">Run scan</button>' +
+        '</div>';
+    }
+    return '<div class="flag-card flag-card-warn">' +
+      '<span class="flag-icon">&#9888;</span>' +
+      '<span class="flag-message">' + esc(f) + '</span>' +
+      '</div>';
+  }
+
+  function renderFlags(report) {
     var el = document.getElementById("flagsSection");
+    var items = report.flagItems;
+    if (items && items.length > 0) {
+      el.innerHTML = '<div class="flags-container">' + items.map(flagCard).join("") + '</div>';
+      return;
+    }
+    var flags = report.flags;
     if (!flags || flags.length === 0) {
       el.innerHTML = "";
       return;
     }
-    el.innerHTML = '<div class="flags-container">' +
-      flags.map(function (f) {
-        // Special-case: replace the "No hygiene scan yet" warning with an
-        // inline CTA — the flag is the affordance.
-        if (f === "No hygiene scan yet") {
-          return '<div class="flag">' +
-            '<span class="flag-icon">&#9888;</span>' +
-            'No hygiene scan yet &nbsp;' +
-            '<button class="flag-cta" data-action="runHygieneScan">Run scan</button>' +
-            '</div>';
-        }
-        var anchor = flagAnchorFor(f);
-        var attrs = anchor
-          ? ' data-anchor="' + esc(anchor) + '" title="Jump to section"'
-          : '';
-        var cls = anchor ? 'flag flag-clickable' : 'flag';
-        return '<div class="' + cls + '"' + attrs + '>' +
-          '<span class="flag-icon">&#9888;</span>' + esc(f) + '</div>';
-      }).join("") +
-      '</div>';
+    el.innerHTML = '<div class="flags-container">' + flags.map(legacyFlagChip).join("") + '</div>';
+  }
+
+  function flagActionMessageFor(flagId) {
+    var ui = FLAG_UI[flagId];
+    return ui && ui.action ? ui.action.message : null;
   }
 
   // ── Activity & Hygiene (retained computed insight) ─────────────────
@@ -608,10 +644,11 @@
   //
   // Precedence (first match wins):
   //   1. .diff-link          → openDiff   (pending-change diff icon)
-  //   2. .flag-cta           → runHygieneScan ("Run scan" inline CTA)
-  //   3. .report-link        → openReport (risk badges, dead-code adornment)
+  //   2. .flag-cta           → flag action message (looked up by flag id)
+  //   3. .report-link        → openReport (risk badges, dead-code adornment,
+  //                            section-header adornments)
   //   4. .card-clickable     → openScm    (summary cards)
-  //   5. .flag-clickable     → scroll-to  (flag → known section anchor)
+  //   5. .flag-card-clickable → scroll-to (action card → known section anchor)
   //   6. .path-link          → openFile   (fallback)
   document.addEventListener("click", function (e) {
     if (!e.target || !e.target.closest) return;
@@ -623,8 +660,9 @@
     }
 
     var cta = e.target.closest(".flag-cta");
-    if (cta && cta.dataset.action === "runHygieneScan") {
-      vscode.postMessage({ type: "runHygieneScan" });
+    if (cta && cta.dataset.flagId) {
+      var msg = flagActionMessageFor(cta.dataset.flagId);
+      if (msg) vscode.postMessage(msg);
       return;
     }
 
@@ -640,7 +678,7 @@
       return;
     }
 
-    var fl = e.target.closest(".flag-clickable");
+    var fl = e.target.closest(".flag-card-clickable");
     if (fl && fl.dataset.anchor) {
       var target = document.getElementById(fl.dataset.anchor);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });

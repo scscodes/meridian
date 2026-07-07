@@ -157,6 +157,20 @@ export interface PulseSlice {
   appended: boolean;
 }
 
+/**
+ * One structured flag emitted by the aggregator (ADR 011-style additive
+ * slice): `flags: string[]` is derived from `flagItems` (`message` in
+ * insertion order) so the two can never drift. `id` is a stable machine
+ * identifier for UI wiring (e.g. anchors, actions) — deliberately free of
+ * anchors, action names, or any other DOM concept, since this type is
+ * frozen into a public JSON contract.
+ */
+export interface FlagItem {
+  id: string;
+  severity: "warn" | "info";
+  message: string;
+}
+
 export interface SessionBriefing {
   generatedAt: string;
   branch: string;
@@ -167,6 +181,11 @@ export interface SessionBriefing {
   recentCommits: RecentCommit[];
   uncommittedFiles: Array<{ path: string; status: "A" | "M" | "D" | "R" }>;
   flags: string[];
+  /**
+   * Structured counterpart to `flags` (additive slice, ADR 011 style).
+   * Optional for now; present whenever the aggregator has run.
+   */
+  flagItems?: FlagItem[];
   recentRuns?: RecentRunEntry[];
   activityWindow?: ActivityWindow;
   hygieneSnapshot?: HygieneSnapshot;

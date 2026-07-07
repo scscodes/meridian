@@ -117,6 +117,23 @@ async function writeFileIfMissing(filePath: string, content: string, logger: Log
  */
 let writeQueue: Promise<void> = Promise.resolve();
 
+export type LatestSnapshotWriteListener = (kind: LatestSnapshotKind) => void;
+
+const writeListeners = new Set<LatestSnapshotWriteListener>();
+
+/**
+ * Subscribe to successful snapshot writes (invoked inside the queue, after
+ * the rename lands). Returns an unsubscribe function. Listener errors are
+ * swallowed — a bad subscriber can never stall the queue or fail a write.
+ * Module stays `vscode`-free; callers adapt the unsubscribe to a Disposable.
+ */
+export function onLatestSnapshotWrite(listener: LatestSnapshotWriteListener): () => void {
+  writeListeners.add(listener);
+  return () => {
+    writeListeners.delete(listener);
+  };
+}
+
 /**
  * Write `report` to `.meridian/latest/<kind>.v1.json`, atomically (unique
  * tmp + rename) so a concurrent reader never observes torn JSON.
@@ -162,6 +179,15 @@ export function writeLatestSnapshot(
         // Best-effort cleanup only — nothing further to do on double failure.
       });
       logger.warn(`Latest-snapshot write failed for ${kind}: ${String(e)}`, "writeLatestSnapshot");
+      return;
+    }
+
+    for (const listener of writeListeners) {
+      try {
+        listener(kind);
+      } catch {
+        // Listener errors never fail the write or stall the queue.
+      }
     }
   };
 

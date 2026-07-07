@@ -22,12 +22,13 @@ import { SETTING_DEFAULTS } from "../src/infrastructure/settings";
 
 // ── Whitelists ────────────────────────────────────────────────────────────────
 
-/** Registered in specialized-commands.ts (ADR 005). Not in COMMAND_MAP. */
+/** Dedicated registrations outside COMMAND_MAP (ADR 005): custom UI/param sourcing. */
 const SPECIALIZED_COMMANDS = new Set([
   "meridian.hygiene.deleteFile",
   "meridian.hygiene.ignoreFile",
   "meridian.hygiene.impactAnalysis", // ADR 005: active-file fallback + InputBox prompt
   "meridian.hygiene.pruneStorage",   // ADR 019: status preview + confirmation modal
+  "meridian.latest.reveal",          // tree-setup.ts: reveal-or-explain .meridian/latest/ (ADR 020)
 ]);
 
 /** View lifecycle commands. No routing, no palette exposure. */

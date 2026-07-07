@@ -172,6 +172,12 @@
           "dark": "media/glyph-dark.svg"
         },
         "category": "Meridian"
+      },
+      {
+        "command": "meridian.latest.reveal",
+        "title": "Reveal Latest Snapshots",
+        "icon": "$(folder-opened)",
+        "category": "Meridian"
       }
     ],
     "configuration": {
@@ -403,6 +409,10 @@
         {
           "command": "meridian.hygiene.impactAnalysis",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.latest.reveal",
+          "when": "workspaceFolderCount > 0"
         }
       ],
       "view/title": [
@@ -417,9 +427,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "meridian.openSettings",
+          "command": "meridian.latest.reveal",
           "when": "view == meridian.reports.view",
           "group": "navigation@1"
+        },
+        {
+          "command": "meridian.openSettings",
+          "when": "view == meridian.reports.view",
+          "group": "navigation@2"
         },
         {
           "command": "meridian.openSettings",

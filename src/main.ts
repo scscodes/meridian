@@ -20,7 +20,7 @@ import {
   ConsoleTelemetrySink,
 } from "./infrastructure/telemetry";
 import { generateProse } from "./infrastructure/prose-generator";
-import { readSetting } from "./infrastructure/settings";
+import { readSetting, setWorkspaceSettingsDiagnosticsListener } from "./infrastructure/settings";
 import { getPruneConfig } from "./domains/hygiene/prune-config";
 import { createRunLog } from "./infrastructure/run-log";
 import { createPulseStore } from "./infrastructure/pulse-store";
@@ -62,6 +62,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const logger = new Logger();
   const outputChannel = vscode.window.createOutputChannel("Meridian");
   context.subscriptions.push(outputChannel);
+
+  // Surface .meridian/settings.json misconfigurations — a typo'd key or
+  // mis-typed value falls through silently by contract (ADR 014), so report
+  // it once per file change in the output channel instead of never.
+  setWorkspaceSettingsDiagnosticsListener((diagnostics, file) => {
+    const parts: string[] = [];
+    if (diagnostics.parseError) parts.push(`parse error: ${diagnostics.parseError}`);
+    if (diagnostics.unknownKeys.length > 0) parts.push(`unknown key(s): ${diagnostics.unknownKeys.join(", ")}`);
+    if (diagnostics.mismatchedKeys.length > 0) parts.push(`wrong value type, ignored: ${diagnostics.mismatchedKeys.join(", ")}`);
+    const message = `${file} — ${parts.join("; ")}`;
+    logger.warn(message, "settings");
+    outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
+  });
+  context.subscriptions.push({ dispose: () => setWorkspaceSettingsDiagnosticsListener(null) });
 
   const telemetry = new TelemetryTracker(new ConsoleTelemetrySink(false));
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;

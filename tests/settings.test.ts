@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import { readSetting, SETTING_DEFAULTS } from "../src/infrastructure/settings";
+import {
+  readSetting,
+  setWorkspaceSettingsDiagnosticsListener,
+  SETTING_DEFAULTS,
+  WorkspaceSettingsDiagnostics,
+} from "../src/infrastructure/settings";
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -201,6 +206,119 @@ describe("readSetting()", () => {
       );
 
       expect(readSetting("security.gitNetwork.allowedHosts")).toEqual([]);
+    });
+
+    describe("misconfiguration diagnostics", () => {
+      let emitted: Array<{ diagnostics: WorkspaceSettingsDiagnostics; file: string }>;
+
+      beforeEach(() => {
+        emitted = [];
+        setWorkspaceSettingsDiagnosticsListener((diagnostics, file) => {
+          emitted.push({ diagnostics, file });
+        });
+        vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+          mockCfg((_key, fallback) => fallback)
+        );
+      });
+
+      afterEach(() => {
+        setWorkspaceSettingsDiagnosticsListener(null);
+      });
+
+      function writeSettings(root: string, content: string): void {
+        fs.mkdirSync(path.join(root, ".meridian"), { recursive: true });
+        fs.writeFileSync(path.join(root, ".meridian", "settings.json"), content);
+      }
+
+      it("reports unknown keys once per file change, not once per read", () => {
+        const root = makeWorkspace();
+        writeSettings(root, JSON.stringify({ "hygine.prune.minAgeDays": 7 }));
+        setWorkspaceRoot(root);
+
+        readSetting("hygiene.prune.minAgeDays");
+        readSetting("hygiene.prune.maxSizeMB");
+
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0].diagnostics.unknownKeys).toEqual(["hygine.prune.minAgeDays"]);
+        expect(emitted[0].diagnostics.mismatchedKeys).toEqual([]);
+        expect(emitted[0].file).toBe(path.join(root, ".meridian", "settings.json"));
+      });
+
+      it("reports type-mismatched values for known keys", () => {
+        const root = makeWorkspace();
+        writeSettings(root, JSON.stringify({ "startup.enableFileWatchers": "true" }));
+        setWorkspaceRoot(root);
+
+        expect(readSetting("startup.enableFileWatchers")).toBe(true);
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0].diagnostics.mismatchedKeys).toEqual(["startup.enableFileWatchers"]);
+        expect(emitted[0].diagnostics.unknownKeys).toEqual([]);
+      });
+
+      it("reports a parse error for malformed JSON — and only once despite repeated reads", () => {
+        const root = makeWorkspace();
+        writeSettings(root, "{ not valid json");
+        setWorkspaceRoot(root);
+
+        readSetting("hygiene.prune.minAgeDays");
+        readSetting("hygiene.prune.minAgeDays");
+
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0].diagnostics.parseError).toBeTruthy();
+      });
+
+      it("reports non-object JSON as a parse error", () => {
+        const root = makeWorkspace();
+        writeSettings(root, JSON.stringify(["nope"]));
+        setWorkspaceRoot(root);
+
+        readSetting("startup.enableFileWatchers");
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0].diagnostics.parseError).toContain("JSON object");
+      });
+
+      it("stays silent for a valid file, a missing file, and the JSON-null idiom", () => {
+        const validRoot = makeWorkspace();
+        writeSettings(validRoot, JSON.stringify({ "hygiene.prune.minAgeDays": 7, "model.default": null }));
+        setWorkspaceRoot(validRoot);
+        expect(readSetting("hygiene.prune.minAgeDays")).toBe(7);
+
+        const emptyRoot = makeWorkspace();
+        setWorkspaceRoot(emptyRoot);
+        readSetting("hygiene.prune.minAgeDays");
+
+        expect(emitted).toEqual([]);
+      });
+
+      it("re-reports when the file changes", () => {
+        const root = makeWorkspace();
+        const file = path.join(root, ".meridian", "settings.json");
+        writeSettings(root, JSON.stringify({ "first.unknown": 1 }));
+        setWorkspaceRoot(root);
+        readSetting("hygiene.prune.minAgeDays");
+
+        fs.writeFileSync(file, JSON.stringify({ "second.unknown": 2 }));
+        // Force an mtime the cache cannot mistake for the first write.
+        const later = new Date(Date.now() + 5_000);
+        fs.utimesSync(file, later, later);
+        readSetting("hygiene.prune.minAgeDays");
+
+        expect(emitted.map((e) => e.diagnostics.unknownKeys)).toEqual([
+          ["first.unknown"],
+          ["second.unknown"],
+        ]);
+      });
+
+      it("a throwing listener never breaks the settings read", () => {
+        setWorkspaceSettingsDiagnosticsListener(() => {
+          throw new Error("listener bug");
+        });
+        const root = makeWorkspace();
+        writeSettings(root, JSON.stringify({ "typo.key": 1 }));
+        setWorkspaceRoot(root);
+
+        expect(readSetting("hygiene.prune.minAgeDays")).toBe(30);
+      });
     });
 
     it("accepts a well-typed string[] overlay", () => {

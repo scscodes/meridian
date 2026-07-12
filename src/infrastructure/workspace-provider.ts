@@ -16,6 +16,14 @@ import {
 } from "../types";
 import { resolveWorkspacePath } from "../security/path-guard";
 
+/**
+ * Recoverable-delete capability, injected from the host (main.ts passes
+ * vscode.workspace.fs.delete with useTrash) so this module stays vscode-free.
+ * Must reject when the file cannot be trashed; the provider then falls back
+ * to a permanent unlink.
+ */
+export type MoveToTrashFn = (absolutePath: string) => Promise<void>;
+
 function fsError(code: string, op: string, filePath: string, err: unknown): AppError {
   return {
     code,
@@ -92,7 +100,11 @@ function compilePattern(pattern: string): (name: string) => boolean {
 }
 
 class RealWorkspaceProvider implements WorkspaceProvider {
-  constructor(private readonly workspaceRoot: string, private readonly logger?: Logger) {}
+  constructor(
+    private readonly workspaceRoot: string,
+    private readonly logger?: Logger,
+    private readonly moveToTrash?: MoveToTrashFn
+  ) {}
 
   async findFiles(pattern: string): Promise<Result<string[]>> {
     try {
@@ -165,6 +177,20 @@ class RealWorkspaceProvider implements WorkspaceProvider {
           )
         );
       }
+      // Trash-first: a mis-confirmed delete stays recoverable from the OS
+      // trash. Fall back to a permanent unlink where trash is unavailable
+      // (e.g. some remote filesystems) so deletion keeps working there.
+      if (this.moveToTrash) {
+        try {
+          await this.moveToTrash(target);
+          return success(undefined);
+        } catch (trashErr) {
+          this.logger?.warn(
+            `Trash unavailable for '${target}' (${trashErr instanceof Error ? trashErr.message : String(trashErr)}); deleting permanently`,
+            "WorkspaceProvider"
+          );
+        }
+      }
       await fs.unlink(target);
       return success(undefined);
     } catch (err) {
@@ -175,7 +201,12 @@ class RealWorkspaceProvider implements WorkspaceProvider {
 
 /**
  * Factory: creates a real WorkspaceProvider for the given workspace root.
+ * When `moveToTrash` is supplied, deleteFile is trash-first (recoverable).
  */
-export function createWorkspaceProvider(workspaceRoot: string, logger?: Logger): WorkspaceProvider {
-  return new RealWorkspaceProvider(workspaceRoot, logger);
+export function createWorkspaceProvider(
+  workspaceRoot: string,
+  logger?: Logger,
+  moveToTrash?: MoveToTrashFn
+): WorkspaceProvider {
+  return new RealWorkspaceProvider(workspaceRoot, logger, moveToTrash);
 }

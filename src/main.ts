@@ -73,7 +73,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   migrateLegacyIgnoreFile(workspaceFolder, logger);
 
   const gitProvider = createGitProvider(workspaceRoot);
-  const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger);
+  // Trash-first deletion: hygiene's user-facing Delete File stays recoverable
+  // from the OS trash; the provider falls back to a permanent unlink where
+  // the host filesystem has no trash.
+  const workspaceProvider = createWorkspaceProvider(workspaceRoot, logger, (absolutePath) =>
+    Promise.resolve(
+      vscode.workspace.fs.delete(vscode.Uri.file(absolutePath), { recursive: false, useTrash: true })
+    )
+  );
 
   // ADR 020 addendum: every latest-snapshot write stamps a `repo` staleness
   // fingerprint resolved through the GitProvider (the only place that shells

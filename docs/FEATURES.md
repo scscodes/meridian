@@ -53,7 +53,7 @@ Trace the blast radius of a file or function change by analyzing imports, call s
 Open a dashboard displaying Hygiene analytics: prune candidates over time, file-type breakdown, disk impact (total and per-category), and age/size distributions. Configurable thresholds via workspace settings.
 
 ### File actions (sidebar / explorer context)
-- **Delete File** — remove a file flagged by the last scan (confirmation required).
+- **Delete File** — remove a file flagged by the last scan (confirmation required; the file is moved to the OS trash where supported, so a mis-click stays recoverable).
 - **Ignore File** — append the file's pattern to `.meridian/.meridianignore`.
 
 ### **hygiene.pruneStorage** (Meridian Storage)

@@ -11,8 +11,10 @@ import * as path from "node:path";
 
 import {
   writeLatestSnapshot,
+  setLatestSnapshotRepoContextProvider,
   LATEST_SNAPSHOT_SCHEMA_VERSION,
   LatestSnapshotKind,
+  LatestSnapshotRepoContext,
 } from "../src/infrastructure/latest-snapshot";
 import { LATEST_SNAPSHOT_FILES, MERIDIAN_DIR, MERIDIAN_LATEST_DIR } from "../src/constants";
 import { MockLogger } from "./fixtures";
@@ -29,6 +31,7 @@ describe("writeLatestSnapshot", () => {
   });
 
   afterEach(() => {
+    setLatestSnapshotRepoContextProvider(null);
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -66,6 +69,45 @@ describe("writeLatestSnapshot", () => {
     expect(typeof parsed.generatedAt).toBe("string");
     expect(new Date(parsed.generatedAt as string).toISOString()).toBe(parsed.generatedAt);
     expect(parsed.report).toEqual({ summary: { totalCommits: 3 } });
+    // No provider registered → the repo fingerprint is absent, never fabricated.
+    expect(parsed.repo).toBeUndefined();
+  });
+
+  describe("repo staleness fingerprint (ADR 020 addendum)", () => {
+    const fingerprint: LatestSnapshotRepoContext = {
+      branch: "main",
+      head: "0123456789abcdef0123456789abcdef01234567",
+      isDirty: true,
+      staged: 1,
+      unstaged: 2,
+      untracked: 3,
+    };
+
+    it("stamps the envelope with the provider's repo context", async () => {
+      setLatestSnapshotRepoContextProvider(async () => fingerprint);
+      await writeLatestSnapshot(root, "sessionBriefing", { branch: "main" }, logger);
+
+      expect(readSnapshot("sessionBriefing").repo).toEqual(fingerprint);
+    });
+
+    it("omits repo when the provider resolves null (e.g. non-git workspace)", async () => {
+      setLatestSnapshotRepoContextProvider(async () => null);
+      await writeLatestSnapshot(root, "gitAnalytics", {}, logger);
+
+      expect(readSnapshot("gitAnalytics").repo).toBeUndefined();
+    });
+
+    it("a throwing provider degrades to no fingerprint — the snapshot still lands, with a warn", async () => {
+      setLatestSnapshotRepoContextProvider(async () => {
+        throw new Error("git exploded");
+      });
+      await writeLatestSnapshot(root, "hygieneAnalytics", { files: [] }, logger);
+
+      const parsed = readSnapshot("hygieneAnalytics");
+      expect(parsed.repo).toBeUndefined();
+      expect(parsed.report).toEqual({ files: [] });
+      expect(logger.getByLevel("warn").length).toBeGreaterThan(0);
+    });
   });
 
   it("serializes Date fields in the report to ISO strings", async () => {

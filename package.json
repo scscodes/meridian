@@ -178,6 +178,11 @@
         "title": "Reveal Latest Snapshots",
         "icon": "$(folder-opened)",
         "category": "Meridian"
+      },
+      {
+        "command": "meridian.latest.refresh",
+        "title": "Refresh Latest Snapshots",
+        "category": "Meridian"
       }
     ],
     "configuration": {
@@ -412,6 +417,10 @@
         },
         {
           "command": "meridian.latest.reveal",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "meridian.latest.refresh",
           "when": "workspaceFolderCount > 0"
         }
       ],

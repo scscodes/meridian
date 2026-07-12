@@ -176,6 +176,39 @@ new subsystem.
   "updated Nm ago" row descriptions (redrawn via `onLatestSnapshotWrite`)
   and never parses the JSON, so it cannot couple to the envelope shape.
 
+## Addendum (2026-07-12) — repo fingerprint and headless refresh
+
+Two additive extensions, both inside the v1 envelope contract (adding a
+field is non-breaking; only removal or re-meaning forces `v2`):
+
+1. **Envelope `repo` staleness fingerprint.** Each write stamps an optional
+   `repo: { branch, head, isDirty, staged, unstaged, untracked }` captured at
+   write time, resolved through an injectable provider registered at
+   activation from the GitProvider (this module still never imports `vscode`
+   or shells git). `generatedAt` only says *when* a snapshot was written;
+   `repo.head` lets an agent compare against `git rev-parse HEAD` and *know*
+   whether it predates recent commits. All-or-nothing and fail-soft: any
+   failed lookup omits the field entirely (absent = "not measured", never a
+   partial or fabricated fingerprint), and a provider failure can never lose
+   a snapshot.
+
+2. **Second sanctioned write path: `meridian.latest.refresh`.** The original
+   decision's weakness was that snapshots only refreshed when a *human
+   rendered a webview* — an agent could only ever read state as fresh as the
+   last click. `Meridian: Refresh Latest Snapshots`
+   (`src/presentation/latest-refresh.ts`) dispatches the three report
+   commands through the router and writes each result through the same
+   `writeLatestSnapshot()` chokepoint, opening no panel. Point 3's semantics
+   widen from "latest = last rendered" to **"latest = last computed"**
+   (render or explicit refresh); the handlers return the exact object a
+   webview would receive, so the two write paths cannot diverge. This does
+   *not* reopen the ADR 012 runtime-surface question: it is a user-triggered
+   command (palette / keybinding / task), pull-only — no daemon, no watcher,
+   no LM tool.
+
+`.meridian/AGENTS.md` documents both (new workspaces only — the file is
+never overwritten once present, by design).
+
 ## Cross-references
 
 - `src/infrastructure/latest-snapshot.ts` — `writeLatestSnapshot()`,

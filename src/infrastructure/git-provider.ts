@@ -330,6 +330,10 @@ class RealGitProvider implements GitProvider {
     return result;
   }
 
+  async getHeadCommit(): Promise<Result<string>> {
+    return git(["rev-parse", "HEAD"], this.workspaceRoot);
+  }
+
   async getRecentCommits(count: number): Promise<Result<RecentCommit[]>> {
     const logResult = await git(
       ["log", `-${count}`, "--pretty=format:%h|%s|%an", "--numstat"],

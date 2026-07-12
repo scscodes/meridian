@@ -28,10 +28,27 @@ export type LatestSnapshotKind = keyof typeof LATEST_SNAPSHOT_FILES;
 
 export const LATEST_SNAPSHOT_SCHEMA_VERSION = 1;
 
+/**
+ * Repository state captured at write time — the envelope's staleness
+ * fingerprint (ADR 020 addendum). An agent compares `head` against
+ * `git rev-parse HEAD` to detect a snapshot that predates recent commits.
+ * Declared explicitly (not derived from GitStatus) so the wire shape cannot
+ * silently widen if the internal type gains fields.
+ */
+export interface LatestSnapshotRepoContext {
+  branch: string;
+  head: string;
+  isDirty: boolean;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+}
+
 interface LatestSnapshotEnvelope {
   schemaVersion: typeof LATEST_SNAPSHOT_SCHEMA_VERSION;
   kind: LatestSnapshotKind;
   generatedAt: string;
+  repo?: LatestSnapshotRepoContext;
   report: unknown;
 }
 
@@ -52,16 +69,21 @@ off disk. No runtime integration or tool call is required.
 Each file is a JSON envelope:
 
 \`\`\`json
-{ "schemaVersion": 1, "kind": "sessionBriefing", "generatedAt": "<ISO 8601>", "report": { ... } }
+{ "schemaVersion": 1, "kind": "sessionBriefing", "generatedAt": "<ISO 8601>", "repo": { "branch": "main", "head": "<full sha>", "isDirty": false, "staged": 0, "unstaged": 0, "untracked": 0 }, "report": { ... } }
 \`\`\`
 
 ## Semantics
 
-- **Latest = last rendered.** Each file is overwritten in place whenever the
-  corresponding report webview renders (initial open, refresh, or filter).
-  There is no history — read history via \`.meridian/pulse/\` instead.
+- **Latest = last computed.** Each file is overwritten in place whenever the
+  corresponding report is computed — a webview render (initial open, refresh,
+  or filter) or the \`Meridian: Refresh Latest Snapshots\` command. There is
+  no history — read history via \`.meridian/pulse/\` instead.
 - **Freshness.** The envelope's \`generatedAt\` is the write time;
   \`report.generatedAt\` (when present) is when the report was computed.
+- **Staleness.** When present, \`repo\` captures repository state at write
+  time. Compare \`repo.head\` against \`git rev-parse HEAD\` to detect a
+  snapshot that predates recent commits; \`repo\` may be absent (not
+  measured), never fabricated.
 - **Absent optional fields mean "not measured," never zero.** Do not treat a
   missing field as a zero value.
 - **Open sets.** Flag \`id\`s and \`severity\` values may gain members within
@@ -123,6 +145,23 @@ async function writeFileIfMissing(filePath: string, content: string, logger: Log
  */
 let writeQueue: Promise<void> = Promise.resolve();
 
+export type LatestSnapshotRepoContextProvider = () => Promise<LatestSnapshotRepoContext | null>;
+
+let repoContextProvider: LatestSnapshotRepoContextProvider | null = null;
+
+/**
+ * Register the resolver for the envelope's `repo` staleness fingerprint —
+ * wired once at activation from the GitProvider (this module stays
+ * `vscode`-free and never shells git itself). `null` (or a provider that
+ * resolves null, e.g. a non-git workspace) simply omits the field: absent
+ * means "not measured", per the envelope's fail-soft field semantics.
+ */
+export function setLatestSnapshotRepoContextProvider(
+  provider: LatestSnapshotRepoContextProvider | null
+): void {
+  repoContextProvider = provider;
+}
+
 export type LatestSnapshotWriteListener = (kind: LatestSnapshotKind) => void;
 
 const writeListeners = new Set<LatestSnapshotWriteListener>();
@@ -170,10 +209,22 @@ export function writeLatestSnapshot(
     await writeFileIfMissing(path.join(latestDir, ".gitignore"), "*\n", logger);
     await writeFileIfMissing(path.join(workspaceRoot, MERIDIAN_DIR, AGENTS_MD_FILENAME), AGENTS_MD_CONTENT, logger);
 
+    // Fingerprint failure is isolated like the side files: a broken provider
+    // degrades to an envelope without `repo`, never a lost snapshot.
+    let repo: LatestSnapshotRepoContext | null = null;
+    if (repoContextProvider) {
+      try {
+        repo = await repoContextProvider();
+      } catch (e) {
+        logger.warn(`Latest-snapshot repo context failed for ${kind}: ${String(e)}`, "writeLatestSnapshot");
+      }
+    }
+
     const envelope: LatestSnapshotEnvelope = {
       schemaVersion: LATEST_SNAPSHOT_SCHEMA_VERSION,
       kind,
       generatedAt: new Date().toISOString(),
+      ...(repo ? { repo } : {}),
       report,
     };
 

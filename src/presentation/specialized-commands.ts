@@ -41,8 +41,9 @@ export function registerSpecializedCommands(
       if (!filePath) return;
       const filename = nodePath.basename(filePath);
       const confirm = await vscode.window.showWarningMessage(
-        `Delete "${filename}"? This cannot be undone.`,
-        { modal: true }, "Delete"
+        `Delete "${filename}"?`,
+        { modal: true, detail: "The file is moved to the OS trash where supported." },
+        "Delete"
       );
       if (confirm !== "Delete") return;
       const freshCtx = getCommandContext();

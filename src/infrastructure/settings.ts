@@ -40,6 +40,40 @@ export const SETTING_DEFAULTS = {
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingValue<K extends SettingKey> = typeof SETTING_DEFAULTS[K];
 
+/**
+ * What a (re)parse of `.meridian/settings.json` found wrong. All three are
+ * silently *ignored* at read time (fall-through semantics are the contract);
+ * the diagnostics exist so a typo'd key or mis-typed value is reported once
+ * instead of failing silently forever.
+ */
+export interface WorkspaceSettingsDiagnostics {
+  /** File-level failure: unreadable, malformed JSON, or not a JSON object. */
+  parseError?: string;
+  /** Keys with no SETTING_DEFAULTS counterpart (typo'd or retired). */
+  unknownKeys: string[];
+  /** Known keys whose value shape mismatches the typed default. */
+  mismatchedKeys: string[];
+}
+
+export type WorkspaceSettingsDiagnosticsListener = (
+  diagnostics: WorkspaceSettingsDiagnostics,
+  file: string
+) => void;
+
+let diagnosticsListener: WorkspaceSettingsDiagnosticsListener | null = null;
+
+/**
+ * Register the sink for settings-file diagnostics (main.ts wires the Meridian
+ * output channel). Invoked at most once per file change — parsing is keyed to
+ * the file's mtime, so a hot readSetting() path never re-emits. Listener
+ * errors are swallowed; reporting must never break a settings read.
+ */
+export function setWorkspaceSettingsDiagnosticsListener(
+  listener: WorkspaceSettingsDiagnosticsListener | null
+): void {
+  diagnosticsListener = listener;
+}
+
 let workspaceSettingsCache:
   | { mtime: number; root: string; values: Record<string, unknown> }
   | null = null;
@@ -54,32 +88,77 @@ function vscodeWorkspaceRoot(): string | undefined {
   }
 }
 
+/** Key-level audit of a parsed overrides object (file-level errors are handled by the caller). */
+function diagnoseOverrides(values: Record<string, unknown>): WorkspaceSettingsDiagnostics {
+  const unknownKeys: string[] = [];
+  const mismatchedKeys: string[] = [];
+  for (const [key, value] of Object.entries(values)) {
+    if (!(key in SETTING_DEFAULTS)) {
+      unknownKeys.push(key);
+    } else if (value !== null && !overrideMatchesDefault(value, key as SettingKey)) {
+      // JSON null is the documented "not supplied" idiom — never flagged.
+      mismatchedKeys.push(key);
+    }
+  }
+  return { unknownKeys, mismatchedKeys };
+}
+
+function emitDiagnostics(diagnostics: WorkspaceSettingsDiagnostics, file: string): void {
+  if (!diagnostics.parseError && diagnostics.unknownKeys.length === 0 && diagnostics.mismatchedKeys.length === 0) {
+    return;
+  }
+  try {
+    diagnosticsListener?.(diagnostics, file);
+  } catch {
+    // A broken listener must never break a settings read.
+  }
+}
+
 function readWorkspaceSettings(): Record<string, unknown> {
   const root = vscodeWorkspaceRoot();
   if (!root) return {};
   const file = path.join(root, MERIDIAN_DIR, "settings.json");
+
+  // An absent file is the normal case: no overrides, no diagnostic.
+  let stat: fs.Stats;
   try {
-    const stat = fs.statSync(file);
-    if (
-      workspaceSettingsCache &&
-      workspaceSettingsCache.root === root &&
-      workspaceSettingsCache.mtime === stat.mtimeMs
-    ) {
-      return workspaceSettingsCache.values;
-    }
-    const raw = fs.readFileSync(file, "utf-8");
-    const parsed: unknown = JSON.parse(raw);
-    const values: Record<string, unknown> =
-      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : {};
-    workspaceSettingsCache = { mtime: stat.mtimeMs, root, values };
-    return values;
+    stat = fs.statSync(file);
   } catch {
-    // Missing file, malformed JSON, ENOENT — all collapse to "no overrides".
     workspaceSettingsCache = null;
     return {};
   }
+
+  if (
+    workspaceSettingsCache &&
+    workspaceSettingsCache.root === root &&
+    workspaceSettingsCache.mtime === stat.mtimeMs
+  ) {
+    return workspaceSettingsCache.values;
+  }
+
+  // Cache miss = the file changed (or first read): parse once, audit once.
+  // A failed parse is cached against the same mtime so a malformed file is
+  // neither re-parsed nor re-reported on every readSetting() call.
+  let values: Record<string, unknown> = {};
+  let diagnostics: WorkspaceSettingsDiagnostics;
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"));
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      values = parsed as Record<string, unknown>;
+      diagnostics = diagnoseOverrides(values);
+    } else {
+      diagnostics = { parseError: "not a JSON object of key/value pairs", unknownKeys: [], mismatchedKeys: [] };
+    }
+  } catch (e) {
+    diagnostics = {
+      parseError: e instanceof Error ? e.message : String(e),
+      unknownKeys: [],
+      mismatchedKeys: [],
+    };
+  }
+  workspaceSettingsCache = { mtime: stat.mtimeMs, root, values };
+  emitDiagnostics(diagnostics, file);
+  return values;
 }
 
 // Shape check against the typed default. Rejects mismatched workspace-file

@@ -53,7 +53,7 @@ Trace the blast radius of a file or function change by analyzing imports, call s
 Open a dashboard displaying Hygiene analytics: prune candidates over time, file-type breakdown, disk impact (total and per-category), and age/size distributions. Configurable thresholds via workspace settings.
 
 ### File actions (sidebar / explorer context)
-- **Delete File** — remove a file flagged by the last scan (confirmation required).
+- **Delete File** — remove a file flagged by the last scan (confirmation required; the file is moved to the OS trash where supported, so a mis-click stays recoverable).
 - **Ignore File** — append the file's pattern to `.meridian/.meridianignore`.
 
 ### **hygiene.pruneStorage** (Meridian Storage)
@@ -64,7 +64,7 @@ Meridian polices its own storage ([ADR 019](./adr/019-pulse-and-retention.md)). 
 ## Sidebar Views & UI
 
 ### **Panel Reports View** (`meridian.reports.view`)
-First view in the Meridian activity-bar container — the anchored, first-class entry point for the three webview reports, in order: **Session Briefing**, **Git Analytics**, **Hygiene Analytics**. Report rows carry no glyphs by design. Single-click (or the hover **View** action, `$(open-preview)`) reveals a live panel without recomputing, or runs the report once if no panel is open. The hover **Refresh** action (`$(refresh)`) always recomputes. Each row shows a coarse freshness description ("just now", "5m ago", …) read from its `.meridian/latest/` snapshot mtime, redrawn on every snapshot write; the view-title **Reveal Latest Snapshots** action (`Meridian: Reveal Latest Snapshots`, also in the palette) reveals `latest/` in the Explorer ([ADR 020](./adr/020-latest-snapshot-contract.md)). The former in-tree "View Git Report" / "View Hygiene Report" nodes and the Git/Hygiene view-title report icons were removed — report entry now lives exclusively here.
+First view in the Meridian activity-bar container — the anchored, first-class entry point for the three webview reports, in order: **Session Briefing**, **Git Analytics**, **Hygiene Analytics**. Report rows carry no glyphs by design. Single-click (or the hover **View** action, `$(open-preview)`) reveals a live panel without recomputing, or runs the report once if no panel is open. The hover **Refresh** action (`$(refresh)`) always recomputes. Each row shows a coarse freshness description ("just now", "5m ago", …) read from its `.meridian/latest/` snapshot mtime, redrawn on every snapshot write; the view-title **Reveal Latest Snapshots** action (`Meridian: Reveal Latest Snapshots`, also in the palette) reveals `latest/` in the Explorer, and `Meridian: Refresh Latest Snapshots` recomputes all three reports and rewrites the snapshots without opening any panel — useful before pointing a coding agent at them ([ADR 020](./adr/020-latest-snapshot-contract.md)). The former in-tree "View Git Report" / "View Hygiene Report" nodes and the Git/Hygiene view-title report icons were removed — report entry now lives exclusively here.
 
 ### **Git View** (`meridian.git.view`)
 Browse current branch, dirty state, change groups (staged/unstaged/untracked, expandable to files), and recent commits. The Git Analytics report is reached via the Panel Reports view.
@@ -95,9 +95,9 @@ All features respect workspace settings under the `meridian.*` namespace, includ
 Per-workspace Meridian state lives under `.meridian/` at the workspace root (see [ADR 014](./adr/014-dotdir-doctrine.md)):
 
 - `.meridian/.meridianignore` — gitignore-syntax patterns excluded from hygiene scans. Editor syntax highlighting is provided via the built-in `ignore` language association. Legacy `.meridianignore` at the workspace root is auto-relocated on activation.
-- `.meridian/settings.json` — sparse JSON overrides for `meridian.*` settings. Present keys take precedence over VS Code user/workspace settings; absent keys fall through. Example: `{ "hygiene.prune.minAgeDays": 7 }`.
+- `.meridian/settings.json` — sparse JSON overrides for `meridian.*` settings. Present keys take precedence over VS Code user/workspace settings; absent keys fall through. Example: `{ "hygiene.prune.minAgeDays": 7 }`. Misconfigurations (unknown keys, wrong value types, malformed JSON) are still ignored at read time but reported once per file change in the `Meridian` output channel, so a typo never fails silently.
 - `.meridian/pulse/` — local, self-gitignored pulse history (`pulse.v1.jsonl`) behind the session briefing's pulse slice; self-capping, no maintenance needed ([ADR 019](./adr/019-pulse-and-retention.md)).
-- `.meridian/latest/` — local, self-gitignored, agent-readable snapshot of the three reports (`session-briefing.v1.json`, `git-analytics.v1.json`, `hygiene-analytics.v1.json`), each a `{ schemaVersion, kind, generatedAt, report }` envelope overwritten on every report render ("latest = last rendered"); no history, no runtime integration — coding agents read the files directly ([ADR 020](./adr/020-latest-snapshot-contract.md)).
+- `.meridian/latest/` — local, self-gitignored, agent-readable snapshot of the three reports (`session-briefing.v1.json`, `git-analytics.v1.json`, `hygiene-analytics.v1.json`), each a `{ schemaVersion, kind, generatedAt, repo?, report }` envelope overwritten on every report render and by `Meridian: Refresh Latest Snapshots` ("latest = last computed"); the optional `repo` field fingerprints repository state (branch, HEAD sha, dirty counts) at write time so agents can detect staleness against `git rev-parse HEAD`; no history, no runtime integration — coding agents read the files directly ([ADR 020](./adr/020-latest-snapshot-contract.md)).
 - `.meridian/AGENTS.md` — generated once on first snapshot write, documenting the `.meridian/latest/` contract and a paste-ready agent-rules snippet; never overwritten once present, safe to edit ([ADR 020](./adr/020-latest-snapshot-contract.md)).
 
 ---

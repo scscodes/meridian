@@ -69,6 +69,7 @@ export class MockGitProvider implements GitProvider {
 
   private allChanges: GitFileChange[] = [];
   private currentBranch = 'main';
+  private headCommit = '0123456789abcdef0123456789abcdef01234567';
   private remoteUrl = 'https://github.com/test/repo.git';
 
   // Override default values for tests
@@ -82,6 +83,10 @@ export class MockGitProvider implements GitProvider {
 
   setCurrentBranch(branch: string): void {
     this.currentBranch = branch;
+  }
+
+  setHeadCommit(sha: string): void {
+    this.headCommit = sha;
   }
 
   setRemoteUrl(url: string): void {
@@ -119,6 +124,10 @@ export class MockGitProvider implements GitProvider {
 
   async getCurrentBranch(): Promise<Result<string>> {
     return success(this.currentBranch);
+  }
+
+  async getHeadCommit(): Promise<Result<string>> {
+    return success(this.headCommit);
   }
 
   async getRecentCommits(_count: number): Promise<Result<RecentCommit[]>> {

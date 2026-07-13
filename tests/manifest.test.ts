@@ -32,12 +32,14 @@ const SPECIALIZED_COMMANDS = new Set([
 ]);
 
 /**
- * Palette-visible utility commands registered in tree-setup.ts. Distinct from
- * INFRASTRUCTURE_COMMANDS (which are enforced out of the palette) and from
- * SPECIALIZED_COMMANDS (whose home is specialized-commands.ts).
+ * Palette-visible utility commands registered in the presentation layer
+ * (tree-setup.ts, latest-refresh.ts). Distinct from INFRASTRUCTURE_COMMANDS
+ * (which are enforced out of the palette) and from SPECIALIZED_COMMANDS
+ * (whose home is specialized-commands.ts).
  */
 const PRESENTATION_UTILITY_COMMANDS = new Set([
-  "meridian.latest.reveal", // reveal-or-explain .meridian/latest/ (ADR 020)
+  "meridian.latest.reveal",  // reveal-or-explain .meridian/latest/ (ADR 020)
+  "meridian.latest.refresh", // headless recompute of .meridian/latest/ (ADR 020 addendum)
 ]);
 
 /** View lifecycle commands. No routing, no palette exposure. */

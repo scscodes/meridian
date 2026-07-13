@@ -109,6 +109,7 @@ export interface GitProvider {
   fetch(remote?: string): Promise<Result<void>>; // Fetch from remote without pulling (network-policy gated)
   getRemoteUrl(remote?: string): Promise<Result<string>>; // Get remote URL for generating diff links
   getCurrentBranch(): Promise<Result<string>>; // Get current branch name
+  getHeadCommit(): Promise<Result<string>>; // Full HEAD sha — staleness fingerprint for latest snapshots (ADR 020)
   getRecentCommits(count: number): Promise<Result<RecentCommit[]>>;
   getUntrackedFiles(): Promise<Result<string[]>>;
 }
